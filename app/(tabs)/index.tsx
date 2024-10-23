@@ -1,8 +1,18 @@
-import { Text, View, Image, Platform } from 'react-native';
+import { Text, View, Image, Platform, TouchableOpacity } from 'react-native';
 import { HelloWave } from '@/components/HelloWave';
 import ParallaxScrollView from '@/components/ParallaxScrollView';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'expo-router';
 
 export default function HomeScreen() {
+  const { resetAllStorage } = useAuth();
+  const router = useRouter();
+
+  const handleReset = async () => {
+    await resetAllStorage();
+    router.replace('/onboarding');
+  };
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
@@ -46,6 +56,15 @@ export default function HomeScreen() {
       <View className="p-4 bg-yellow-500">
         <Text className="text-white text-2xl">Kiểm tra NativeWind</Text>
       </View>
+      {/* Thêm nút Reset vào cuối */}
+      <TouchableOpacity 
+        className="p-4 bg-red-500 mx-4 rounded-lg mt-4"
+        onPress={handleReset}
+      >
+        <Text className="text-white text-center font-bold">
+          Reset App (Dev Only)
+        </Text>
+      </TouchableOpacity>
     </ParallaxScrollView>
   );
 }

@@ -1,21 +1,25 @@
 {
   "expo": {
-    "name": "BarBuddy-App",
-    "slug": "BarBuddy-App",
+    "name": "BarBuddy",
+    "slug": "BarBuddy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#000000"
     },
     "ios": {
+      "bundleIdentifier": "com.fptu.barbuddy",
+      "buildNumber": "1.0.0",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.fptu.barbuddy",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -31,6 +35,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "941c0537-b48d-4c75-b93d-5061f39ff9c5"
+      }
     }
   }
 }

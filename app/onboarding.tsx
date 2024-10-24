@@ -1,11 +1,13 @@
 import { useRouter } from 'expo-router';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Image, Text, View } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle,
   withTiming,
-  runOnJS
+  withSequence,
+  runOnJS,
+  cancelAnimation
 } from 'react-native-reanimated';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -13,31 +15,54 @@ const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { setIsFirstTime, isGuest, isLoading } = useAuth();
+  const { isGuest, isLoading } = useAuth();
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.3);
+  const hasNavigated = useRef(false);
 
   const navigateNext = () => {
-    if (isLoading) return;
+    if (isLoading || hasNavigated.current) return;
     
-    setIsFirstTime(false);
+    hasNavigated.current = true;
     const nextRoute = isGuest ? '/(tabs)' : '/(auth)/welcome';
     
-    opacity.value = withTiming(0, { duration: 200 }, (finished) => {
-      if (finished) {
-        runOnJS(router.replace)(nextRoute);
-      }
-    });
-    scale.value = withTiming(0.8, { duration: 200 });
+    setTimeout(() => {
+      router.replace(nextRoute);
+    }, 100);
   };
 
   useEffect(() => {
-    opacity.value = withTiming(1, { duration: 300 });
-    scale.value = withTiming(1, { duration: 300 });
+    let isMounted = true;
 
-    const timeout = setTimeout(navigateNext, 1500);
-    return () => clearTimeout(timeout);
-  }, [isLoading]);
+    const startAnimation = () => {
+      if (!isMounted) return;
+
+      opacity.value = withSequence(
+        withTiming(1, { duration: 150 }),
+        withTiming(1, { duration: 700 }),
+        withTiming(0, { duration: 150 }, (finished) => {
+          if (finished && isMounted) {
+            runOnJS(navigateNext)();
+          }
+        })
+      );
+
+      scale.value = withSequence(
+        withTiming(1, { duration: 150 }),
+        withTiming(1, { duration: 700 }),
+        withTiming(0.8, { duration: 150 })
+      );
+    };
+
+    const timeout = setTimeout(startAnimation, 100);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timeout);
+      cancelAnimation(opacity);
+      cancelAnimation(scale);
+    };
+  }, []);
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
@@ -54,7 +79,6 @@ export default function OnboardingScreen() {
         />
       </Animated.View>
       
-      {/* Version Text */}
       <View className="absolute bottom-10 w-full items-center">
         <Text className="text-white/50 text-sm">Version 1.0.0</Text>
       </View>

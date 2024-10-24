@@ -1,18 +1,13 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { UserInfo } from '@/types/auth';
+import { authService } from '@/services/auth';
 
 // Định nghĩa kiểu dữ liệu cho user
-type User = {
-  id: string;
-  email: string;
-  name: string;
-  avatar?: string;
-};
+type User = UserInfo;
 
 // Định nghĩa kiểu dữ liệu cho context
 type AuthContextType = {
-  isFirstTime: boolean;
-  setIsFirstTime: (value: boolean) => void;
   isAuthenticated: boolean;
   isGuest: boolean;
   setIsGuest: (value: boolean) => void;
@@ -28,56 +23,42 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_STORAGE_KEY = '@auth';
-const FIRST_TIME_KEY = '@first_time';
 const GUEST_MODE_KEY = '@guest_mode';  // Thêm dòng này
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [isFirstTime, setIsFirstTime] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isGuest, setIsGuest] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load trạng thái đã lưu
+  // Load trạng thái ngay khi component mount
   useEffect(() => {
     loadStoredAuth();
   }, []);
 
   const loadStoredAuth = async () => {
     try {
-      const [firstTimeValue, authValue, guestValue] = await Promise.all([
-        AsyncStorage.getItem(FIRST_TIME_KEY),
+      const [authValue, guestValue] = await Promise.all([
         AsyncStorage.getItem(AUTH_STORAGE_KEY),
         AsyncStorage.getItem(GUEST_MODE_KEY),
       ]);
 
-      if (firstTimeValue !== null) {
-        setIsFirstTime(JSON.parse(firstTimeValue));
-      }
-
       if (authValue !== null) {
         const authData = JSON.parse(authValue);
-        setIsAuthenticated(true);
-        setUser(authData.user);
+        if (authData.user) {
+          setUser(authData.user);
+          setIsAuthenticated(true);
+        }
       }
 
       if (guestValue !== null) {
         setIsGuest(JSON.parse(guestValue));
       }
     } catch (error) {
-      setError('Không thể tải thông tin đăng nhập');
+      console.error('Không thể tải thông tin đăng nhập:', error);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const updateIsFirstTime = async (value: boolean) => {
-    try {
-      await AsyncStorage.setItem(FIRST_TIME_KEY, JSON.stringify(value));
-      setIsFirstTime(value);
-    } catch (error) {
-      setError('Không thể cập nhật trạng thái');
     }
   };
 
@@ -86,23 +67,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(null);
 
-      // TODO: Thay thế bằng API call thực tế
-      const mockUser: User = {
-        id: '1',
-        email,
-        name: 'Test User',
-      };
+      const user = await authService.login({ email, password });
 
       // Lưu thông tin authentication
       await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-        user: mockUser,
-        // token: response.token
+        user
       }));
 
-      setUser(mockUser);
+      setUser(user);
       setIsAuthenticated(true);
-    } catch (error) {
-      setError('Đăng nhập thất bại');
+    } catch (error: any) {
+      setError(error.message);
       throw error;
     } finally {
       setIsLoading(false);
@@ -130,15 +105,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // TODO: Thay thế bằng API call thực tế
       const mockUser: User = {
-        id: '1',
-        email,
-        name,
+        accountId: '1',
+        fullname: name,
+        email: email,
+        phone: '',
+        image: '',
+        accessToken: '',
+        identityId: null,
+        role: 'CUSTOMER'
       };
 
       // Tự động đăng nhập sau khi đăng ký
       await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
         user: mockUser,
-        // token: response.token
       }));
 
       setUser(mockUser);
@@ -162,8 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetAllStorage = async () => {
     try {
-      await AsyncStorage.multiRemove([FIRST_TIME_KEY, AUTH_STORAGE_KEY, GUEST_MODE_KEY]);
-      setIsFirstTime(true);
+      await AsyncStorage.multiRemove([AUTH_STORAGE_KEY, GUEST_MODE_KEY]);
       setIsAuthenticated(false);
       setIsGuest(false);
       setUser(null);
@@ -175,11 +153,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        isFirstTime,
-        setIsFirstTime: updateIsFirstTime,
         isAuthenticated,
         isGuest,
-        setIsGuest: updateGuestMode,  // Thay đổi dòng này
+        setIsGuest: updateGuestMode,
         isLoading,
         user,
         login,

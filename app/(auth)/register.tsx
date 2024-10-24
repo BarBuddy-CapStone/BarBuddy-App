@@ -11,6 +11,7 @@ import Animated, {
   runOnJS
 } from 'react-native-reanimated';
 import { KeyboardTypeOptions } from 'react-native';
+import { FadeIn, FadeOut } from 'react-native-reanimated';
 
 // Thêm interface InputFieldProps
 interface InputFieldProps {
@@ -103,21 +104,13 @@ export default function RegisterScreen() {
   }, []);
 
   const handleBack = () => {
-    opacity.value = withTiming(0, { duration: 200 }, (finished) => {
-      if (finished) {
-        runOnJS(router.back)();
-      }
-    });
+    router.replace('/(auth)/welcome');
   };
 
   const handleRegister = async () => {
     try {
       await register(email, password, name);
-      opacity.value = withTiming(0, { duration: 200 }, (finished) => {
-        if (finished) {
-          runOnJS(router.replace)('/(tabs)');
-        }
-      });
+      router.replace('/(tabs)');
     } catch (err) {
       // Error đã được xử lý trong AuthContext
     }
@@ -128,7 +121,11 @@ export default function RegisterScreen() {
   }));
 
   return (
-    <Animated.View style={animatedStyle} className="flex-1 bg-black">
+    <Animated.View 
+      entering={FadeIn.duration(200)} 
+      exiting={FadeOut.duration(200)} 
+      className="flex-1 bg-black"
+    >
       <Image 
         source={require('../../assets/images/bar-background.png')} 
         className="absolute w-full h-full opacity-20"

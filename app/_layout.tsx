@@ -31,14 +31,10 @@ function RootLayoutNav() {
     }
 
     if (!inOnboarding) {
-      if (isAuthenticated || isGuest) {
-        if (!inTabsGroup) {
-          router.replace('/(tabs)');
-        }
-      } else {
-        if (!inAuthGroup) {
-          router.replace('/(auth)/welcome');
-        }
+      if (isAuthenticated && !inTabsGroup) {
+        router.replace('/(tabs)');
+      } else if (!isAuthenticated && !isGuest && !inAuthGroup) {
+        router.replace('/(auth)/welcome');
       }
     }
   }, [isAuthenticated, isGuest, segments, isLoading]);

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserInfo } from '@/types/auth';
 import { authService } from '@/services/auth';
+import axios from 'axios'; // Thêm import axios
 
 // Định nghĩa kiểu dữ liệu cho user
 type User = UserInfo;
@@ -86,15 +87,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      setIsLoading(true);
-      // TODO: Gọi API logout nếu cần
-      await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
-      setIsAuthenticated(false);
+      // Xóa user từ state
       setUser(null);
+      setIsAuthenticated(false); // Thêm dòng này
+      
+      // Xóa token và thông tin user từ AsyncStorage
+      await AsyncStorage.multiRemove([
+        AUTH_STORAGE_KEY,
+        GUEST_MODE_KEY,
+        // Thêm các key khác nếu có lưu thêm thông tin
+      ]);
+      
+      // Xóa token khỏi header của axios
+      delete axios.defaults.headers.common['Authorization'];
     } catch (error) {
-      setError('Đăng xuất thất bại');
-    } finally {
-      setIsLoading(false);
+      console.error('Error during logout:', error);
+      throw error;
     }
   };
 

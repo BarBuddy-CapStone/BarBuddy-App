@@ -12,6 +12,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { validateEmail, validatePassword } from '@/utils/validation';
 import { ScrollView } from 'react-native';
+import { FadeIn, FadeOut } from 'react-native-reanimated';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -28,11 +29,7 @@ export default function LoginScreen() {
   }, []);
 
   const handleBack = () => {
-    opacity.value = withTiming(0, { duration: 200 }, (finished) => {
-      if (finished) {
-        runOnJS(router.back)();
-      }
-    });
+    router.replace('/(auth)/welcome');
   };
 
   const handleLogin = async () => {
@@ -54,11 +51,7 @@ export default function LoginScreen() {
       }
 
       await login(email, password);
-      opacity.value = withTiming(0, { duration: 200 }, (finished) => {
-        if (finished) {
-          runOnJS(router.replace)('/(tabs)');
-        }
-      });
+      router.replace('/(tabs)');
     } catch (err: any) {
       setError(err.message);
     }
@@ -73,7 +66,11 @@ export default function LoginScreen() {
   }));
 
   return (
-    <Animated.View style={animatedStyle} className="flex-1 bg-black">
+    <Animated.View 
+      entering={FadeIn.duration(200)} 
+      exiting={FadeOut.duration(200)} 
+      className="flex-1 bg-black"
+    >
       <Image 
         source={require('../../assets/images/bar-background.png')} 
         className="absolute w-full h-full opacity-20"

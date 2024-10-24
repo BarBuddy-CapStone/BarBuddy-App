@@ -39,12 +39,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="check-in"
+        name="booking-history"
         options={{
-          title: 'Check-In',
+          title: 'Lịch sử',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'qr-code' : 'qr-code-outline'} 
+              name={focused ? 'calendar' : 'calendar-outline'} 
               size={24} 
               color={color} 
             />

@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { barService, type Bar } from '@/services/bar';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { drinkService, type Drink } from '@/services/drink';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -153,10 +153,11 @@ export default function HomeScreen() {
                     <TouchableOpacity 
                       className="w-72 overflow-hidden"
                       activeOpacity={0.7}
+                      onPress={() => router.push(`./bar-detail/${bar.barId}`)}
                     >
                       <View className="relative">
                         <Image
-                          source={{ uri: bar.images }}
+                          source={{ uri: bar.images.split(',')[0].trim() }} // Lấy ảnh đầu tiên làm ảnh đại diện
                           className="w-full h-[380px] rounded-3xl"
                           resizeMode="cover"
                         />

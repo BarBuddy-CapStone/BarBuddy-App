@@ -10,54 +10,32 @@ import { View } from 'react-native';
 SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
-  const { isAuthenticated, isGuest, isLoading } = useAuth();
+  const { isAuthenticated, isGuest, isLoading, allowNavigation } = useAuth();
   const segments = useSegments();
   const router = useRouter();
-  const initialRoute = useRef(true);
 
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !allowNavigation) return;
 
     const inAuthGroup = segments[0] === '(auth)';
     const inTabsGroup = segments[0] === '(tabs)';
-    const inOnboarding = segments[0] === 'onboarding';
 
-    if (initialRoute.current) {
-      initialRoute.current = false;
-      requestAnimationFrame(() => {
-        router.replace('/onboarding');
-      });
-      return;
+    if (
+      (inAuthGroup && isAuthenticated) ||
+      (inTabsGroup && !isAuthenticated && !isGuest)
+    ) {
+      router.replace(isAuthenticated ? '/(tabs)' : '/(auth)/welcome');
     }
-
-    if (!inOnboarding) {
-      if (isAuthenticated && !inTabsGroup) {
-        router.replace('/(tabs)');
-      } else if (!isAuthenticated && !isGuest && !inAuthGroup) {
-        router.replace('/(auth)/welcome');
-      }
-    }
-  }, [isAuthenticated, isGuest, segments, isLoading]);
+  }, [isAuthenticated, isGuest, segments, isLoading, allowNavigation]);
 
   return (
     <ThemeProvider value={DarkTheme}>
-      <Stack 
-        screenOptions={{ 
-          headerShown: false,
-          animation: 'fade',
-          animationDuration: 300,
-          contentStyle: {
-            backgroundColor: 'black'
-          }
-        }}
-      >
-        <Stack.Screen 
-          name="onboarding"
-          options={{
-            animation: 'none',
-            gestureEnabled: false
-          }}
-        />
+      <Stack screenOptions={{
+        headerShown: false,
+        contentStyle: { backgroundColor: 'black' },
+        animation: 'fade',
+      }}>
+        <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(auth)" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
       </Stack>

@@ -452,6 +452,11 @@ export default function BarDetailScreen() {
               <TouchableOpacity
                 className="bg-yellow-500 p-3 rounded-xl mx-4 mb-2"
                 activeOpacity={0.8}
+                onPress={() => {
+                  if (barDetail?.barId) {
+                    router.push(`/booking-table/${barDetail.barId}` as any);
+                  }
+                }}
                 style={{
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 2 },

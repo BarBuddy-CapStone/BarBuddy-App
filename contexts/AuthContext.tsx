@@ -19,6 +19,7 @@ type AuthContextType = {
   register: (email: string, password: string, name: string) => Promise<void>;
   error: string | null;
   resetAllStorage: () => Promise<void>;
+  allowNavigation: boolean;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +33,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Thêm state mới
+  const [allowNavigation, setAllowNavigation] = useState(true);
 
   // Load trạng thái ngay khi component mount
   useEffect(() => {
@@ -75,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user
       }));
 
+      await AsyncStorage.setItem('userToken', user.accessToken);
       setUser(user);
       setIsAuthenticated(true);
     } catch (error: any) {
@@ -171,6 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         error,
         resetAllStorage,
+        allowNavigation,
       }}>
       {children}
     </AuthContext.Provider>

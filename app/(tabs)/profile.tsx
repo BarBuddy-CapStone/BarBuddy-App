@@ -37,6 +37,12 @@ export default function ProfileScreen() {
     fetchAccount();
   }, [user?.accountId]);
 
+  useEffect(() => {
+    if (user?.accountId) {
+      setIsGuest(false); // Đảm bảo isGuest được set false khi có user
+    }
+  }, [user?.accountId, setIsGuest]);
+
   const handleLogoutConfirm = async () => {
     try {
       setLoggingOut(true);
@@ -77,54 +83,57 @@ export default function ProfileScreen() {
     </View>
   );
 
-  // Component cho Guest Mode
+  // Thay thế component GuestView hiện tại bằng phiên bản mới này
   const GuestView = () => {
-    const handleNavigateToAuth = async (screen: 'login' | 'register') => {
-      try {
-        // Tắt chế độ khách và điều hướng ngay lập tức
-        setIsGuest(false);
-        router.replace(`/(auth)/${screen}`);
-      } catch (error) {
-        console.error('Error navigating to auth:', error);
-      }
-    };
-
     return (
-      <Animated.View entering={FadeIn} className="flex-1 p-6">
-        <View className="items-center mb-8">
-          <View className="w-24 h-24 bg-white/10 rounded-full items-center justify-center">
-            <Ionicons name="person-outline" size={48} color="#EAB308" />
-          </View>
-          <Text className="text-white text-xl font-bold mt-4">
-            Chào mừng bạn đến với Bar Buddy
+      <View className="flex-1">
+        <View className="flex-1 items-center justify-center p-6">
+          <Ionicons name="lock-closed-outline" size={64} color="#EAB308" />
+          <Text className="text-white text-xl font-bold mt-6 text-center">
+            Đăng nhập để xem hồ sơ
           </Text>
-          <Text className="text-white/60 text-center mt-2">
-            Đăng nhập hoặc đăng ký để trải nghiệm đầy đủ tính năng
+          <Text className="text-white/60 text-center mt-2 mb-6">
+            Bạn cần đăng nhập để xem và quản lý thông tin cá nhân
           </Text>
-        </View>
-
-        <View className="space-y-4">
-          <TouchableOpacity 
-            onPress={() => handleNavigateToAuth('login')}
-            className="w-full bg-yellow-500 py-4 rounded-full items-center"
+          
+          <TouchableOpacity
+            className="bg-yellow-500 w-full py-3 rounded-xl"
+            onPress={() => router.push('/login')}
           >
-            <Text className="text-neutral-800 font-bold text-lg">
-              Đăng nhập
+            <Text className="text-black font-bold text-center text-lg">
+              Đăng nhập ngay
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            onPress={() => handleNavigateToAuth('register')}
-            className="w-full border border-white py-4 rounded-full items-center"
+          <TouchableOpacity
+            className="mt-4 w-full py-3 rounded-xl border border-yellow-500"
+            onPress={() => router.push('/register')}
           >
-            <Text className="text-white font-bold text-lg">
-              Đăng ký
+            <Text className="text-yellow-500 font-bold text-center text-lg">
+              Đăng ký tài khoản
             </Text>
           </TouchableOpacity>
         </View>
-      </Animated.View>
+      </View>
     );
   };
+
+  if (isGuest || !user?.accountId) {
+    return (
+      <View className="flex-1 bg-black">
+        <SafeAreaView className="flex-1">
+          <View className="px-6 py-4 border-b border-white/10">
+            <Text className="text-yellow-500 text-2xl font-bold">
+              Hồ sơ
+            </Text>
+          </View>
+          <View className="flex-1 justify-center">
+            <GuestView />
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-black">
@@ -142,135 +151,112 @@ export default function ProfileScreen() {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh}
-              enabled={!isGuest} // Disable refresh khi ở guest mode
+              enabled={!isGuest}
+              tintColor="#EAB308"
             />
           }
         >
-          {isGuest ? (
-            <GuestView />
+          {loading ? (
+            <ProfileSkeleton />
           ) : (
-            loading ? (
-              <ProfileSkeleton />
-            ) : (
-              <Animated.View entering={FadeIn} className="p-6">
-                {/* Profile Info */}
-                <View className="items-center mb-8">
-                  <Image 
-                    source={{ uri: account?.image }} 
-                    className="w-24 h-24 rounded-full"
-                  />
-                  <Text className="text-white text-xl font-bold mt-4">
-                    {account?.fullname}
-                  </Text>
-                  <Text className="text-white/60">
-                    {account?.email}
-                  </Text>
-                </View>
+            <Animated.View entering={FadeIn} className="p-6">
+              {/* Profile Info */}
+              <View className="items-center mb-8">
+                <Image 
+                  source={{ uri: account?.image }} 
+                  className="w-24 h-24 rounded-full"
+                />
+                <Text className="text-white text-xl font-bold mt-4">
+                  {account?.fullname}
+                </Text>
+                <Text className="text-white/60">
+                  {account?.email}
+                </Text>
+              </View>
 
-                {/* Menu Items */}
-                <View className="space-y-4">
-                  <TouchableOpacity className="flex-row items-center bg-white/5 p-4 rounded-xl">
-                    <Ionicons name="person-outline" size={24} color="#EAB308" />
-                    <View className="flex-1 ml-3">
-                      <Text className="text-white font-medium">Thông tin cá nhân</Text>
-                      <Text className="text-white/60 text-sm">Cập nhật thông tin của bạn</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={24} color="white" />
-                  </TouchableOpacity>
+              {/* Menu Items */}
+              <View className="space-y-4">
+                <TouchableOpacity className="flex-row items-center bg-white/5 p-4 rounded-xl">
+                  <Ionicons name="person-outline" size={24} color="#EAB308" />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-white font-medium">Thông tin cá nhân</Text>
+                    <Text className="text-white/60 text-sm">Cập nhật thông tin của bạn</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="white" />
+                </TouchableOpacity>
 
-                  <TouchableOpacity className="flex-row items-center bg-white/5 p-4 rounded-xl">
-                    <Ionicons name="time-outline" size={24} color="#EAB308" />
-                    <View className="flex-1 ml-3">
-                      <Text className="text-white font-medium">Lịch sử giao dịch</Text>
-                      <Text className="text-white/60 text-sm">Xem lại các giao dịch của bạn</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={24} color="white" />
-                  </TouchableOpacity>
+                <TouchableOpacity className="flex-row items-center bg-white/5 p-4 rounded-xl">
+                  <Ionicons name="time-outline" size={24} color="#EAB308" />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-white font-medium">Lịch sử giao dịch</Text>
+                    <Text className="text-white/60 text-sm">Xem lại các giao dịch của bạn</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color="white" />
+                </TouchableOpacity>
 
-                  {/* <TouchableOpacity className="flex-row items-center bg-white/5 p-4 rounded-xl">
-                    <Ionicons name="settings-outline" size={24} color="#EAB308" />
-                    <View className="flex-1 ml-3">
-                      <Text className="text-white font-medium">Cài đặt</Text>
-                      <Text className="text-white/60 text-sm">Thông báo, bảo mật</Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={24} color="white" />
-                  </TouchableOpacity> */}
-
-                  <TouchableOpacity 
-                    onPress={handleLogout}
-                    disabled={loggingOut}
-                    className="flex-row items-center bg-red-500/10 p-4 rounded-xl"
-                  >
-                    <Ionicons name="log-out-outline" size={24} color="#EF4444" />
-                    <View className="flex-1 ml-3">
-                      <Text className="text-red-500 font-medium">
-                        Đăng xuất
-                      </Text>
-                      <Text className="text-red-500/60 text-sm">
-                        Tạm biệt!
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            )
+                <TouchableOpacity 
+                  onPress={handleLogout}
+                  disabled={loggingOut}
+                  className="flex-row items-center bg-red-500/10 p-4 rounded-xl"
+                >
+                  <Ionicons name="log-out-outline" size={24} color="#EF4444" />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-red-500 font-medium">
+                      Đăng xuất
+                    </Text>
+                    <Text className="text-red-500/60 text-sm">
+                      Tạm biệt!
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
           )}
         </ScrollView>
 
         {/* Logout Modal */}
-        {!isGuest && (
-          <Modal
-            animationType="fade"
-            transparent={true}
-            visible={showLogoutModal}
-            onRequestClose={() => setShowLogoutModal(false)}
-          >
-            <View className="flex-1 bg-black/50 justify-center items-center">
-              <View className="bg-neutral-900 m-6 p-6 rounded-3xl w-[85%]">
-                <View className="items-center mb-6">
-                  <View className="w-16 h-16 bg-red-500/10 rounded-full items-center justify-center mb-4">
-                    <Ionicons name="log-out-outline" size={32} color="#EF4444" />
-                  </View>
-                  <Text className="text-white text-xl font-bold mb-2">
-                    Xác nhận đăng xuất
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={showLogoutModal}
+          onRequestClose={() => setShowLogoutModal(false)}
+        >
+          <View className="flex-1 bg-black/50 justify-center items-center p-6">
+            <View className="bg-neutral-900 w-full rounded-2xl p-6">
+              <Text className="text-white text-xl font-bold text-center mb-2">
+                Đăng xuất
+              </Text>
+              <Text className="text-white/60 text-center mb-6">
+                Bạn có chắc chắn muốn đăng xuất?
+              </Text>
+              
+              <View className="flex-row space-x-3">
+                <TouchableOpacity
+                  className="flex-1 bg-white/10 py-3 rounded-xl"
+                  onPress={() => setShowLogoutModal(false)}
+                >
+                  <Text className="text-white font-bold text-center">
+                    Hủy
                   </Text>
-                  <Text className="text-white/60 text-center">
-                    Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?
-                  </Text>
-                </View>
-
-                <View className="flex-row space-x-3">
-                  <TouchableOpacity
-                    onPress={() => setShowLogoutModal(false)}
-                    disabled={loggingOut}
-                    className="flex-1 py-4 rounded-2xl bg-white/5"
-                  >
-                    <Text className="text-white font-medium text-center">
-                      Hủy
+                </TouchableOpacity>
+                
+                <TouchableOpacity
+                  className="flex-1 bg-red-500 py-3 rounded-xl"
+                  onPress={handleLogoutConfirm}
+                  disabled={loggingOut}
+                >
+                  {loggingOut ? (
+                    <ActivityIndicator color="white" />
+                  ) : (
+                    <Text className="text-white font-bold text-center">
+                      Đăng xuất
                     </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={handleLogoutConfirm}
-                    disabled={loggingOut}
-                    className="flex-1 py-4 rounded-2xl bg-red-500"
-                  >
-                    {loggingOut ? (
-                      <ActivityIndicator color="white" />
-                    ) : (
-                      <Text className="text-white font-medium text-center">
-                        Đăng xuất
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
+                  )}
+                </TouchableOpacity>
               </View>
             </View>
-          </Modal>
-        )}
-        
-        {/* Toast Message */}
-        <Toast />
+          </View>
+        </Modal>
       </SafeAreaView>
     </View>
   );

@@ -38,6 +38,12 @@ export interface BookingTableRequest {
   tableIds: string[];
 }
 
+// Thêm hàm xử lý images ở đầu file
+const getImageArray = (imagesString: string): string[] => {
+  if (!imagesString) return [];
+  return imagesString.split(',').map(img => img.trim()).filter(img => img !== '');
+};
+
 export default function BookingTableScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -82,7 +88,7 @@ export default function BookingTableScreen() {
       selectedDate.getMonth() === now.getMonth() &&
       selectedDate.getFullYear() === now.getFullYear();
 
-    // Thêm khung giờ đêm trước (0h-3h của ngày được chọn)
+    // Thêm khung giờ đêm trớc (0h-3h của ngày được chọn)
     if (!isToday || (isToday && currentHour < endHour % 24)) {
       for (let hour = 0; hour < endHour % 24; hour++) {
         if (!isToday || hour > currentHour || (hour === currentHour && currentMinute <= 30)) {
@@ -309,6 +315,65 @@ export default function BookingTableScreen() {
               Đặt bàn
             </Text>
           </View>
+        </View>
+
+        {/* Thông tin quán */}
+        <View className="bg-neutral-900 px-6 py-6 border-b border-white/10">
+          {barDetail ? (
+            <View>
+              <View className="flex-row items-center mb-4">
+                <Image 
+                  source={{ 
+                    uri: getImageArray(barDetail.images)[0] || 'https://placehold.co/64x64/333/FFF?text=Bar'
+                  }} 
+                  className="w-16 h-16 rounded-xl"
+                  onError={() => {
+                    // Không cần xử lý onError vì đã có fallback trong uri
+                  }}
+                />
+                <View className="ml-4 flex-1">
+                  <Text className="text-white text-xl font-bold mb-1">
+                    {barDetail.barName}
+                  </Text>
+                  <View className="flex-row items-center">
+                    <Ionicons name="location" size={16} color="#EAB308" />
+                    <Text className="text-white/60 ml-1 flex-1">
+                      {barDetail.address}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View className="flex-row justify-between">
+                <View className="flex-row items-center">
+                  <Ionicons name="time-outline" size={16} color="#EAB308" />
+                  <Text className="text-white/60 ml-1">
+                    {barDetail.startTime} - {barDetail.endTime}
+                  </Text>
+                </View>
+                <View className="flex-row items-center">
+                  <Ionicons name="call-outline" size={16} color="#EAB308" />
+                  <Text className="text-white/60 ml-1">
+                    {barDetail.phoneNumber}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View className="animate-pulse">
+              <View className="flex-row items-center mb-4">
+                <View className="w-16 h-16 rounded-xl bg-white/10" />
+                <View className="ml-4 flex-1">
+                  <View className="h-6 bg-white/10 rounded w-3/4 mb-2" />
+                  <View className="h-4 bg-white/10 rounded w-1/2" />
+                </View>
+              </View>
+              <View className="flex-row justify-between">
+                <View className="h-4 bg-white/10 rounded w-1/3" />
+                <View className="h-4 bg-white/10 rounded w-1/3" />
+              </View>
+            </View>
+          )}
         </View>
 
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 150 }}>

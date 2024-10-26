@@ -7,6 +7,7 @@ import { accountService, type Account } from '@/services/account';
 import { router } from 'expo-router';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function ProfileScreen() {
   const { user, logout, isGuest, setIsGuest } = useAuth();
@@ -113,6 +114,33 @@ export default function ProfileScreen() {
               Đăng ký tài khoản
             </Text>
           </TouchableOpacity>
+
+          {/* Thêm nút Reset App */}
+          <TouchableOpacity 
+            onPress={() => {
+              // Reset toàn bộ app state
+              setAccount(null);
+              setIsGuest(true);
+              logout();
+              // Clear storage
+              AsyncStorage.clear();
+              // Redirect về màn welcome
+              router.replace('/(auth)/welcome');
+              // Hiển thị thông báo
+              Toast.show({
+                type: 'success',
+                text1: 'Đã reset ứng dụng',
+                text2: 'Tất cả dữ liệu đã được xóa',
+                position: 'bottom'
+              });
+            }}
+            className="mt-8 flex-row items-center justify-center bg-orange-500/10 py-3 px-4 rounded-xl"
+          >
+            <Ionicons name="refresh-circle-outline" size={24} color="#F97316" />
+            <Text className="text-orange-500 font-medium ml-2">
+              Reset App
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -192,6 +220,37 @@ export default function ProfileScreen() {
                     <Text className="text-white/60 text-sm">Xem lại các giao dịch của bạn</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={24} color="white" />
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  onPress={() => {
+                    // Reset toàn bộ app state
+                    setAccount(null);
+                    setIsGuest(true);
+                    logout();
+                    // Clear storage nếu cần
+                    AsyncStorage.clear();
+                    // Redirect về màn welcome
+                    router.replace('/(auth)/welcome');
+                    // Hiển thị thông báo
+                    Toast.show({
+                      type: 'success',
+                      text1: 'Đã reset ứng dụng',
+                      text2: 'Tất cả dữ liệu đã được xóa',
+                      position: 'bottom'
+                    });
+                  }}
+                  className="flex-row items-center bg-orange-500/10 p-4 rounded-xl"
+                >
+                  <Ionicons name="refresh-circle-outline" size={24} color="#F97316" />
+                  <View className="flex-1 ml-3">
+                    <Text className="text-orange-500 font-medium">
+                      Reset App
+                    </Text>
+                    <Text className="text-orange-500/60 text-sm">
+                      Xóa tất cả dữ liệu và reset ứng dụng
+                    </Text>
+                  </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity 

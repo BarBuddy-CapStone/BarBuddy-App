@@ -53,18 +53,28 @@ export type BarDetail = {
 };
 
 export interface IBarService {
-  getBars(pageIndex?: number, pageSize?: number): Promise<Bar[]>;
+  getBars(pageIndex?: number, pageSize?: number, search?: string): Promise<Bar[]>;
   getBarDetail(barId: string): Promise<BarDetail | null>;
 }
 
 class BarService implements IBarService {
-  async getBars(pageIndex: number = 1, pageSize: number = 10): Promise<Bar[]> {
+  async getBars(pageIndex: number = 1, pageSize: number = 10, search?: string): Promise<Bar[]> {
     try {
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/v1/bars?PageIndex=${pageIndex}&PageSize=${pageSize}`
-      );
-      return response.data.data;
+      let url = `${API_CONFIG.BASE_URL}/api/v1/bars?PageIndex=${pageIndex}&PageSize=${pageSize}`;
+      if (search) {
+        url += `&Search=${encodeURIComponent(search)}`;
+      }
+      
+      const response = await axios.get(url);
+      return response.data.data || []; // Trả về mảng rỗng nếu data là null
+
     } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        // Nếu status là 404, trả về mảng rỗng thay vì coi là lỗi
+        return [];
+      }
+
+      // Log các lỗi khác
       console.error('Error fetching bars:', error);
       return [];
     }

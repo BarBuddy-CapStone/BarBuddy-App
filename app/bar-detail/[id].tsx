@@ -15,6 +15,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { barService, type BarDetail } from '@/services/bar';
 import { drinkService, type Drink } from '@/services/drink';
+import ImageView from 'react-native-image-viewing';
 
 // Thêm hàm xử lý images
 const getImageArray = (imagesString: string): string[] => {
@@ -150,6 +151,10 @@ export default function BarDetailScreen() {
   const screenWidth = Dimensions.get('window').width;
   const [drinks, setDrinks] = useState<Drink[]>([]);
 
+  // Thêm state để quản lý modal preview
+  const [isImageViewVisible, setIsImageViewVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
   useEffect(() => {
     fetchBarDetail();
     fetchDrinks();
@@ -193,6 +198,9 @@ export default function BarDetailScreen() {
   // Thêm constant cho tỷ lệ 16:9
   const ASPECT_RATIO = 16 / 9;
   const imageHeight = screenWidth / ASPECT_RATIO;
+
+  // Chuyển đổi mảng ảnh sang định dạng phù hợp với ImageView
+  const imageViewImages = images.map(uri => ({ uri }));
 
   return (
     <View className="flex-1 bg-black">
@@ -342,8 +350,16 @@ export default function BarDetailScreen() {
                         );
                         setCurrentImageIndex(newIndex);
                       }}
-                      renderItem={({ item }) => (
-                        <View style={{ width: screenWidth - 48 }} className="pr-2">
+                      renderItem={({ item, index }) => (
+                        <TouchableOpacity 
+                          activeOpacity={0.9}
+                          onPress={() => {
+                            setSelectedImageIndex(index);
+                            setIsImageViewVisible(true);
+                          }}
+                          style={{ width: screenWidth - 48 }} 
+                          className="pr-2"
+                        >
                           <Image
                             source={{ uri: item }}
                             style={{ 
@@ -353,11 +369,17 @@ export default function BarDetailScreen() {
                             className="rounded-xl"
                             resizeMode="cover"
                           />
-                        </View>
+                          {/* Thêm overlay mờ và icon để chỉ ra ảnh có thể click */}
+                          <View className="absolute inset-0 bg-black/10 rounded-xl items-center justify-center">
+                            <View className="bg-black/30 rounded-full p-2">
+                              <Ionicons name="expand-outline" size={20} color="white" />
+                            </View>
+                          </View>
+                        </TouchableOpacity>
                       )}
                     />
                     
-                    {/* Pagination Dots */}
+                    {/* Pagination Dots giữ nguyên */}
                     <View className="mt-4 w-full flex-row justify-center space-x-2">
                       {images.map((_, index) => (
                         <View
@@ -370,6 +392,33 @@ export default function BarDetailScreen() {
                     </View>
                   </View>
                 </View>
+
+                {/* Image Viewer Modal */}
+                <ImageView
+                  images={imageViewImages}
+                  imageIndex={selectedImageIndex}
+                  visible={isImageViewVisible}
+                  onRequestClose={() => setIsImageViewVisible(false)}
+                  swipeToCloseEnabled={true}
+                  doubleTapToZoomEnabled={true}
+                  presentationStyle="overFullScreen"
+                  animationType="fade"
+                  HeaderComponent={({ imageIndex }) => (
+                    <SafeAreaView edges={['top']}>
+                      <View className="w-full flex-row justify-between items-center px-4 py-2">
+                        <TouchableOpacity
+                          onPress={() => setIsImageViewVisible(false)}
+                          className="bg-black/50 rounded-full p-2"
+                        >
+                          <Ionicons name="close" size={24} color="white" />
+                        </TouchableOpacity>
+                        <Text className="text-white font-medium">
+                          {imageIndex + 1} / {images.length}
+                        </Text>
+                      </View>
+                    </SafeAreaView>
+                  )}
+                />
 
                 {/* Drinks */}
                 <View className="mt-8">

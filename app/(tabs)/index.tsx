@@ -1,13 +1,16 @@
 import { View, Text, TouchableOpacity, Image, ScrollView, RefreshControl, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { barService, type Bar } from '@/services/bar';
 import { Link, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { drinkService, type Drink } from '@/services/drink';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { Dimensions } from 'react-native';
+
+const screenWidth = Dimensions.get('window').width;
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -17,6 +20,8 @@ export default function HomeScreen() {
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [randomDrinks, setRandomDrinks] = useState<Drink[]>([]);
   const [loadingDrinks, setLoadingDrinks] = useState(true);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const bannerRef = useRef<FlatList>(null);
 
   const fetchBars = async () => {
     setLoading(true);
@@ -96,6 +101,66 @@ export default function HomeScreen() {
     </View>
   );
 
+  const BannerSlider = () => {
+    const [scrollPosition, setScrollPosition] = useState(0);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+      // Chỉ bắt đầu auto scroll khi có dữ liệu
+      if (bars.length > 0) {
+        timeoutRef.current = setInterval(() => {
+          const nextPosition = scrollPosition + screenWidth;
+          // Nếu đã đến cuối, quay lại đầu
+          const newPosition = nextPosition >= screenWidth * bars.length ? 0 : nextPosition;
+          
+          bannerRef.current?.scrollToOffset({
+            offset: newPosition,
+            animated: true
+          });
+          
+          setScrollPosition(newPosition);
+        }, 3000);
+      }
+
+      return () => {
+        if (timeoutRef.current) {
+          clearInterval(timeoutRef.current);
+        }
+      };
+    }, [scrollPosition, bars.length]);
+
+    return (
+      <View className="mt-8">
+        <FlatList
+          ref={bannerRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          data={bars}
+          snapToInterval={screenWidth}
+          decelerationRate="fast"
+          bounces={false}
+          onScroll={(event) => {
+            const currentOffset = event.nativeEvent.contentOffset.x;
+            setScrollPosition(currentOffset);
+          }}
+          scrollEventThrottle={16}
+          renderItem={({ item: bar }) => (
+            <View style={{ width: screenWidth }}>
+              <Image
+                source={{ uri: bar.images.split(',')[0].trim() }}
+                style={{ 
+                  width: screenWidth,
+                  height: screenWidth * 0.5
+                }}
+                resizeMode="cover"
+              />
+            </View>
+          )}
+        />
+      </View>
+    );
+  };
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
@@ -121,6 +186,9 @@ export default function HomeScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
+          {/* Thêm BannerSlider vào đây */}
+          <BannerSlider />
+
           <View className="mt-8">
             <View className="flex-row justify-between items-center px-6 mb-4">
               <Text className="text-white text-xl font-bold">

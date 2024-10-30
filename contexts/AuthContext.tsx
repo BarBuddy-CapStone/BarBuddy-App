@@ -19,7 +19,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
-  loginWithGoogle: () => Promise<LoginResponse>;
+  loginWithGoogle: () => Promise<LoginResponse | null>;
   error: string | null;
   resetAllStorage: () => Promise<void>;
   allowNavigation: boolean;
@@ -162,44 +162,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginWithGoogle = async (): Promise<LoginResponse> => {
+  const loginWithGoogle = async (): Promise<LoginResponse | null> => {
     try {
       setError(null);
       
       const response = await googleAuthService.signIn();
       
-      if (response.data?.data) {
-        const apiData = response.data.data;
-        
-        // Transform API data to match UserInfo structure
-        const userData: UserInfo = {
-          accountId: apiData.accountId,
-          fullname: apiData.fullname,
-          email: apiData.email,
-          phone: apiData.phone,
-          image: apiData.image,
-          accessToken: apiData.accessToken,
-          identityId: apiData.identityId,
-          role: 'CUSTOMER' // Thêm role mặc định vì API Google không trả về role
-        };
-
-        console.log('User data from response:', userData);
-
-        await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-          user: userData
-        }));
-
-        await AsyncStorage.setItem('userToken', userData.accessToken);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${userData.accessToken}`;
-        
-        setUser(userData);
-        setIsAuthenticated(true);
-        setIsGuest(false);
-
-        return response.data;
-      } else {
+      // Nếu response là null (người dùng hủy), return ngay
+      if (!response) {
+        return null;
+      }
+      
+      // Kiểm tra response trước khi xử lý
+      if (!response.data?.data) {
         throw new Error('Không nhận được dữ liệu người dùng');
       }
+
+      const apiData = response.data.data;
+      
+      const userData: UserInfo = {
+        accountId: apiData.accountId,
+        fullname: apiData.fullname,
+        email: apiData.email,
+        phone: apiData.phone,
+        image: apiData.image,
+        accessToken: apiData.accessToken,
+        identityId: apiData.identityId,
+        role: 'CUSTOMER'
+      };
+
+      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+        user: userData
+      }));
+
+      await AsyncStorage.setItem('userToken', userData.accessToken);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${userData.accessToken}`;
+      
+      setUser(userData);
+      setIsAuthenticated(true);
+      setIsGuest(false);
+
+      return response.data;
     } catch (error: any) {
       setError(error.message);
       throw error;

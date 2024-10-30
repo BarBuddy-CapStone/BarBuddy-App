@@ -20,6 +20,7 @@ import Animated, {
 import { validateEmail, validatePassword } from '@/utils/validation';
 import { ScrollView } from 'react-native';
 import { googleAuthService } from '@/services/google-auth';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -35,6 +36,10 @@ export default function LoginScreen() {
   const progressWidth = useSharedValue(0);
   const logoSpacing = useSharedValue(48);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isGoogleSuccess, setIsGoogleSuccess] = useState(false);
+  const googleButtonScale = useSharedValue(1);
+  const googleLoadingRotate = useSharedValue(0);
+  const googleProgressWidth = useSharedValue(0);
 
   useEffect(() => {
     // Khởi tạo Google Sign In khi component mount
@@ -145,23 +150,81 @@ export default function LoginScreen() {
     marginTop: logoSpacing.value
   }));
 
+  const googleButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: googleButtonScale.value }]
+  }));
+
+  const googleLoadingIconStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${googleLoadingRotate.value}deg` }]
+  }));
+
+  const googleProgressBarStyle = useAnimatedStyle(() => ({
+    width: `${googleProgressWidth.value}%`,
+    height: 2,
+    backgroundColor: '#fff',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    opacity: 0.3
+  }));
+
   const handleGoogleSignIn = async () => {
     try {
       setIsGoogleLoading(true);
       setError(null);
+
+      // Bắt đầu animation
+      googleButtonScale.value = withSpring(0.95);
+      googleProgressWidth.value = withTiming(100, {
+        duration: 1000,
+        easing: Easing.bezier(0.4, 0.0, 0.2, 1)
+      });
       
+      // Animation loading xoay
+      googleLoadingRotate.value = withRepeat(
+        withTiming(360, {
+          duration: 1000,
+          easing: Easing.linear
+        }),
+        -1
+      );
+
       const response = await loginWithGoogle();
       
-      if (response?.statusCode === 200 && response.data) {
-        router.replace('/(tabs)');
-      } else {
-        throw new Error(response.message || 'Đăng nhập không thành công');
+      // Reset animation và loading state nếu response là null (người dùng hủy)
+      if (!response) {
+        // Dừng tất cả animation trước
+        googleProgressWidth.value = withTiming(0, undefined, (finished) => {
+          if (finished) {
+            runOnJS(setError)('Đăng nhập đã bị hủy');
+          }
+        });
+        googleButtonScale.value = withSpring(1);
+        googleLoadingRotate.value = 0;
+        setIsGoogleLoading(false);
+        return;
+      }
+      
+      if (response.statusCode === 200 && response.data) {
+        // Animation hoàn thành
+        googleProgressWidth.value = withTiming(0);
+        googleButtonScale.value = withSequence(
+          withSpring(1.05),
+          withSpring(1)
+        );
+
+        setTimeout(() => {
+          router.replace('/(tabs)');
+        }, 500);
       }
     } catch (error: any) {
-      console.error('Google login error:', error);
-      setError(error.message || 'Có lỗi xảy ra khi đăng nhập với Google');
-    } finally {
+      // Reset animation khi có lỗi
+      googleProgressWidth.value = withTiming(0);
+      googleButtonScale.value = withSpring(1);
+      googleLoadingRotate.value = 0;
       setIsGoogleLoading(false);
+      
+      setError(error.message || 'Có lỗi xảy ra khi đăng nhập với Google');
     }
   };
 
@@ -296,26 +359,38 @@ export default function LoginScreen() {
                 <View className="h-[1px] flex-1 bg-white/20" />
               </View>
 
-              <TouchableOpacity 
-                className="flex-row items-center justify-center space-x-3 border border-white/20 p-4 rounded-xl bg-white/5"
-                activeOpacity={0.8}
-                disabled={isGoogleLoading}
-                onPress={handleGoogleSignIn}
-              >
-                {isGoogleLoading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <>
-                    <Image 
-                      source={require('../../assets/images/google.png')} 
-                      className="w-5 h-5"
-                    />
-                    <Text className="text-white font-semibold">
-                      Tiếp tục với Google
-                    </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+              <Animated.View style={googleButtonAnimatedStyle}>
+                <TouchableOpacity 
+                  className="flex-row items-center justify-center space-x-3 border border-white/20 p-4 rounded-xl bg-white/5 overflow-hidden"
+                  activeOpacity={0.8}
+                  disabled={isGoogleLoading}
+                  onPress={handleGoogleSignIn}
+                >
+                  <View className="flex-row items-center justify-center space-x-3">
+                    {isGoogleLoading ? (
+                      <>
+                        <Animated.View style={googleLoadingIconStyle}>
+                          <Ionicons name="sync" size={20} color="white" />
+                        </Animated.View>
+                        <Text className="text-white font-semibold">
+                          Đang xử lý...
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Image 
+                          source={require('../../assets/images/google.png')} 
+                          className="w-5 h-5"
+                        />
+                        <Text className="text-white font-semibold">
+                          Tiếp tục với Google
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                  <Animated.View style={googleProgressBarStyle} />
+                </TouchableOpacity>
+              </Animated.View>
             </View>
           </Animated.View>
 

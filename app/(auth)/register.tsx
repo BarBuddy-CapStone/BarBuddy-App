@@ -8,10 +8,14 @@ import Animated, {
   useSharedValue, 
   useAnimatedStyle,
   withTiming,
-  runOnJS
+  runOnJS,
+  withSpring,
+  withRepeat,
+  withSequence
 } from 'react-native-reanimated';
 import { KeyboardTypeOptions } from 'react-native';
 import { FadeIn, FadeOut } from 'react-native-reanimated';
+import { Easing } from 'react-native-reanimated';
 
 // Thêm interface InputFieldProps
 interface InputFieldProps {
@@ -69,7 +73,8 @@ const InputField: React.FC<InputFieldProps> = ({
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, error, isLoading, loginWithGoogle } = useAuth();
+  const { register, loginWithGoogle, isLoading } = useAuth();
+  const [localError, setLocalError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -79,6 +84,12 @@ export default function RegisterScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [birthDate, setBirthDate] = useState('');
   const opacity = useSharedValue(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const googleButtonScale = useSharedValue(1);
+  const googleLoadingRotate = useSharedValue(0);
+  const googleProgressWidth = useSharedValue(0);
+  const [googleError, setGoogleError] = useState<string | null>(null);
 
   // Hàm format ngày sinh theo DD/MM/YYYY
   const formatBirthDate = (text: string) => {
@@ -119,6 +130,83 @@ export default function RegisterScreen() {
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value
   }));
+
+  const googleButtonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: googleButtonScale.value }]
+  }));
+
+  const googleLoadingIconStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${googleLoadingRotate.value}deg` }]
+  }));
+
+  const googleProgressBarStyle = useAnimatedStyle(() => ({
+    width: `${googleProgressWidth.value}%`,
+    height: 2,
+    backgroundColor: '#fff',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    opacity: 0.3
+  }));
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setGoogleError(null);
+      setLocalError(null);
+
+      // Bắt đầu animation
+      googleButtonScale.value = withSpring(0.95);
+      googleProgressWidth.value = withTiming(100, {
+        duration: 1000,
+        easing: Easing.bezier(0.4, 0.0, 0.2, 1)
+      });
+      
+      // Animation loading xoay
+      googleLoadingRotate.value = withRepeat(
+        withTiming(360, {
+          duration: 1000,
+          easing: Easing.linear
+        }),
+        -1
+      );
+
+      const response = await loginWithGoogle();
+      
+      if (!response) {
+        // Reset animation và hiển thị thông báo khi hủy
+        googleProgressWidth.value = withTiming(0, undefined, (finished) => {
+          if (finished) {
+            runOnJS(setGoogleError)('Đăng nhập đã bị hủy');
+          }
+        });
+        googleButtonScale.value = withSpring(1);
+        googleLoadingRotate.value = 0;
+        setIsGoogleLoading(false);
+        return;
+      }
+
+      // Animation hoàn thành và chuyển trang
+      googleProgressWidth.value = withTiming(0);
+      googleButtonScale.value = withSequence(
+        withSpring(1.05),
+        withSpring(1)
+      );
+
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 500);
+
+    } catch (error: any) {
+      // Reset animation khi có lỗi
+      googleProgressWidth.value = withTiming(0);
+      googleButtonScale.value = withSpring(1);
+      googleLoadingRotate.value = 0;
+      setIsGoogleLoading(false);
+      
+      setGoogleError(error.message || 'Có lỗi xảy ra khi đăng nhập với Google');
+    }
+  };
 
   return (
     <Animated.View 
@@ -213,9 +301,9 @@ export default function RegisterScreen() {
               keyboardType="phone-pad"
             />
 
-            {error && (
+            {localError && (
               <View className="bg-red-500/20 p-4 rounded-xl mb-4">
-                <Text className="text-red-400 text-sm font-medium">{error}</Text>
+                <Text className="text-red-400 text-sm font-medium text-center">{localError}</Text>
               </View>
             )}
 
@@ -223,10 +311,10 @@ export default function RegisterScreen() {
               className="bg-yellow-500 p-4 rounded-xl mt-4"
               activeOpacity={0.8}
               onPress={handleRegister}
-              disabled={isLoading}
+              disabled={isSubmitting}
             >
               <Text className="text-black font-bold text-center text-lg">
-                {isLoading ? 'Đang đăng ký...' : 'Đăng ký'}
+                {isSubmitting ? 'Đang đăng ký...' : 'Đăng ký'}
               </Text>
             </TouchableOpacity>
 
@@ -236,24 +324,44 @@ export default function RegisterScreen() {
               <View className="h-[1px] flex-1 bg-white/20" />
             </View>
 
-            <TouchableOpacity 
-              className="flex-row items-center justify-center space-x-3 border border-white/20 p-4 rounded-xl bg-black/40"
-              activeOpacity={0.8}
-              onPress={async () => {
-                try {
-                  await loginWithGoogle();
-                  router.replace('/(tabs)');
-                } catch (error) {
-                  // Error đã được handle trong AuthContext
-                }
-              }}
-            >
-              <Image 
-                source={require('../../assets/images/google.png')} 
-                className="w-5 h-5"
-              />
-              <Text className="text-white font-semibold">Tiếp tục với Google</Text>
-            </TouchableOpacity>
+            {googleError && (
+              <View className="bg-red-500/20 p-4 rounded-xl mb-4">
+                <Text className="text-red-400 text-sm font-medium text-center">{googleError}</Text>
+              </View>
+            )}
+
+            <Animated.View style={googleButtonAnimatedStyle}>
+              <TouchableOpacity 
+                className="flex-row items-center justify-center space-x-3 border border-white/20 p-4 rounded-xl bg-white/5 overflow-hidden"
+                activeOpacity={0.8}
+                disabled={isGoogleLoading}
+                onPress={handleGoogleSignIn}
+              >
+                <View className="flex-row items-center justify-center space-x-3">
+                  {isGoogleLoading ? (
+                    <>
+                      <Animated.View style={googleLoadingIconStyle}>
+                        <Ionicons name="sync" size={20} color="white" />
+                      </Animated.View>
+                      <Text className="text-white font-semibold">
+                        Đang xử lý...
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Image 
+                        source={require('../../assets/images/google.png')} 
+                        className="w-5 h-5"
+                      />
+                      <Text className="text-white font-semibold">
+                        Tiếp tục với Google
+                      </Text>
+                    </>
+                  )}
+                </View>
+                <Animated.View style={googleProgressBarStyle} />
+              </TouchableOpacity>
+            </Animated.View>
           </View>
 
           <Text className="text-white/60 text-xs text-center mt-8 mb-6 px-6">

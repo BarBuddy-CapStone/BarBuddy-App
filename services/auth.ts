@@ -12,6 +12,32 @@ interface ApiErrorResponse {
   message: string;
 }
 
+interface RegisterRequest {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  fullname: string;
+  phone: string;
+  dob: string; // ISO string format
+}
+
+interface RegisterResponse {
+  statusCode: number;
+  message: string;
+  data: boolean;
+}
+
+interface VerifyOTPRequest {
+  email: string;
+  otp: string;
+}
+
+interface VerifyOTPResponse {
+  statusCode: number;
+  message: string;
+  data: null;
+}
+
 class AuthService {
   async login(credentials: LoginRequest): Promise<UserInfo> {
     try {
@@ -35,6 +61,50 @@ class AuthService {
     } catch (error) {
       if (error instanceof AxiosError && error.response?.data) {
         // Trả về message từ API response
+        throw new Error(error.response.data.message);
+      }
+      
+      if (error instanceof Error) {
+        throw error;
+      }
+      
+      throw new Error('Đã có lỗi xảy ra, vui lòng thử lại sau');
+    }
+  }
+
+  async register(data: RegisterRequest): Promise<RegisterResponse> {
+    try {
+      const response = await api.post<RegisterResponse>('/api/authen/register', data);
+      
+      if (response.data.statusCode === 200) {
+        return response.data;
+      }
+      
+      throw new Error(response.data.message);
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.data) {
+        throw new Error(error.response.data.message);
+      }
+      
+      if (error instanceof Error) {
+        throw error;
+      }
+      
+      throw new Error('Đã có lỗi xảy ra, vui lòng thử lại sau');
+    }
+  }
+
+  async verifyOTP(data: VerifyOTPRequest): Promise<VerifyOTPResponse> {
+    try {
+      const response = await api.post<VerifyOTPResponse>('/api/authen/verify', data);
+      
+      if (response.data.statusCode === 200) {
+        return response.data;
+      }
+      
+      throw new Error(response.data.message);
+    } catch (error) {
+      if (error instanceof AxiosError && error.response?.data) {
         throw new Error(error.response.data.message);
       }
       

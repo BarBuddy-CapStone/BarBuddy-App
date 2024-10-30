@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { UserInfo } from '@/types/auth';
+import { RegisterRequest, RegisterResponse, UserInfo } from '@/types/auth';
 import { authService } from '@/services/auth';
 import axios from 'axios'; // Thêm import axios
 import { googleAuthService } from '@/services/google-auth';
@@ -18,7 +18,8 @@ type AuthContextType = {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, confirmPassword: string, 
+             fullname: string, phone: string, dob: string) => Promise<RegisterResponse>;
   loginWithGoogle: () => Promise<LoginResponse | null>;
   error: string | null;
   resetAllStorage: () => Promise<void>;
@@ -110,35 +111,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (email: string, password: string, name: string) => {
+  const register = async (email: string, password: string, confirmPassword: string, 
+                         fullname: string, phone: string, dob: string): Promise<RegisterResponse> => {
     try {
-      setIsLoading(true);
       setError(null);
 
-      // TODO: Thay thế bằng API call thực tế
-      const mockUser: User = {
-        accountId: '1',
-        fullname: name,
-        email: email,
-        phone: '',
-        image: '',
-        accessToken: '',
-        identityId: null,
-        role: 'CUSTOMER'
+      const registerData: RegisterRequest = {
+        email,
+        password,
+        confirmPassword,
+        fullname,
+        phone,
+        dob
       };
 
-      // Tự động đăng nhập sau khi đăng ký
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-        user: mockUser,
-      }));
-
-      setUser(mockUser);
-      setIsAuthenticated(true);
-    } catch (error) {
-      setError('Đăng ký thất bại');
+      const response = await authService.register(registerData);
+      return response;
+    } catch (error: any) {
+      setError(error.message);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 

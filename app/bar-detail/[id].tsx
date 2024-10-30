@@ -141,6 +141,146 @@ const BarDetailSkeleton = () => (
   </View>
 );
 
+// Thêm helper function để lấy tên ngày
+const getDayOfWeekText = (dayOfWeek: number) => {
+  switch (dayOfWeek) {
+    case 0:
+      return 'Chủ nhật';
+    case 1:
+      return 'Thứ 2';
+    case 2:
+      return 'Thứ 3';
+    case 3:
+      return 'Thứ 4';
+    case 4:
+      return 'Thứ 5';
+    case 5:
+      return 'Thứ 6';
+    case 6:
+      return 'Thứ 7';
+    default:
+      return '';
+  }
+};
+
+// Thêm component OperatingHours
+const OperatingHours = ({ barTimes }: { barTimes: BarDetail['barTimeResponses'] }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const today = new Date().getDay();
+  const timeForToday = barTimes?.find(time => time.dayOfWeek === today);
+  
+  // Animation
+  const animation = useSharedValue(0);
+  
+  const toggleExpand = () => {
+    setIsExpanded(!isExpanded);
+    animation.value = withTiming(isExpanded ? 0 : 1, {
+      duration: 300
+    });
+  };
+
+  const contentStyle = useAnimatedStyle(() => {
+    const height = interpolate(
+      animation.value,
+      [0, 1],
+      [0, 360]
+    );
+
+    const marginTop = interpolate(
+      animation.value,
+      [0, 1],
+      [0, 8]
+    );
+
+    return {
+      height,
+      marginTop,
+      opacity: animation.value,
+    };
+  });
+
+  // Thêm rotateStyle cho animation xoay icon
+  const rotateStyle = useAnimatedStyle(() => {
+    const rotate = interpolate(
+      animation.value,
+      [0, 1],
+      [0, 180]
+    );
+
+    return {
+      transform: [{ rotate: `${rotate}deg` }]
+    };
+  });
+
+  return (
+    <View>
+      {/* Header - Always visible */}
+      <TouchableOpacity 
+        onPress={toggleExpand}
+        className="flex-row items-center justify-between p-3 rounded-lg bg-white/5"
+      >
+        <View className="flex-row items-center space-x-2">
+          <Ionicons name="time-outline" size={20} color="#9CA3AF" />
+          <View>
+            <Text className="text-white text-base font-bold">
+              Giờ hoạt động
+            </Text>
+            <Text className="text-gray-400 text-sm">
+              {timeForToday 
+                ? `Hôm nay: ${timeForToday.startTime.slice(0,5)} - ${timeForToday.endTime.slice(0,5)}`
+                : 'Đóng cửa hôm nay'
+              }
+            </Text>
+          </View>
+        </View>
+        <Animated.View style={rotateStyle}>
+          <Ionicons name="chevron-down" size={24} color="#9CA3AF" />
+        </Animated.View>
+      </TouchableOpacity>
+
+      {/* Dropdown content */}
+      <Animated.View style={[contentStyle, { overflow: 'hidden' }]}>
+        <View className="space-y-2 px-1">
+          {[0, 1, 2, 3, 4, 5, 6].map((day) => {
+            const timeForDay = barTimes?.find(time => time.dayOfWeek === day);
+            const isToday = today === day;
+            
+            return (
+              <View 
+                key={day} 
+                className={`flex-row items-center justify-between p-3 rounded-lg ${
+                  isToday ? 'bg-yellow-500/20' : 'bg-white/5'
+                }`}
+              >
+                <View className="flex-row items-center">
+                  <Ionicons 
+                    name={isToday ? "today" : "calendar-outline"} 
+                    size={20} 
+                    color={isToday ? "#EAB308" : "#9CA3AF"} 
+                  />
+                  <Text className={`ml-2 ${
+                    isToday ? 'text-yellow-500 font-bold' : 'text-gray-400'
+                  }`}>
+                    {getDayOfWeekText(day)}
+                  </Text>
+                </View>
+                <Text className={
+                  isToday ? 'text-yellow-500 font-bold' : 'text-gray-400'
+                }>
+                  {timeForDay 
+                    ? `${timeForDay.startTime.slice(0,5)} - ${timeForDay.endTime.slice(0,5)}`
+                    : 'Đóng cửa'
+                  }
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </Animated.View>
+    </View>
+  );
+};
+
 export default function BarDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -298,18 +438,16 @@ export default function BarDetailScreen() {
 
                 {/* Location & Contact */}
                 <View className="space-y-4">
-                  <View className="flex-row items-center space-x-3">
+                  <View className="flex-row items-center space-x-3 mb-2">
                     <Ionicons name="location-outline" size={20} color="#9CA3AF" />
                     <Text className="text-gray-400 flex-1">
                       {barDetail?.address}
                     </Text>
                   </View>
-                  <View className="flex-row items-center space-x-3">
-                    <Ionicons name="time-outline" size={20} color="#9CA3AF" />
-                    <Text className="text-gray-400">
-                      {barDetail?.startTime.slice(0,5)} - {barDetail?.endTime.slice(0,5)}
-                    </Text>
-                  </View>
+                  
+                  {/* Thêm component OperatingHours vào đây */}
+                  <OperatingHours barTimes={barDetail?.barTimeResponses || []} />
+                  
                   <View className="flex-row items-center space-x-3">
                     <Ionicons name="call-outline" size={20} color="#9CA3AF" />
                     <Text className="text-gray-400">{barDetail?.phoneNumber}</Text>

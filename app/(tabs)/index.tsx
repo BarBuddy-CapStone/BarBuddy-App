@@ -161,6 +161,36 @@ export default function HomeScreen() {
     );
   };
 
+  // Thêm hàm helper để chuyển đổi dayOfWeek thành text
+  const getDayOfWeekText = (dayOfWeek: number) => {
+    switch (dayOfWeek) {
+      case 0:
+        return 'CN';
+      case 1:
+        return 'T2';
+      case 2:
+        return 'T3';
+      case 3:
+        return 'T4';
+      case 4:
+        return 'T5';
+      case 5:
+        return 'T6';
+      case 6:
+        return 'T7';
+      default:
+        return '';
+    }
+  };
+
+  // Cập nhật hàm getCurrentDayTime
+  const getCurrentDayTime = (barTimes: Bar['barTimeResponses']) => {
+    const today = new Date().getDay();
+    const currentDayTime = barTimes.find(time => time.dayOfWeek === today);
+    if (!currentDayTime) return 'Đóng cửa hôm nay';
+    return `${getDayOfWeekText(currentDayTime.dayOfWeek)}, ${currentDayTime.startTime.slice(0,5)} - ${currentDayTime.endTime.slice(0,5)}`;
+  };
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
@@ -217,63 +247,65 @@ export default function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 24 }}
                   ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
-                  renderItem={({ item: bar }) => (
-                    <TouchableOpacity 
-                      className="w-72 overflow-hidden"
-                      activeOpacity={0.7}
-                      onPress={() => router.push(`./bar-detail/${bar.barId}`)}
-                    >
-                      <View className="relative">
-                        <Image
-                          source={{ uri: bar.images.split(',')[0].trim() }} // Lấy ảnh đầu tiên làm ảnh đại diện
-                          className="w-full h-[380px] rounded-3xl"
-                          resizeMode="cover"
-                        />
-                        
-                        {/* Gradient overlay */}
-                        <LinearGradient
-                          colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
-                          className="absolute bottom-0 left-0 right-0 h-40 rounded-b-3xl"
-                        >
-                          {/* Content overlay */}
-                          <View className="absolute bottom-0 p-5 w-full">
-                            <Text className="text-yellow-500 text-xl font-bold mb-2">
-                              {bar.barName}
-                            </Text>
-                            
-                            <View className="flex-row items-center mb-2">
-                              <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                              <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
-                                {bar.address}
+                  renderItem={({ item: bar }) => {
+                    return (
+                      <TouchableOpacity 
+                        className="w-72 overflow-hidden"
+                        activeOpacity={0.7}
+                        onPress={() => router.push(`./bar-detail/${bar.barId}`)}
+                      >
+                        <View className="relative">
+                          <Image
+                            source={{ uri: bar.images.split(',')[0].trim() }}
+                            className="w-full h-[380px] rounded-3xl"
+                            resizeMode="cover"
+                          />
+                          
+                          {/* Gradient overlay */}
+                          <LinearGradient
+                            colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+                            className="absolute bottom-0 left-0 right-0 h-40 rounded-b-3xl"
+                          >
+                            {/* Content overlay */}
+                            <View className="absolute bottom-0 p-5 w-full">
+                              <Text className="text-yellow-500 text-xl font-bold mb-2">
+                                {bar.barName}
                               </Text>
-                            </View>
-
-                            <View className="flex-row items-center space-x-4">
-                              <View className="flex-row items-center">
-                                <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-                                <Text className="text-gray-400 text-xs ml-1">
-                                  {bar.startTime.slice(0,5)} - {bar.endTime.slice(0,5)}
+                              
+                              <View className="flex-row items-center mb-2">
+                                <Ionicons name="location-outline" size={14} color="#9CA3AF" />
+                                <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
+                                  {bar.address}
                                 </Text>
                               </View>
-                              <View className="flex-row items-center">
-                                <Ionicons name="star" size={14} color="#EAB308" />
-                                <Text className="text-white ml-1 text-xs font-medium">
-                                  {getAverageRating(bar.feedBacks)}
-                                </Text>
+
+                              <View className="flex-row items-center space-x-4">
+                                <View className="flex-row items-center">
+                                  <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+                                  <Text className="text-gray-400 text-xs ml-1">
+                                    {getCurrentDayTime(bar.barTimeResponses)}
+                                  </Text>
+                                </View>
+                                <View className="flex-row items-center">
+                                  <Ionicons name="star" size={14} color="#EAB308" />
+                                  <Text className="text-white ml-1 text-xs font-medium">
+                                    {getAverageRating(bar.feedBacks)}
+                                  </Text>
+                                </View>
                               </View>
                             </View>
-                          </View>
-                        </LinearGradient>
+                          </LinearGradient>
 
-                        {/* Discount badge */}
-                        {bar.discount > 0 && (
-                          <View className="absolute top-4 right-4 bg-yellow-500/90 px-2.5 py-1 rounded-full">
-                            <Text className="text-black font-bold text-sm">-{bar.discount}%</Text>
-                          </View>
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  )}
+                          {/* Discount badge */}
+                          {bar.discount > 0 && (
+                            <View className="absolute top-4 right-4 bg-yellow-500/90 px-2.5 py-1 rounded-full">
+                              <Text className="text-black font-bold text-sm">-{bar.discount}%</Text>
+                            </View>
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }}
                 />
               </Animated.View>
             )}

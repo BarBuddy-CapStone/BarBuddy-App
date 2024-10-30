@@ -16,7 +16,7 @@ class AccountService {
       const response = await axios.get(
         `${API_CONFIG.BASE_URL}/api/v1/customer/${accountId}`
       );
-      return response.data;
+      return response.data.data;
     } catch (error) {
       console.error('Error fetching account info:', error);
       throw error;

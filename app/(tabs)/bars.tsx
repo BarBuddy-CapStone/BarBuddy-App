@@ -38,6 +38,35 @@ const BarSkeleton = () => (
   </View>
 );
 
+// Thêm helper function ở đầu file
+const getDayOfWeekText = (dayOfWeek: number) => {
+  switch (dayOfWeek) {
+    case 0:
+      return 'CN';
+    case 1:
+      return 'T2';
+    case 2:
+      return 'T3';
+    case 3:
+      return 'T4';
+    case 4:
+      return 'T5';
+    case 5:
+      return 'T6';
+    case 6:
+      return 'T7';
+    default:
+      return '';
+  }
+};
+
+const getCurrentDayTime = (barTimes: Bar['barTimeResponses']) => {
+  const today = new Date().getDay();
+  const currentDayTime = barTimes.find(time => time.dayOfWeek === today);
+  if (!currentDayTime) return 'Đóng cửa hôm nay';
+  return `${getDayOfWeekText(currentDayTime.dayOfWeek)}, ${currentDayTime.startTime.slice(0,5)} - ${currentDayTime.endTime.slice(0,5)}`;
+};
+
 export default function BarsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [bars, setBars] = useState<Bar[]>([]);
@@ -232,7 +261,7 @@ export default function BarsScreen() {
                           <View className="flex-row items-center">
                             <Ionicons name="time-outline" size={14} color="#9CA3AF" />
                             <Text className="text-gray-400 text-xs ml-1">
-                              {bar.startTime.slice(0,5)} - {bar.endTime.slice(0,5)}
+                              {getCurrentDayTime(bar.barTimeResponses)}
                             </Text>
                           </View>
                           <View className="flex-row items-center">

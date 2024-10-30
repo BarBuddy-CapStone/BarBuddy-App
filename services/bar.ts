@@ -6,12 +6,16 @@ export type Bar = {
   barName: string;
   address: string;
   images: string;
-  startTime: string;
-  endTime: string;
   discount: number;
   isAnyTableAvailable: boolean;
   feedBacks: Array<{
     rating: number;
+  }>;
+  barTimeResponses: Array<{
+    barTimeId: string;
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
   }>;
 };
 
@@ -49,6 +53,12 @@ export type BarDetail = {
     maximumGuest: number;
     minimumPrice: number;
     status: number;
+  }> | null;
+  barTimeResponses: Array<{
+    barTimeId: string;
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
   }>;
 };
 

@@ -1,6 +1,6 @@
 import { Link, useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
-import { Image, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,11 +8,17 @@ import Animated, {
   useSharedValue, 
   useAnimatedStyle,
   withTiming,
-  runOnJS
+  withSpring,
+  withSequence,
+  withRepeat,
+  Easing,
+  interpolate,
+  runOnJS,
+  FadeIn,
+  FadeOut
 } from 'react-native-reanimated';
 import { validateEmail, validatePassword } from '@/utils/validation';
 import { ScrollView } from 'react-native';
-import { FadeIn, FadeOut } from 'react-native-reanimated';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -22,11 +28,24 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const opacity = useSharedValue(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const buttonScale = useSharedValue(1);
+  const loadingRotate = useSharedValue(0);
+  const progressWidth = useSharedValue(0);
+  const logoSpacing = useSharedValue(48);
 
   // Thêm animation fade in khi màn hình được mount
   useEffect(() => {
     opacity.value = withTiming(1, { duration: 200 });
   }, []);
+
+  useEffect(() => {
+    if (error) {
+      logoSpacing.value = withSpring(16);
+    } else {
+      logoSpacing.value = withSpring(48);
+    }
+  }, [error]);
 
   const handleBack = () => {
     router.replace('/(auth)/welcome');
@@ -34,25 +53,57 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     try {
-      setError(null); // Reset error trước khi validate
+      setError(null);
 
-      // Validate email
+      // Validate email & password
       const emailError = validateEmail(email);
       if (emailError) {
         setError(emailError);
         return;
       }
 
-      // Validate password
       const passwordError = validatePassword(password);
       if (passwordError) {
         setError(passwordError);
         return;
       }
 
+      // Bắt đầu animation
+      setIsSubmitting(true);
+      buttonScale.value = withSpring(0.95);
+      progressWidth.value = withTiming(100, {
+        duration: 1000,
+        easing: Easing.bezier(0.4, 0.0, 0.2, 1)
+      });
+      
+      // Animation loading xoay
+      loadingRotate.value = withRepeat(
+        withTiming(360, {
+          duration: 1000,
+          easing: Easing.linear
+        }),
+        -1 // Lặp vô hạn
+      );
+
       await login(email, password);
-      router.replace('/(tabs)');
+
+      // Animation hoàn thành
+      progressWidth.value = withTiming(0);
+      buttonScale.value = withSequence(
+        withSpring(1.05),
+        withSpring(1)
+      );
+
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 500);
+
     } catch (err: any) {
+      // Reset animation khi có lỗi
+      progressWidth.value = withTiming(0);
+      buttonScale.value = withSpring(1);
+      loadingRotate.value = 0;
+      setIsSubmitting(false);
       setError(err.message);
     }
   };
@@ -63,6 +114,28 @@ export default function LoginScreen() {
 
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value
+  }));
+
+  const buttonAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }]
+  }));
+
+  const loadingIconStyle = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${loadingRotate.value}deg` }]
+  }));
+
+  const progressBarStyle = useAnimatedStyle(() => ({
+    width: `${progressWidth.value}%`,
+    height: 2,
+    backgroundColor: '#000',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    opacity: 0.3
+  }));
+
+  const formContainerStyle = useAnimatedStyle(() => ({
+    marginTop: logoSpacing.value
   }));
 
   return (
@@ -98,96 +171,116 @@ export default function LoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Logo */}
-          <View className="items-center mt-8 mb-12">
+          <View className="items-center mt-8">
             <Image
               source={require('../../assets/images/icon.png')}
               className="w-24 h-24"
             />
           </View>
 
-          {/* Form */}
-          <View className="space-y-6 mt-12">
-            <View>
-              <Text className="text-white text-sm font-medium mb-2">Email</Text>
-              <View className="flex-row items-center border border-white/30 rounded-xl p-4 bg-black/40">
-                <Ionicons name="mail-outline" size={20} color="#FFF" />
-                <TextInput
-                  className="flex-1 text-white text-base ml-3"
-                  placeholder="Nhập email của bạn"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  value={email}
-                  onChangeText={setEmail}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-              </View>
-            </View>
-
-            <View>
-              <Text className="text-white text-sm font-medium mb-2">Mật khẩu</Text>
-              <View className="flex-row items-center border border-white/30 rounded-xl p-4 bg-black/40">
-                <Ionicons name="lock-closed-outline" size={20} color="#FFF" />
-                <TextInput
-                  className="flex-1 text-white text-base ml-3"
-                  placeholder="Nhập mật khẩu"
-                  placeholderTextColor="rgba(255,255,255,0.5)"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                />
-                <TouchableOpacity 
-                  onPress={toggleShowPassword}
-                  className="p-1"
-                >
-                  <Ionicons 
-                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                    size={20} 
-                    color="#FFF" 
+          {/* Form - Wrap trong Animated.View */}
+          <Animated.View style={formContainerStyle}>
+            <View className="space-y-6">
+              <View>
+                <Text className="text-white text-sm font-medium mb-2">Email</Text>
+                <View className="flex-row items-center border border-white/30 rounded-xl p-4 bg-black/40">
+                  <Ionicons name="mail-outline" size={20} color="#FFF" />
+                  <TextInput
+                    className="flex-1 text-white text-base ml-3"
+                    placeholder="Nhập email của bạn"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    value={email}
+                    onChangeText={setEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
                   />
-                </TouchableOpacity>
+                </View>
               </View>
-            </View>
 
-            {error && (
-              <View className="bg-red-500/20 p-4 rounded-xl">
-                <Text className="text-red-400 text-sm font-medium text-center">
-                  {error}
-                </Text>
+              <View>
+                <Text className="text-white text-sm font-medium mb-2">Mật khẩu</Text>
+                <View className="flex-row items-center border border-white/30 rounded-xl p-4 bg-black/40">
+                  <Ionicons name="lock-closed-outline" size={20} color="#FFF" />
+                  <TextInput
+                    className="flex-1 text-white text-base ml-3"
+                    placeholder="Nhập mật khẩu"
+                    placeholderTextColor="rgba(255,255,255,0.5)"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                  />
+                  <TouchableOpacity 
+                    onPress={toggleShowPassword}
+                    className="p-1"
+                  >
+                    <Ionicons 
+                      name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                      size={20} 
+                      color="#FFF" 
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
-            )}
 
-            <TouchableOpacity onPress={() => {}}>
-              <Text className="text-yellow-400 text-right font-medium">Quên mật khẩu?</Text>
-            </TouchableOpacity>
+              {error && (
+                <View className="bg-red-500/20 p-4 rounded-xl">
+                  <Text className="text-red-400 text-sm font-medium text-center">
+                    {error}
+                  </Text>
+                </View>
+              )}
 
-            <TouchableOpacity
-              className="bg-yellow-500 p-4 rounded-xl mt-4"
-              activeOpacity={0.8}
-              onPress={handleLogin}
-              disabled={isLoading}
-            >
-              <Text className="text-black font-bold text-center text-lg">
-                {isLoading ? 'Đang đăng nhập...' : 'Đăng nhập'}
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity onPress={() => {}}>
+                <Text className="text-yellow-400 text-right font-medium">Quên mật khẩu?</Text>
+              </TouchableOpacity>
 
-            <View className="flex-row items-center justify-center space-x-4">
-              <View className="h-[1px] flex-1 bg-white/20" />
-              <Text className="text-white/60 px-3">hoặc</Text>
-              <View className="h-[1px] flex-1 bg-white/20" />
+              <View className="mt-4">
+                <Animated.View style={buttonAnimatedStyle}>
+                  <TouchableOpacity
+                    className="bg-yellow-500 p-4 rounded-xl overflow-hidden"
+                    activeOpacity={0.8}
+                    onPress={handleLogin}
+                    disabled={isSubmitting}
+                  >
+                    <View className="flex-row items-center justify-center space-x-2">
+                      {isSubmitting ? (
+                        <>
+                          <Animated.View style={loadingIconStyle}>
+                            <Ionicons name="sync" size={20} color="black" />
+                          </Animated.View>
+                          <Text className="text-black font-bold text-lg">
+                            Đang xử lý...
+                          </Text>
+                        </>
+                      ) : (
+                        <Text className="text-black font-bold text-center text-lg">
+                          Đăng nhập
+                        </Text>
+                      )}
+                    </View>
+                    <Animated.View style={progressBarStyle} />
+                  </TouchableOpacity>
+                </Animated.View>
+              </View>
+
+              <View className="flex-row items-center justify-center space-x-4">
+                <View className="h-[1px] flex-1 bg-white/20" />
+                <Text className="text-white/60 px-3">hoặc</Text>
+                <View className="h-[1px] flex-1 bg-white/20" />
+              </View>
+
+              <TouchableOpacity 
+                className="flex-row items-center justify-center space-x-3 border border-white/20 p-4 rounded-xl bg-white/5"
+                activeOpacity={0.8}
+              >
+                <Image 
+                  source={require('../../assets/images/google.png')} 
+                  className="w-5 h-5"
+                />
+                <Text className="text-white font-semibold">Tiếp tục với Google</Text>
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity 
-              className="flex-row items-center justify-center space-x-3 border border-white/20 p-4 rounded-xl bg-white/5"
-              activeOpacity={0.8}
-            >
-              <Image 
-                source={require('../../assets/images/google.png')} 
-                className="w-5 h-5"
-              />
-              <Text className="text-white font-semibold">Tiếp tục với Google</Text>
-            </TouchableOpacity>
-          </View>
+          </Animated.View>
 
           <Text className="text-white/60 text-xs text-center mt-8 mb-6 px-6">
             Bằng cách đăng nhập, bạn đã đồng ý với{' '}

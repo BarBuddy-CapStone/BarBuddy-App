@@ -68,7 +68,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string) => {
     try {
-      setIsLoading(true);
       setError(null);
 
       const user = await authService.login({ email, password });
@@ -84,8 +83,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       setError(error.message);
       throw error;
-    } finally {
-      setIsLoading(false);
     }
   };
 

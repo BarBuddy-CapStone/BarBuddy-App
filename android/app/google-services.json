@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "294668771815",
+    "project_id": "barbuddy-b2026",
+    "storage_bucket": "barbuddy-b2026.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:294668771815:android:e55c7337e9cb523db61d42",
+        "android_client_info": {
+          "package_name": "com.fptu.barbuddy"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "294668771815-f26bdgb6u33t0a8p964lfrtajgbuifgm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.fptu.barbuddy",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "294668771815-0ofnuitrmh09f1gs9ift8ap8qnodsnac.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDGgqnjaMj-tkRZepNOai3UXHdU_eIw94U"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "294668771815-0ofnuitrmh09f1gs9ift8ap8qnodsnac.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

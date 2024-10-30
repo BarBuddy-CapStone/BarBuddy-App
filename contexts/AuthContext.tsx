@@ -3,6 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserInfo } from '@/types/auth';
 import { authService } from '@/services/auth';
 import axios from 'axios'; // Thêm import axios
+import { googleAuthService } from '@/services/google-auth';
+import { LoginResponse } from '@/types/auth';
 
 // Định nghĩa kiểu dữ liệu cho user
 type User = UserInfo;
@@ -17,6 +19,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
+  loginWithGoogle: () => Promise<LoginResponse>;
   error: string | null;
   resetAllStorage: () => Promise<void>;
   allowNavigation: boolean;
@@ -25,7 +28,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const AUTH_STORAGE_KEY = '@auth';
-const GUEST_MODE_KEY = '@guest_mode';  // Thêm dòng này
+const GUEST_MODE_KEY = '@guest_mode';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -159,6 +162,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async (): Promise<LoginResponse> => {
+    try {
+      setError(null);
+      
+      const response = await googleAuthService.signIn();
+      
+      if (response.data?.data) {
+        const apiData = response.data.data;
+        
+        // Transform API data to match UserInfo structure
+        const userData: UserInfo = {
+          accountId: apiData.accountId,
+          fullname: apiData.fullname,
+          email: apiData.email,
+          phone: apiData.phone,
+          image: apiData.image,
+          accessToken: apiData.accessToken,
+          identityId: apiData.identityId,
+          role: 'CUSTOMER' // Thêm role mặc định vì API Google không trả về role
+        };
+
+        console.log('User data from response:', userData);
+
+        await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+          user: userData
+        }));
+
+        await AsyncStorage.setItem('userToken', userData.accessToken);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${userData.accessToken}`;
+        
+        setUser(userData);
+        setIsAuthenticated(true);
+        setIsGuest(false);
+
+        return response.data;
+      } else {
+        throw new Error('Không nhận được dữ liệu người dùng');
+      }
+    } catch (error: any) {
+      setError(error.message);
+      throw error;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -170,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         register,
+        loginWithGoogle,
         error,
         resetAllStorage,
         allowNavigation,

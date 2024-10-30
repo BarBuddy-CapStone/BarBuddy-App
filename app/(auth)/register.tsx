@@ -69,7 +69,7 @@ const InputField: React.FC<InputFieldProps> = ({
 
 export default function RegisterScreen() {
   const router = useRouter();
-  const { register, error, isLoading } = useAuth();
+  const { register, error, isLoading, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -239,6 +239,14 @@ export default function RegisterScreen() {
             <TouchableOpacity 
               className="flex-row items-center justify-center space-x-3 border border-white/20 p-4 rounded-xl bg-black/40"
               activeOpacity={0.8}
+              onPress={async () => {
+                try {
+                  await loginWithGoogle();
+                  router.replace('/(tabs)');
+                } catch (error) {
+                  // Error đã được handle trong AuthContext
+                }
+              }}
             >
               <Image 
                 source={require('../../assets/images/google.png')} 

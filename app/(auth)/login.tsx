@@ -19,10 +19,11 @@ import Animated, {
 } from 'react-native-reanimated';
 import { validateEmail, validatePassword } from '@/utils/validation';
 import { ScrollView } from 'react-native';
+import { googleAuthService } from '@/services/google-auth';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, loginWithGoogle } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -33,6 +34,12 @@ export default function LoginScreen() {
   const loadingRotate = useSharedValue(0);
   const progressWidth = useSharedValue(0);
   const logoSpacing = useSharedValue(48);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    // Khởi tạo Google Sign In khi component mount
+    googleAuthService.init();
+  }, []);
 
   // Thêm animation fade in khi màn hình được mount
   useEffect(() => {
@@ -137,6 +144,26 @@ export default function LoginScreen() {
   const formContainerStyle = useAnimatedStyle(() => ({
     marginTop: logoSpacing.value
   }));
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsGoogleLoading(true);
+      setError(null);
+      
+      const response = await loginWithGoogle();
+      
+      if (response?.statusCode === 200 && response.data) {
+        router.replace('/(tabs)');
+      } else {
+        throw new Error(response.message || 'Đăng nhập không thành công');
+      }
+    } catch (error: any) {
+      console.error('Google login error:', error);
+      setError(error.message || 'Có lỗi xảy ra khi đăng nhập với Google');
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
 
   return (
     <Animated.View 
@@ -272,12 +299,22 @@ export default function LoginScreen() {
               <TouchableOpacity 
                 className="flex-row items-center justify-center space-x-3 border border-white/20 p-4 rounded-xl bg-white/5"
                 activeOpacity={0.8}
+                disabled={isGoogleLoading}
+                onPress={handleGoogleSignIn}
               >
-                <Image 
-                  source={require('../../assets/images/google.png')} 
-                  className="w-5 h-5"
-                />
-                <Text className="text-white font-semibold">Tiếp tục với Google</Text>
+                {isGoogleLoading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <>
+                    <Image 
+                      source={require('../../assets/images/google.png')} 
+                      className="w-5 h-5"
+                    />
+                    <Text className="text-white font-semibold">
+                      Tiếp tục với Google
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </Animated.View>

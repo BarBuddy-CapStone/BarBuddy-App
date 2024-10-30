@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "BarBuddy",
-    "slug": "BarBuddy",
+    "slug": "BarBuddy-App",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "myapp",
+    "scheme": "com.fptu.barbuddy",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/images/splash.png",
@@ -38,8 +38,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "941c0537-b48d-4c75-b93d-5061f39ff9c5"
+        "projectId": "7f78547a-caf1-420f-b7bb-d69c26cd081d"
       }
-    }
+    },
+    "owner": "kiendtse161968"
   }
 }

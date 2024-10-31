@@ -281,6 +281,62 @@ const OperatingHours = ({ barTimes }: { barTimes: BarDetail['barTimeResponses'] 
   );
 };
 
+// Thêm hàm kiểm tra quán có mở cửa hôm nay không
+const isOpenToday = (barTimes: BarDetail['barTimeResponses']) => {
+  const today = new Date().getDay();
+  return barTimes.some(time => time.dayOfWeek === today);
+};
+
+// Thêm component FeedbackItem
+const FeedbackItem = ({ feedback }: { feedback: BarDetail['feedBacks'][0] }) => {
+  const [imageError, setImageError] = useState(false);
+  const formattedDate = new Date(feedback.createdTime).toLocaleDateString('vi-VN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  return (
+    <View className="bg-white/5 rounded-xl p-4 mb-3">
+      <View className="flex-row items-center mb-3">
+        <View className="relative">
+          {feedback.imageAccount && !imageError ? (
+            <Image
+              source={{ uri: feedback.imageAccount }}
+              className="w-10 h-10 rounded-full"
+              onError={() => setImageError(true)}
+            />
+          ) : (
+            <View className="w-10 h-10 bg-white/10 rounded-full items-center justify-center">
+              <Ionicons name="person" size={20} color="#EAB308" />
+            </View>
+          )}
+          {feedback.accountName && (
+            <View className="absolute -right-1 -bottom-1 bg-yellow-500 rounded-full p-0.5">
+              <Ionicons name="checkmark" size={12} color="black" />
+            </View>
+          )}
+        </View>
+        <View className="ml-3 flex-1">
+          <Text className="text-white font-medium">
+            {feedback.accountName || 'Khách hàng ẩn danh'}
+          </Text>
+          <Text className="text-gray-400 text-xs">{formattedDate}</Text>
+        </View>
+        <View className="bg-yellow-500/10 px-2 py-1 rounded-lg">
+          <View className="flex-row items-center">
+            <Ionicons name="star" size={14} color="#EAB308" />
+            <Text className="text-yellow-500 font-bold ml-1">
+              {feedback.rating.toFixed(1)}
+            </Text>
+          </View>
+        </View>
+      </View>
+      <Text className="text-gray-400 leading-5">{feedback.comment}</Text>
+    </View>
+  );
+};
+
 export default function BarDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -323,8 +379,9 @@ export default function BarDetailScreen() {
     }
   };
 
+  // Cập nhật hàm getAverageRating
   const getAverageRating = () => {
-    if (!barDetail?.feedBacks.length) return 0;
+    if (!barDetail?.feedBacks.length) return null;
     const sum = barDetail.feedBacks.reduce((acc, curr) => acc + curr.rating, 0);
     return (sum / barDetail.feedBacks.length).toFixed(1);
   };
@@ -420,16 +477,32 @@ export default function BarDetailScreen() {
                     {barDetail?.barName}
                   </Text>
                   <View className="flex-row items-center space-x-4">
+                    {/* Rating */}
                     <View className="flex-row items-center">
                       <Ionicons name="star" size={16} color="#EAB308" />
                       <Text className="text-white ml-1 font-medium">
-                        {getAverageRating()}
+                        {getAverageRating() ?? 'Chưa có đánh giá'}
                       </Text>
                     </View>
+
+                    {/* Discount badge */}
                     {(barDetail?.discount ?? 0) > 0 && (
-                      <View className="bg-yellow-500/90 px-2 py-1 rounded-full">
+                      <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full">
                         <Text className="text-black font-bold text-xs">
                           Giảm {barDetail?.discount}%
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Table availability badge - chỉ hiển thị khi quán mở cửa hôm nay */}
+                    {barDetail && isOpenToday(barDetail.barTimeResponses) && (
+                      <View 
+                        className={`px-2.5 py-1 rounded-full ${
+                          barDetail.isAnyTableAvailable ? 'bg-green-500/90' : 'bg-red-500/90'
+                        }`}
+                      >
+                        <Text className="text-white font-bold text-xs">
+                          {barDetail.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
                         </Text>
                       </View>
                     )}
@@ -594,40 +667,33 @@ export default function BarDetailScreen() {
                 <View className="mt-8">
                   <View className="flex-row justify-between items-center mb-4">
                     <Text className="text-white text-lg font-bold">
-                      Đánh giá ({barDetail?.feedBacks.length})
+                      Đánh giá ({barDetail?.feedBacks.length || 0})
                     </Text>
-                    <TouchableOpacity>
-                      <Text className="text-yellow-500">Xem tất cả</Text>
-                    </TouchableOpacity>
+                    {barDetail?.feedBacks.length ? (
+                      <TouchableOpacity>
+                        <Text className="text-yellow-500">Xem tất cả</Text>
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
-                  {barDetail?.feedBacks.map((feedback, index) => (
-                    <View
-                      key={index}
-                      className="bg-white/5 rounded-xl p-4 mb-3"
-                    >
-                      <View className="flex-row items-center mb-2">
-                        <View className="w-10 h-10 bg-white/10 rounded-full items-center justify-center">
-                          <Ionicons name="person" size={20} color="#EAB308" />
-                        </View>
-                        <View className="ml-3">
-                          <Text className="text-white font-medium">
-                            {feedback.accountName || 'Khách hàng ẩn danh'}
-                          </Text>
-                          <View className="flex-row items-center">
-                            {[...Array(5)].map((_, i) => (
-                              <Ionicons
-                                key={i}
-                                name="star"
-                                size={12}
-                                color={i < feedback.rating ? '#EAB308' : '#4B5563'}
-                              />
-                            ))}
-                          </View>
-                        </View>
-                      </View>
-                      <Text className="text-gray-400">{feedback.comment}</Text>
+                  
+                  {barDetail?.feedBacks.length ? (
+                    barDetail.feedBacks
+                      .sort((a, b) => new Date(b.createdTime).getTime() - new Date(a.createdTime).getTime())
+                      .slice(0, 3)
+                      .map((feedback, index) => (
+                        <FeedbackItem key={index} feedback={feedback} />
+                      ))
+                  ) : (
+                    <View className="bg-white/5 rounded-xl p-4 items-center">
+                      <Ionicons name="star-outline" size={40} color="#9CA3AF" />
+                      <Text className="text-gray-400 mt-2 text-center">
+                        Chưa có đánh giá nào
+                      </Text>
+                      <Text className="text-gray-500 text-sm text-center mt-1">
+                        Hãy là người đầu tiên đánh giá quán bar này
+                      </Text>
                     </View>
-                  ))}
+                  )}
                 </View>
               </Animated.View>
             </View>

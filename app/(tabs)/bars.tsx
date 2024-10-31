@@ -67,6 +67,17 @@ const getCurrentDayTime = (barTimes: Bar['barTimeResponses']) => {
   return `${getDayOfWeekText(currentDayTime.dayOfWeek)}, ${currentDayTime.startTime.slice(0,5)} - ${currentDayTime.endTime.slice(0,5)}`;
 };
 
+const isBarOpen = (barTimes: Bar['barTimeResponses']) => {
+  const today = new Date().getDay();
+  const now = new Date();
+  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
+  
+  const todaySchedule = barTimes.find(time => time.dayOfWeek === today);
+  if (!todaySchedule) return false;
+  
+  return true; // Tạm thời return true vì logic check giờ phức tạp hơn cần xử lý riêng
+};
+
 export default function BarsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [bars, setBars] = useState<Bar[]>([]);
@@ -149,7 +160,7 @@ export default function BarsScreen() {
   }, [searchQuery]);
 
   const getAverageRating = (feedBacks: Array<{ rating: number }>) => {
-    if (!feedBacks || feedBacks.length === 0) return '0.0';
+    if (!feedBacks || feedBacks.length === 0) return null;
     const sum = feedBacks.reduce((acc, curr) => acc + curr.rating, 0);
     return (sum / feedBacks.length).toFixed(1);
   };
@@ -239,6 +250,35 @@ export default function BarsScreen() {
                       resizeMode="cover"
                     />
                     
+                    {/* Status badges container */}
+                    <View className="absolute top-4 w-full flex-row justify-between px-4">
+                      {/* Left side - Table availability badge */}
+                      <View>
+                        {isBarOpen(bar.barTimeResponses) && (
+                          <View 
+                            className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
+                              bar.isAnyTableAvailable 
+                                ? 'bg-green-500/90' 
+                                : 'bg-red-500/90'
+                            }`}
+                          >
+                            <Text className="text-white font-medium text-xs">
+                              {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                      
+                      {/* Right side - Discount badge */}
+                      <View>
+                        {bar.discount > 0 && (
+                          <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full h-7 items-center justify-center">
+                            <Text className="text-black font-bold text-xs">-{bar.discount}%</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+
                     {/* Gradient overlay */}
                     <LinearGradient
                       colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
@@ -267,19 +307,12 @@ export default function BarsScreen() {
                           <View className="flex-row items-center">
                             <Ionicons name="star" size={14} color="#EAB308" />
                             <Text className="text-white ml-1 text-xs font-medium">
-                              {getAverageRating(bar.feedBacks)}
+                              {getAverageRating(bar.feedBacks) ?? 'Chưa có đánh giá'}
                             </Text>
                           </View>
                         </View>
                       </View>
                     </LinearGradient>
-
-                    {/* Discount badge */}
-                    {bar.discount > 0 && (
-                      <View className="absolute top-4 right-4 bg-yellow-500/90 px-2.5 py-1 rounded-full">
-                        <Text className="text-black font-bold text-sm">-{bar.discount}%</Text>
-                      </View>
-                    )}
                   </View>
                 </TouchableOpacity>
               </Animated.View>

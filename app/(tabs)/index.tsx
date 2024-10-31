@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Image, ScrollView, RefreshControl, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState, useRef } from 'react';
@@ -6,20 +6,38 @@ import { useAuth } from '@/contexts/AuthContext';
 import { barService, type Bar } from '@/services/bar';
 import { Link, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { drinkService, type Drink } from '@/services/drink';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Dimensions } from 'react-native';
 
 const screenWidth = Dimensions.get('window').width;
+
+// Thêm mảng banners cứng
+const BANNERS = [
+  {
+    id: 1,
+    image: 'https://cdn-kvweb.kiotviet.vn/kiotviet-website/wp-content/uploads/2019/09/kinh-doanh-qu%C3%A1n-bar.jpg',
+    title: 'Nhận ưu đãi khi đặt trước',
+    description: 'Chiết khấu cho khách hàng đặt trước thức uống tại quán'
+  },
+  {
+    id: 2, 
+    image: 'https://cdn.pastaxi-manager.onepas.vn/content/uploads/articles/nguyendoan/anh-blog/20-beer-club-soi-dong-hcm/top-20-beer-club-noi-tieng-soi-dong-nhat-o-tphcm-14.jpg',
+    title: 'Đa dạng concept',
+    description: 'Mỗi quán bar sẽ có những concept khác nhau'
+  },
+  {
+    id: 3,
+    image: 'https://i0.wp.com/utahagenda.com/wp-content/uploads/2022/08/e7e10-live-music-venue-utah-1038.jpg?resize=1038%2C576&ssl=1', 
+    title: 'Sự kiện âm nhạc mỗi cuối tuần',
+    description: 'Live cùng các band nhạc mỗi tối Thứ 7 và Chủ nhật'
+  }
+];
 
 export default function HomeScreen() {
   const { user } = useAuth();
   const [bars, setBars] = useState<Bar[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [drinks, setDrinks] = useState<Drink[]>([]);
-  const [randomDrinks, setRandomDrinks] = useState<Drink[]>([]);
-  const [loadingDrinks, setLoadingDrinks] = useState(true);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerRef = useRef<FlatList>(null);
 
@@ -35,38 +53,17 @@ export default function HomeScreen() {
     }
   };
 
-  const getRandomDrinks = (drinks: Drink[], count: number = 10) => {
-    const shuffled = [...drinks].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-  };
-
-  const fetchDrinks = async () => {
-    setLoadingDrinks(true);
-    try {
-      const data = await drinkService.getDrinks();
-      setDrinks(data);
-      setRandomDrinks(getRandomDrinks(data, 10));
-    } catch (error) {
-      console.error('Error fetching drinks:', error);
-    } finally {
-      setLoadingDrinks(false);
-    }
-  };
-
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    Promise.all([fetchBars(), fetchDrinks()]).finally(() => 
-      setRefreshing(false)
-    );
+    fetchBars().finally(() => setRefreshing(false));
   }, []);
 
   useEffect(() => {
     fetchBars();
-    fetchDrinks();
   }, []);
 
   const getAverageRating = (feedBacks: Array<{rating: number}>) => {
-    if (!feedBacks.length) return 0;
+    if (!feedBacks.length) return null;
     const sum = feedBacks.reduce((acc, curr) => acc + curr.rating, 0);
     return (sum / feedBacks.length).toFixed(1);
   };
@@ -86,56 +83,37 @@ export default function HomeScreen() {
     </View>
   );
 
-  const DrinkSkeleton = () => (
-    <View className="w-40 bg-white/5 rounded-2xl overflow-hidden mx-2 animate-pulse">
-      <View className="w-full h-40 bg-white/10" />
-      <View className="p-3">
-        <View className="h-4 bg-white/10 rounded-full w-3/4 mb-2" />
-        <View className="h-3 bg-white/10 rounded-full w-full mb-2" />
-        <View className="h-3 bg-white/10 rounded-full w-2/3 mb-2" />
-        <View className="flex-row justify-between items-center">
-          <View className="h-4 bg-white/10 rounded-full w-1/3" />
-          <View className="h-4 bg-white/10 rounded-full w-1/3" />
-        </View>
-      </View>
-    </View>
-  );
-
   const BannerSlider = () => {
     const [scrollPosition, setScrollPosition] = useState(0);
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
-      // Chỉ bắt đầu auto scroll khi có dữ liệu
-      if (bars.length > 0) {
-        timeoutRef.current = setInterval(() => {
-          const nextPosition = scrollPosition + screenWidth;
-          // Nếu đã đến cuối, quay lại đầu
-          const newPosition = nextPosition >= screenWidth * bars.length ? 0 : nextPosition;
-          
-          bannerRef.current?.scrollToOffset({
-            offset: newPosition,
-            animated: true
-          });
-          
-          setScrollPosition(newPosition);
-        }, 3000);
-      }
+      timeoutRef.current = setInterval(() => {
+        const nextPosition = scrollPosition + screenWidth;
+        const newPosition = nextPosition >= screenWidth * BANNERS.length ? 0 : nextPosition;
+        
+        bannerRef.current?.scrollToOffset({
+          offset: newPosition,
+          animated: true
+        });
+        
+        setScrollPosition(newPosition);
+      }, 3000);
 
       return () => {
         if (timeoutRef.current) {
           clearInterval(timeoutRef.current);
         }
       };
-    }, [scrollPosition, bars.length]);
+    }, [scrollPosition]);
 
     return (
-      <View className="mt-8">
+      <View className="">
         <FlatList
           ref={bannerRef}
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={bars}
+          data={BANNERS}
           snapToInterval={screenWidth}
           decelerationRate="fast"
           bounces={false}
@@ -144,16 +122,29 @@ export default function HomeScreen() {
             setScrollPosition(currentOffset);
           }}
           scrollEventThrottle={16}
-          renderItem={({ item: bar }) => (
+          renderItem={({ item: banner }) => (
             <View style={{ width: screenWidth }}>
               <Image
-                source={{ uri: bar.images.split(',')[0].trim() }}
+                source={{ uri: banner.image }}
                 style={{ 
                   width: screenWidth,
                   height: screenWidth * 0.5
                 }}
                 resizeMode="cover"
               />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+                className="absolute bottom-0 left-0 right-0 h-40"
+              >
+                <View className="absolute bottom-0 p-5 w-full">
+                  <Text className="text-yellow-500 text-xl font-bold mb-2">
+                    {banner.title}
+                  </Text>
+                  <Text className="text-gray-400 text-sm">
+                    {banner.description}
+                  </Text>
+                </View>
+              </LinearGradient>
             </View>
           )}
         />
@@ -191,6 +182,18 @@ export default function HomeScreen() {
     return `${getDayOfWeekText(currentDayTime.dayOfWeek)}, ${currentDayTime.startTime.slice(0,5)} - ${currentDayTime.endTime.slice(0,5)}`;
   };
 
+  // Thêm hàm kiểm tra quán có đang mở cửa không
+  const isBarOpen = (barTimes: Bar['barTimeResponses']) => {
+    const today = new Date().getDay();
+    const now = new Date();
+    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
+    
+    const todaySchedule = barTimes.find(time => time.dayOfWeek === today);
+    if (!todaySchedule) return false;
+    
+    return true; // Tạm thời return true vì logic check giờ phức tạp hơn cần xử lý riêng
+  };
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
@@ -216,10 +219,11 @@ export default function HomeScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {/* Thêm BannerSlider vào đây */}
+          {/* Banner Section */}
           <BannerSlider />
 
-          <View className="mt-8">
+          {/* Bars Section */}
+          <View className="mt-4 pb-4">
             <View className="flex-row justify-between items-center px-6 mb-4">
               <Text className="text-white text-xl font-bold">
                 Hệ Thống Quán Bar
@@ -261,7 +265,36 @@ export default function HomeScreen() {
                             resizeMode="cover"
                           />
                           
-                          {/* Gradient overlay */}
+                          {/* Status badges container */}
+                          <View className="absolute top-4 w-full flex-row justify-between px-4">
+                            {/* Left side - Table availability badge */}
+                            <View>
+                              {isBarOpen(bar.barTimeResponses) && (
+                                <View 
+                                  className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
+                                    bar.isAnyTableAvailable 
+                                      ? 'bg-green-500/90' 
+                                      : 'bg-red-500/90'
+                                  }`}
+                                >
+                                  <Text className="text-white font-medium text-xs">
+                                    {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            
+                            {/* Right side - Discount badge */}
+                            <View>
+                              {bar.discount > 0 && (
+                                <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full h-7 items-center justify-center">
+                                  <Text className="text-black font-bold text-xs">-{bar.discount}%</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                          
+                          {/* Existing gradient and content */}
                           <LinearGradient
                             colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
                             className="absolute bottom-0 left-0 right-0 h-40 rounded-b-3xl"
@@ -289,85 +322,16 @@ export default function HomeScreen() {
                                 <View className="flex-row items-center">
                                   <Ionicons name="star" size={14} color="#EAB308" />
                                   <Text className="text-white ml-1 text-xs font-medium">
-                                    {getAverageRating(bar.feedBacks)}
+                                    {getAverageRating(bar.feedBacks) ?? 'Chưa có đánh giá'}
                                   </Text>
                                 </View>
                               </View>
                             </View>
                           </LinearGradient>
-
-                          {/* Discount badge */}
-                          {bar.discount > 0 && (
-                            <View className="absolute top-4 right-4 bg-yellow-500/90 px-2.5 py-1 rounded-full">
-                              <Text className="text-black font-bold text-sm">-{bar.discount}%</Text>
-                            </View>
-                          )}
                         </View>
                       </TouchableOpacity>
                     );
                   }}
-                />
-              </Animated.View>
-            )}
-          </View>
-
-          {/* Drinks Section */}
-          <View className="mt-8">
-            <View className="flex-row justify-between items-center px-6 mb-4">
-              <Text className="text-white text-xl font-bold">
-                Đồ uống phổ biến
-              </Text>
-              <TouchableOpacity>
-                <Text className="text-yellow-500">Xem thêm</Text>
-              </TouchableOpacity>
-            </View>
-
-            {loadingDrinks ? (
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 24 }}
-              >
-                {[1,2,3,4].map(i => <DrinkSkeleton key={i} />)}
-              </ScrollView>
-            ) : (
-              <Animated.View entering={FadeIn}>
-                <FlatList
-                  horizontal
-                  data={randomDrinks}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: 24 }}
-                  ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
-                  renderItem={({ item: drink }) => (
-                    <TouchableOpacity 
-                      className="w-40 bg-white/5 rounded-2xl overflow-hidden"
-                      activeOpacity={0.7}
-                    >
-                      <Image
-                        source={{ uri: drink.images }}
-                        className="w-full h-40 rounded-t-2xl"
-                        resizeMode="cover"
-                      />
-                      <View className="p-3">
-                        <Text className="text-yellow-500 font-bold mb-1" numberOfLines={1}>
-                          {drink.drinkName}
-                        </Text>
-                        <Text className="text-white/60 text-xs mb-2" numberOfLines={2}>
-                          {drink.description}
-                        </Text>
-                        <View className="flex-row items-center justify-between">
-                          <Text className="text-white font-medium">
-                            {drink.price.toLocaleString()}đ
-                          </Text>
-                          <View className="px-2 py-1 bg-white/10 rounded">
-                            <Text className="text-white/80 text-xs">
-                              {drink.drinkCategoryResponse.drinksCategoryName}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  )}
                 />
               </Animated.View>
             )}

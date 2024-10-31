@@ -6,6 +6,7 @@ import { barService, type Bar } from '@/services/bar';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
+import { formatRating } from '@/utils/rating';
 
 // Thêm component BarSkeleton
 const BarSkeleton = () => (
@@ -132,7 +133,7 @@ export default function BarsScreen() {
   const getAverageRating = (feedBacks: Array<{ rating: number }>) => {
     if (!feedBacks || feedBacks.length === 0) return null;
     const sum = feedBacks.reduce((acc, curr) => acc + curr.rating, 0);
-    return (sum / feedBacks.length).toFixed(1);
+    return sum / feedBacks.length;
   };
 
   return (
@@ -287,7 +288,7 @@ export default function BarsScreen() {
                           <View className="flex-row items-center">
                             <Ionicons name="star" size={14} color="#EAB308" />
                             <Text className="text-white ml-1 text-xs font-medium">
-                              {getAverageRating(bar.feedBacks) ?? 'Chưa có đánh giá'}
+                              {formatRating(getAverageRating(bar.feedBacks))}
                             </Text>
                           </View>
                         </View>

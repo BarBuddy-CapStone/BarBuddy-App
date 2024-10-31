@@ -8,6 +8,7 @@ import { Link, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Dimensions } from 'react-native';
+import { formatRating } from '@/utils/rating';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -65,7 +66,7 @@ export default function HomeScreen() {
   const getAverageRating = (feedBacks: Array<{rating: number}>) => {
     if (!feedBacks.length) return null;
     const sum = feedBacks.reduce((acc, curr) => acc + curr.rating, 0);
-    return (sum / feedBacks.length).toFixed(1);
+    return sum / feedBacks.length;
   };
 
   const BarSkeleton = () => (
@@ -322,7 +323,7 @@ export default function HomeScreen() {
                                 <View className="flex-row items-center">
                                   <Ionicons name="star" size={14} color="#EAB308" />
                                   <Text className="text-white ml-1 text-xs font-medium">
-                                    {getAverageRating(bar.feedBacks) ?? 'Chưa có đánh giá'}
+                                    {formatRating(getAverageRating(bar.feedBacks))}
                                   </Text>
                                 </View>
                               </View>

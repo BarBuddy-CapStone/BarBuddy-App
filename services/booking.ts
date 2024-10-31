@@ -1,13 +1,14 @@
 import axios from 'axios';
 import { API_CONFIG } from '@/config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuthHeader } from '@/utils/auth-header';
 
 export interface BookingHistory {
   bookingId: string;
   barName: string;
   bookingDate: string;
   bookingTime: string;
-  status: number; // Thay đổi thành number
+  bookingCode: string;
+  status: number;
   createAt: string;
   image: string;
   isRated: boolean | null;
@@ -23,6 +24,14 @@ export interface BookingHistoryResponse {
 }
 
 // Thêm interface cho booking detail
+export interface BookingDrink {
+  drinkId: string;
+  drinkName: string;
+  actualPrice: number;
+  quantity: number;
+  image: string;
+}
+
 export interface BookingDetail {
   bookingId: string;
   barName: string;
@@ -32,13 +41,17 @@ export interface BookingDetail {
   customerPhone: string;
   customerEmail: string;
   note: string;
+  totalPrice: number | null;
+  additionalFee: number | null;
   bookingDate: string;
   bookingTime: string;
   createAt: string;
+  qrTicket: string;
   images: string[];
   status: number;
+  isRated: boolean | null;
   tableNameList: string[];
-  bookingDrinksList: any[]; // Tạm thời để any
+  bookingDrinksList: BookingDrink[];
 }
 
 export interface BookingDetailResponse {
@@ -48,23 +61,16 @@ export interface BookingDetailResponse {
 }
 
 class BookingService {
-  private async getAuthHeader() {
-    const token = await AsyncStorage.getItem('userToken');
-    return {
-      Authorization: `Bearer ${token}`,
-    };
-  }
-
   async getBookingHistory(
     accountId: string,
     pageIndex: number = 1,
     pageSize: number = 10
   ): Promise<BookingHistoryResponse> {
     try {
-      const headers = await this.getAuthHeader();
+      const authHeader = await getAuthHeader();
       const response = await axios.get(
         `${API_CONFIG.BASE_URL}/api/Booking/${accountId}?PageIndex=${pageIndex}&PageSize=${pageSize}`,
-        { headers }
+        authHeader
       );
       return response.data;
     } catch (error) {
@@ -73,17 +79,59 @@ class BookingService {
     }
   }
 
-  // Thêm method getBookingDetail
   async getBookingDetail(bookingId: string): Promise<BookingDetailResponse> {
     try {
-      const headers = await this.getAuthHeader();
+      const authHeader = await getAuthHeader();
       const response = await axios.get(
         `${API_CONFIG.BASE_URL}/api/Booking/detail/${bookingId}`,
-        { headers }
+        authHeader
       );
       return response.data;
     } catch (error) {
       console.error('Error fetching booking detail:', error);
+      throw error;
+    }
+  }
+
+  async cancelBooking(bookingId: string): Promise<boolean> {
+    try {
+      const authHeader = await getAuthHeader();
+      if (!authHeader.headers) {
+        throw new Error('Bạn cần đăng nhập để thực hiện chức năng này');
+      }
+
+      const response = await axios.patch(
+        `${API_CONFIG.BASE_URL}/api/Booking/cancel/${bookingId}`,
+        {},
+        {
+          ...authHeader,
+          validateStatus: (status) => true
+        }
+      );
+      
+      if (response.status === 405) {
+        throw new Error('Phương thức không được phép. Vui lòng liên hệ admin.');
+      }
+      
+      if (response.status === 202) {
+        throw new Error(`Bạn chỉ có thể hủy bàn trước ${response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
+      }
+      
+      if (response.data.statusCode !== 200) {
+        throw new Error(response.data.message || 'Không thể hủy đặt bàn');
+      }
+      
+      return true;
+    } catch (error: any) {
+      if (error.response?.status === 202) {
+        throw new Error(`Bạn chỉ có thể hủy bàn trước ${error.response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
+      }
+      if (error.response) {
+        throw new Error(
+          error.response.data.message || 
+          `Lỗi ${error.response.status}: Không thể hủy đặt bàn`
+        );
+      }
       throw error;
     }
   }

@@ -6,7 +6,6 @@ import { barService, type Bar } from '@/services/bar';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import debounce from 'lodash/debounce';
 
 // Thêm component BarSkeleton
 const BarSkeleton = () => (
@@ -83,81 +82,52 @@ export default function BarsScreen() {
   const [bars, setBars] = useState<Bar[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  // Thêm state để track trạng thái search
-  const [isSearching, setIsSearching] = useState(false);
+  const [showOpenOnly, setShowOpenOnly] = useState(false);
 
-  const fetchBars = async (page: number, search?: string, refresh: boolean = false) => {
-    if (refresh) {
-      setLoading(true);
-      // Reset các state khi refresh
-      setBars([]);
-      setCurrentPage(1);
-      setHasMore(true);
-    } else {
-      setLoadingMore(true);
-    }
-
+  // Đơn giản hóa fetchBars
+  const fetchBars = async () => {
+    setLoading(true);
     try {
-      const data = await barService.getBars(page, 5, search);
-      if (refresh) {
-        setBars(data);
-      } else {
-        if (data.length > 0) {
-          setBars(prev => [...prev, ...data]);
-        }
-      }
-      setHasMore(data.length === 5);
+      const data = await barService.getBars();
+      setBars(data);
     } catch (error) {
       console.error('Error fetching bars:', error);
-      // Reset state khi có lỗi
-      if (refresh) {
-        setBars([]);
-      }
+      setBars([]);
     } finally {
       setLoading(false);
-      setLoadingMore(false);
-      if (refresh) {
-        setIsSearching(false);
-      }
     }
   };
 
-  const debouncedSearch = useCallback(
-    debounce((query: string) => {
-      fetchBars(1, query, true);
-    }, 500),
-    []
-  );
+  // Tối ưu lại getFilteredBars
+  const getFilteredBars = useCallback(() => {
+    return bars.filter(bar => {
+      // Nếu có search query, kiểm tra match
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const nameMatch = bar.barName.toLowerCase().includes(query);
+        const addressMatch = bar.address.toLowerCase().includes(query);
+        if (!nameMatch && !addressMatch) return false;
+      }
 
-  const handleSearch = (text: string) => {
-    setSearchQuery(text);
-    setIsSearching(true); // Bắt đầu search
-    setBars([]); // Clear results ngay khi bắt đầu search
-    debouncedSearch(text);
-  };
+      // Nếu filter "Đang mở cửa" được bật
+      if (showOpenOnly && !isBarOpen(bar.barTimeResponses)) {
+        return false;
+      }
 
+      return true;
+    });
+  }, [bars, searchQuery, showOpenOnly]);
+
+  // Đơn giản hóa onRefresh
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    fetchBars(1, searchQuery, true).finally(() => setRefreshing(false));
-  }, [searchQuery]);
+    fetchBars().finally(() => setRefreshing(false));
+  }, []);
 
-  const loadMore = () => {
-    if (!loadingMore && hasMore && !isSearching) {
-      fetchBars(currentPage + 1, searchQuery);
-      setCurrentPage(prev => prev + 1);
-    }
-  };
-
-  // Thêm useEffect để handle khi searchQuery thay đổi
+  // Load data lần đầu
   useEffect(() => {
-    if (searchQuery === '') {
-      // Nếu xóa search query, load lại tất cả data
-      fetchBars(1, '', true);
-    }
-  }, [searchQuery]);
+    fetchBars();
+  }, []);
 
   const getAverageRating = (feedBacks: Array<{ rating: number }>) => {
     if (!feedBacks || feedBacks.length === 0) return null;
@@ -173,30 +143,45 @@ export default function BarsScreen() {
           <Text className="text-yellow-500 text-2xl font-bold mb-4">
             Quán Bar
           </Text>
-          <View className="flex-row items-center bg-white/10 rounded-xl px-4 py-2">
-            <Ionicons name="search" size={20} color="#9CA3AF" />
-            <TextInput
-              placeholder="Tìm kiếm quán bar..."
-              placeholderTextColor="#9CA3AF"
-              className="flex-1 ml-2 text-white"
-              value={searchQuery}
-              onChangeText={handleSearch}
-            />
-            {searchQuery !== '' && (
-              <TouchableOpacity 
-                onPress={() => {
-                  setSearchQuery('');
-                  handleSearch('');
-                }}
-              >
-                <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-              </TouchableOpacity>
-            )}
+          
+          {/* Search bar with integrated filter */}
+          <View className="flex-row items-center space-x-2">
+            <View className="flex-1 flex-row items-center bg-white/10 rounded-xl h-11">
+              <View className="flex-row items-center flex-1 px-4">
+                <Ionicons name="search" size={20} color="#9CA3AF" />
+                <TextInput
+                  placeholder="Tìm kiếm quán Bar, địa chỉ quán Bar..."
+                  placeholderTextColor="#9CA3AF"
+                  className="flex-1 ml-2 text-white"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery !== '' && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* Filter button */}
+            <TouchableOpacity
+              onPress={() => setShowOpenOnly(!showOpenOnly)}
+              className={`items-center justify-center w-11 h-11 rounded-xl ${
+                showOpenOnly ? 'bg-yellow-500' : 'bg-white/10'
+              }`}
+            >
+              <Ionicons 
+                name={showOpenOnly ? "time" : "time-outline"} 
+                size={20} 
+                color={showOpenOnly ? "black" : "#9CA3AF"} 
+              />
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Content */}
-        {(loading || isSearching) ? (
+        {loading ? (
           <ScrollView 
             className="flex-1" 
             contentContainerStyle={{ padding: 24 }}
@@ -208,33 +193,28 @@ export default function BarsScreen() {
           </ScrollView>
         ) : (
           <FlatList
-            data={bars}
+            data={getFilteredBars()}
             keyExtractor={item => item.barId}
             contentContainerStyle={{ padding: 24 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
-            onEndReached={loadMore}
-            onEndReachedThreshold={0.5}
             ItemSeparatorComponent={() => <View className="h-6" />}
             ListEmptyComponent={() => (
               <View className="flex-1 items-center justify-center py-20">
-                <Ionicons name="search" size={48} color="#EAB308" />
+                <Ionicons 
+                  name={searchQuery ? "search" : "time-outline"} 
+                  size={48} 
+                  color="#EAB308" 
+                />
                 <Text className="text-white text-lg font-bold mt-4">
-                  Không tìm thấy kết quả
+                  {searchQuery ? 'Không tìm thấy kết quả' : 'Không có quán bar nào đang mở cửa'}
                 </Text>
                 <Text className="text-white/60 text-center mt-2">
-                  Thử tìm kiếm với từ khóa khác
+                  {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử lại vào thời điểm khác'}
                 </Text>
               </View>
-            )}
-            ListFooterComponent={() => (
-              loadingMore ? (
-                <View className="py-4">
-                  <ActivityIndicator color="#EAB308" />
-                </View>
-              ) : null
             )}
             renderItem={({ item: bar }) => (
               <Animated.View entering={FadeIn}>
@@ -263,7 +243,7 @@ export default function BarsScreen() {
                             }`}
                           >
                             <Text className="text-white font-medium text-xs">
-                              {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
+                              {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bn hôm nay'}
                             </Text>
                           </View>
                         )}

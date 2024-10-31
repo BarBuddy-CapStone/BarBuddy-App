@@ -68,7 +68,7 @@ export interface IBarService {
 }
 
 class BarService implements IBarService {
-  async getBars(pageIndex: number = 1, pageSize: number = 10, search?: string): Promise<Bar[]> {
+  async getBars(pageIndex: number = 1, pageSize: number = 1000, search?: string): Promise<Bar[]> {
     try {
       let url = `${API_CONFIG.BASE_URL}/api/v1/bars?PageIndex=${pageIndex}&PageSize=${pageSize}`;
       if (search) {

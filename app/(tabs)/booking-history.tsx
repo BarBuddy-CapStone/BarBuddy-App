@@ -362,7 +362,7 @@ const BookingItem = ({ booking, onRefreshList }: {
                 className="bg-red-500/10 px-4 py-2 rounded-full"
                 onPress={openCancelModal}
               >
-                <Text className="text-red-500 font-bold text-sm">Hủy đặt chỗ</Text>
+                <Text className="text-red-500 font-bold text-sm">Hủy đặt bàn</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -380,14 +380,14 @@ const BookingItem = ({ booking, onRefreshList }: {
                 <View className="items-center py-4">
                   <ActivityIndicator size="large" color="#EAB308" />
                   <Text className="text-white text-lg font-bold mt-4">
-                    Đang hủy đặt chỗ...
+                    Đang hủy đặt bàn...
                   </Text>
                 </View>
               ) : cancelStatus === 'success' ? (
                 <View className="items-center py-4">
                   <Ionicons name="checkmark-circle" size={48} color="#22C55E" />
                   <Text className="text-white text-lg font-bold mt-4">
-                    Đã hủy đặt chỗ thành công
+                    Đã hủy đặt bàn thành công
                   </Text>
                 </View>
               ) : cancelStatus === 'error' ? (
@@ -395,7 +395,7 @@ const BookingItem = ({ booking, onRefreshList }: {
                   <View className="items-center py-4">
                     <Ionicons name="alert-circle" size={48} color="#EF4444" />
                     <Text className="text-white text-lg font-bold mt-4">
-                      Không thể hủy đặt chỗ
+                      Không thể hủy đặt bàn
                     </Text>
                     <Text className="text-white/60 text-center mt-2">
                       {errorMessage}
@@ -422,10 +422,10 @@ const BookingItem = ({ booking, onRefreshList }: {
               ) : (
                 <>
                   <Text className="text-white text-lg font-bold text-center mb-2">
-                    Xác nhận hủy đặt chỗ
+                    Xác nhận hủy đặt bàn
                   </Text>
                   <Text className="text-white/60 text-center mb-6">
-                    Bạn có chắc chắn muốn hủy đặt chỗ này không?
+                    Bạn có chắc chắn muốn hủy đặt bàn này không?
                   </Text>
                   
                   <View className="flex-row space-x-3">
@@ -443,7 +443,7 @@ const BookingItem = ({ booking, onRefreshList }: {
                       disabled={isCanceling}
                     >
                       <Text className="text-white font-semibold text-center">
-                        Hủy đặt chỗ
+                        Hủy đặt bàn
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -730,28 +730,46 @@ export default function BookingHistoryScreen() {
   const [selectedStatus, setSelectedStatus] = useState<number>(0);
   const params = useLocalSearchParams();
 
+  // Thêm states cho filter
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filterBy, setFilterBy] = useState<'createAt' | 'bookingTime'>('createAt');
+
+  // Thêm hàm xử lý filter
+  const handleFilterChange = (type: 'createAt' | 'bookingTime') => {
+    setFilterBy(type);
+    setShowFilterModal(false);
+    // Thực hiện filter dữ liệu ở đây
+    onRefresh();
+  };
+
   const filteredBookings = useMemo(() => {
     // Lọc theo status
     const filtered = bookings.filter(booking => booking.status === selectedStatus);
 
-    // Sort theo bookingDate và bookingTime
+    // Sort theo lựa chọn filter
     return filtered.sort((a, b) => {
-      // So sánh ngày trước
-      const dateCompare = b.bookingDate.localeCompare(a.bookingDate);
-      if (dateCompare !== 0) return dateCompare;
+      if (filterBy === 'createAt') {
+        // Sort theo thời gian tạo đơn
+        return new Date(b.createAt).getTime() - new Date(a.createAt).getTime();
+      } else {
+        // Sort theo ngày và giờ sử dụng
+        // So sánh ngày trước
+        const dateCompare = b.bookingDate.localeCompare(a.bookingDate);
+        if (dateCompare !== 0) return dateCompare;
 
-      // Nếu cùng ngày, so sánh giờ
-      const timeA = a.bookingTime.split(':');
-      const timeB = b.bookingTime.split(':');
-      
-      // So sánh giờ
-      const hourCompare = Number(timeB[0]) - Number(timeA[0]);
-      if (hourCompare !== 0) return hourCompare;
-      
-      // So sánh phút nếu cùng giờ
-      return Number(timeB[1]) - Number(timeA[1]);
+        // Nếu cùng ngày, so sánh giờ
+        const timeA = a.bookingTime.split(':');
+        const timeB = b.bookingTime.split(':');
+        
+        // So sánh giờ
+        const hourCompare = Number(timeB[0]) - Number(timeA[0]);
+        if (hourCompare !== 0) return hourCompare;
+        
+        // So sánh phút nếu cùng giờ
+        return Number(timeB[1]) - Number(timeA[1]);
+      }
     });
-  }, [bookings, selectedStatus]);
+  }, [bookings, selectedStatus, filterBy]);
 
   const statusCounts = useMemo(() => ({
     all: bookings.length,
@@ -833,16 +851,22 @@ export default function BookingHistoryScreen() {
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
+        {/* Header với nút filter */}
         <View className="px-6 py-4 border-b border-white/10">
-          <Text className="text-yellow-500 text-2xl font-bold mb-4">
-            Lịch sử đặt bàn
-          </Text>
-          
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            className="mb-2"
-          >
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-yellow-500 text-2xl font-bold">
+              Lịch sử đặt bàn
+            </Text>
+            
+            <TouchableOpacity 
+              onPress={() => setShowFilterModal(true)}
+              className="bg-white/10 p-2 rounded-full"
+            >
+              <Ionicons name="filter" size={20} color="#EAB308" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
             <FilterTab
               active={selectedStatus === 0}
               label="Đang chờ"
@@ -869,6 +893,59 @@ export default function BookingHistoryScreen() {
             />
           </ScrollView>
         </View>
+
+        {/* Modal Filter */}
+        <Modal
+          visible={showFilterModal}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setShowFilterModal(false)}
+        >
+          <TouchableOpacity 
+            activeOpacity={1}
+            onPress={() => setShowFilterModal(false)} 
+            className="flex-1 bg-black/50 justify-center items-center p-6"
+          >
+            <TouchableOpacity 
+              activeOpacity={1}
+              onPress={e => e.stopPropagation()}
+              className="bg-[#1C1C1E] w-full rounded-2xl overflow-hidden"
+            >
+              <View className="p-4 border-b border-white/10">
+                <Text className="text-white text-lg font-bold text-center">
+                  Sắp xếp theo
+                </Text>
+              </View>
+
+              <TouchableOpacity 
+                onPress={() => handleFilterChange('createAt')}
+                className="flex-row items-center p-4 border-b border-white/10"
+              >
+                <View className="flex-1">
+                  <Text className="text-white font-medium">Ngày đặt bàn</Text>
+                  <Text className="text-white/60 text-sm">Sắp xếp theo thời gian tạo đơn</Text>
+                </View>
+                {filterBy === 'createAt' && (
+                  <Ionicons name="checkmark-circle" size={24} color="#EAB308" />
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                onPress={() => handleFilterChange('bookingTime')}
+                className="flex-row items-center p-4"
+              >
+                <View className="flex-1">
+                  <Text className="text-white font-medium">Ngày sử dụng</Text>
+                  <Text className="text-white/60 text-sm">Sắp xếp theo thời gian phục vụ</Text>
+                </View>
+                {filterBy === 'bookingTime' && (
+                  <Ionicons name="checkmark-circle" size={24} color="#EAB308" />
+                )}
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </Modal>
 
         {loading && bookings.length === 0 ? (
           <ScrollView className="flex-1 px-4">

@@ -1,10 +1,10 @@
-import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Image, ActivityIndicator, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { BarDetail, barService } from '@/services/bar';
 import { TableType, tableTypeService } from '@/services/table-type';
@@ -12,13 +12,14 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Account, accountService } from '@/services/account';
 import { useAuth } from '@/contexts/AuthContext';
-import { bookingTableService } from '@/services/booking-table';
+import { BookingTableFilter, BookingTableRequest, bookingTableService } from '@/services/booking-table';
 
 // Thêm interface cho state availableTables
 interface TableUI {
   id: string;
   name: string;
   status: 'available' | 'booked';
+  typeId: string;
 }
 
 // Thêm interface mới để lưu thông tin bàn đã chọn
@@ -29,19 +30,60 @@ interface SelectedTableInfo {
   typeName: string;
 }
 
-// Thêm interface cho request
-export interface BookingTableRequest {
-  barId: string;
-  bookingDate: string; // Format: yyyy-MM-dd
-  bookingTime: string; // Format: HH:
-  note: string;
-  tableIds: string[];
-}
-
 // Thêm hàm xử lý images ở đầu file
 const getImageArray = (imagesString: string): string[] => {
   if (!imagesString) return [];
   return imagesString.split(',').map(img => img.trim()).filter(img => img !== '');
+};
+
+// Thêm hàm helper để lấy thông tin giờ mở cửa theo ngày
+const getOperatingHours = (date: Date, barDetail: BarDetail) => {
+  const dayOfWeek = date.getDay();
+  const barTimeForSelectedDay = barDetail.barTimeResponses.find(
+    time => time.dayOfWeek === dayOfWeek
+  );
+
+  // Format ngày trong tuần
+  const getDayOfWeekText = (day: number) => {
+    return day === 0 ? 'Chủ nhật' : `Thứ ${day + 1}`;
+  };
+
+  if (!barTimeForSelectedDay) {
+    return {
+      isOpen: false,
+      hours: `Đóng cửa vào ${getDayOfWeekText(dayOfWeek)}`
+    };
+  }
+
+  // Format giờ từ HH:mm:ss thành HH:mm
+  const formatTime = (time: string) => {
+    return time.split(':').slice(0, 2).join(':');
+  };
+
+  return {
+    isOpen: true,
+    hours: `${getDayOfWeekText(dayOfWeek)}: ${formatTime(barTimeForSelectedDay.startTime)} - ${formatTime(barTimeForSelectedDay.endTime)}`
+  };
+};
+
+// Thêm constant cho số lượng bàn tối đa
+const MAX_TABLES = 5;
+
+// Thêm hàm helper để tính ngày tối đa có thể chọn
+const getMaxBookingDate = () => {
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 30); // Thêm 30 ngày
+  return maxDate;
+};
+
+// Thêm hàm helper để xử lý ngày booking
+const getBookingDate = (date: Date, time: string) => {
+  if (time.includes('(+1 ngày)')) {
+    const nextDay = new Date(date);
+    nextDay.setDate(nextDay.getDate() + 1);
+    return format(nextDay, 'yyyy-MM-dd');
+  }
+  return format(date, 'yyyy-MM-dd');
 };
 
 export default function BookingTableScreen() {
@@ -67,18 +109,40 @@ export default function BookingTableScreen() {
   const [isBooking, setIsBooking] = useState(false);
   const [showTypeDescription, setShowTypeDescription] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isLoadingTableTypes, setIsLoadingTableTypes] = useState(true);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [showClosedModal, setShowClosedModal] = useState(false);
+  const [closedMessage, setClosedMessage] = useState('');
+  const [showMaxTablesModal, setShowMaxTablesModal] = useState(false);
+  const [isLoadingAccount, setIsLoadingAccount] = useState(true);
+  const [minDate] = useState(new Date()); // Ngày hiện tại
+  const [maxDate] = useState(getMaxBookingDate()); // Ngày tối đa
+  const [showProcessingModal, setShowProcessingModal] = useState(false);
+  const [bookingStatus, setBookingStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const [bookingError, setBookingError] = useState<string>('');
 
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
     const now = new Date();
-    const startHour = parseInt(barDetail.startTime.split(':')[0]); // Ví dụ: 18
-    let endHour = parseInt(barDetail.endTime.split(':')[0]);   // Ví dụ: 3
+    const dayOfWeek = selectedDate.getDay();
+    
+    // Tìm thông tin giờ mở cửa cho ngày được chọn
+    const barTimeForSelectedDay = barDetail.barTimeResponses.find(
+      time => time.dayOfWeek === dayOfWeek
+    );
+
+    if (!barTimeForSelectedDay) {
+      return []; // Quán không mở cửa vào ngày này
+    }
+
+    const startHour = parseInt(barTimeForSelectedDay.startTime.split(':')[0]);
+    let endHour = parseInt(barTimeForSelectedDay.endTime.split(':')[0]);
     
     // Xử lý trường hợp đóng cửa sau 0h
     const isAfterMidnight = endHour < startHour;
     if (isAfterMidnight) {
-      endHour += 24; // Chuyển 3h thành 27h để dễ tính toán
+      endHour += 24; // Chuyển 4h thành 28h để dễ tính toán
     }
-    
+
     const slots = [];
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
@@ -88,119 +152,188 @@ export default function BookingTableScreen() {
       selectedDate.getMonth() === now.getMonth() &&
       selectedDate.getFullYear() === now.getFullYear();
 
-    // Thêm khung giờ đêm trớc (0h-3h của ngày được chọn)
-    if (!isToday || (isToday && currentHour < endHour % 24)) {
-      for (let hour = 0; hour < endHour % 24; hour++) {
-        if (!isToday || hour > currentHour || (hour === currentHour && currentMinute <= 30)) {
-          slots.push(`${hour.toString().padStart(2, '0')}:00`);
+    const timeInterval = barDetail.timeSlot || 1;
+    
+    for (let hour = startHour; hour < endHour; hour += timeInterval) {
+      const normalizedHour = hour % 24;
+      const timeString = `${normalizedHour.toString().padStart(2, '0')}:00`;
+      
+      // Kiểm tra điều kiện cho ngày hiện tại
+      if (!isToday || 
+          (normalizedHour > currentHour) || 
+          (normalizedHour === currentHour && currentMinute <= 30)) {
+        
+        // Thêm "(+1 ngày)" cho các giờ sau 0h
+        if (hour >= 24) {
+          slots.push(`${timeString} (+1 ngày)`);
+        } else {
+          slots.push(timeString);
         }
       }
     }
 
-    // Thêm khung giờ buổi tối (18h-23h của ngày được chọn)
-    for (let hour = startHour; hour < 24; hour++) {
-      if (!isToday || hour > currentHour || (hour === currentHour && currentMinute <= 30)) {
-        slots.push(`${hour.toString().padStart(2, '0')}:00`);
-      }
-    }
-
-    // Thêm khung giờ đêm sau (0h-3h của ngày hôm sau)
-    for (let hour = 0; hour < endHour % 24; hour++) {
-      slots.push(`${hour.toString().padStart(2, '0')}:00 (+1 ngày)`);
-    }
-    
     return slots;
   };
 
   const handleTimeChange = (time: string) => {
-    // Xử lý trường hợp khung giờ của ngày hôm sau
-    if (time.includes('(+1 ngày)')) {
-      const nextDay = new Date(selectedDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      setSelectedDate(nextDay);
-      // Loại bỏ "(+1 ngày)" khi lưu giờ
-      setSelectedTime(time.replace(' (+1 ngày)', ''));
-    } else {
+    if (time !== selectedTime) { // Chỉ thực hiện khi chọn giờ khác
       setSelectedTime(time);
+      // Reset các state liên quan
+      setSelectedTables([]);
+      setAvailableTables([]);
+      setCurrentTableType(null);
+      setHasSearched(false); // Reset state hasSearched khi đổi giờ
+      setShowTypeDescription(false); // Reset hiển thị description nếu có
     }
     setShowTimePicker(false);
   };
 
+  // Load bar detail và table types khi component mount
   useEffect(() => {
-    const fetchData = async () => {
-      if (id) {
+    const fetchInitialData = async () => {
+      if (!id) return;
+      
+      try {
         const detail = await barService.getBarDetail(id as string);
         setBarDetail(detail);
         
         if (detail) {
-          const now = new Date();
-          const currentHour = now.getHours();
-          const currentMinute = now.getMinutes();
+          await loadTableTypes();
           
-          // Kiểm tra nếu là ngày hiện tại và đã quá muộn
-          const isToday = selectedDate.getDate() === now.getDate() &&
-            selectedDate.getMonth() === now.getMonth() &&
-            selectedDate.getFullYear() === now.getFullYear();
-          
-          // Nếu là ngày hiện tại và đã quá muộn (23:01 hoặc sau đó)
-          if (isToday && (currentHour === 23 && currentMinute > 0)) {
-            // Tự động chuyển sang ngày hôm sau
-            const nextDay = new Date(selectedDate);
-            nextDay.setDate(nextDay.getDate() + 1);
-            setSelectedDate(nextDay);
-            return; // Thoát để useEffect chạy lại với ngày mới
+          // Kiểm tra giờ mở cửa ngay khi có dữ liệu
+          const today = new Date();
+          const dayOfWeek = today.getDay();
+          const barTimeForSelectedDay = detail.barTimeResponses.find(
+            time => time.dayOfWeek === dayOfWeek
+          );
+
+          if (!barTimeForSelectedDay) {
+            setClosedMessage(`Quán không mở cửa vào ${
+              dayOfWeek === 0 ? 'Chủ nhật' : `Thứ ${dayOfWeek + 1}`
+            }`);
+            setShowClosedModal(true);
+            return;
           }
 
-          const slots = generateAvailableTimeSlots(selectedDate, detail);
-          setAvailableTimeSlots(slots);
-          if (slots.length > 0) {
+          const slots = generateAvailableTimeSlots(today, detail);
+          
+          if (slots.length === 0) {
+            setClosedMessage("Không có khung giờ nào khả dụng cho ngày này");
+            setShowClosedModal(true);
+          } else {
+            setAvailableTimeSlots(slots);
             setSelectedTime(slots[0]);
           }
         }
+      } catch (error) {
+        console.error('Error fetching initial data:', error);
       }
-      await loadTableTypes();
     };
     
-    fetchData();
-  }, [id, selectedDate]); // Thêm selectedDate vào dependencies
+    fetchInitialData();
+  }, [id]); // Chỉ phụ thuộc vào id
+
+  // Kiểm tra giờ mở cửa khi thay đổi ngày
+  useEffect(() => {
+    if (!barDetail) return;
+
+    const dayOfWeek = selectedDate.getDay();
+    const barTimeForSelectedDay = barDetail.barTimeResponses.find(
+      time => time.dayOfWeek === dayOfWeek
+    );
+
+    // Reset states
+    setAvailableTimeSlots([]);
+    setSelectedTime('');
+    setSelectedTables([]);
+    setAvailableTables([]);
+    setCurrentTableType(null);
+    setHasSearched(false);
+    setShowTypeDescription(false);
+
+    if (!barTimeForSelectedDay) {
+      setClosedMessage(`Quán không mở cửa vào ${
+        dayOfWeek === 0 ? 'Chủ nhật' : `Thứ ${dayOfWeek + 1}`
+      }`);
+      setShowClosedModal(true);
+      return;
+    }
+
+    const slots = generateAvailableTimeSlots(selectedDate, barDetail);
+    
+    if (slots.length === 0) {
+      setClosedMessage("Không có khung giờ nào khả dụng cho ngày này");
+      setShowClosedModal(true);
+    } else {
+      setShowClosedModal(false);
+      setAvailableTimeSlots(slots);
+      setSelectedTime(slots[0]);
+    }
+  }, [selectedDate, barDetail]); // Chỉ phụ thuộc vào selectedDate và barDetail
+
+  // Thêm cleanup function cho modal
+  useEffect(() => {
+    return () => {
+      setShowClosedModal(false);
+    };
+  }, []);
 
   const loadTableTypes = async () => {
-    const types = await tableTypeService.getTableTypes();
-    setTableTypes(types);
+    if (!id) return;
+    setIsLoadingTableTypes(true);
+    try {
+      const types = await tableTypeService.getTableTypesOfBar(id as string);
+      setTableTypes(types);
+    } catch (error) {
+      console.error('Error loading table types:', error);
+      setTableTypes([]);
+    } finally {
+      setIsLoadingTableTypes(false);
+    }
   };
 
   const handleDateChange = (event: any, date?: Date) => {
     setShowDatePicker(false);
-    if (date) {
-      setSelectedDate(date);
+    
+    // Nếu người dùng cancel hoặc không chọn ngày
+    if (!date || event.type === 'dismissed') {
+      return;
     }
+
+    // Khi người dùng chọn ngày mới
+    setSelectedDate(date);
+    // Reset các state liên quan
+    setSelectedTables([]);
+    setAvailableTables([]);
+    setCurrentTableType(null);
+    setHasSearched(false);
+    setShowTypeDescription(false);
   };
 
   const handleSearchTables = async () => {
     setIsSearching(true);
+    setHasSearched(true);
     try {
-      const filter = {
+      const filter: BookingTableFilter = {
         barId: id as string,
         tableTypeId: selectedTableType,
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        timeSpan: selectedTime,
+        date: format(selectedDate, 'yyyy-MM-dd'), // Luôn sử dụng ngày gốc cho filter
+        timeSpan: selectedTime.replace(' (+1 ngày)', '') + ':00',
       };
 
       const response = await bookingTableService.findAvailableTables(filter);
-      
-      // Lấy danh sách bàn từ response
       const tables = response.bookingTables[0]?.tables || [];
       
-      // Chuyển đổi dữ liệu để phù hợp với giao diện
       const formattedTables: TableUI[] = tables.map(table => ({
         id: table.tableId,
         name: table.tableName,
-        status: table.status === 1 ? 'available' as const : 'booked' as const
+        status: table.status === 1 ? 'available' as const : 'booked' as const,
+        typeId: selectedTableType
       }));
 
       setAvailableTables(formattedTables);
-    } catch (error) {
-      console.error('Error searching tables:', error);
+    } catch {
+      setAvailableTables([]);
     } finally {
       setIsSearching(false);
     }
@@ -209,16 +342,22 @@ export default function BookingTableScreen() {
   const handleTableSelection = (table: TableUI) => {
     setSelectedTables(prev => {
       const existingIndex = prev.findIndex(t => t.id === table.id);
+      
       if (existingIndex !== -1) {
-        // Nếu bàn đã được chọn, xóa nó
         return prev.filter(t => t.id !== table.id);
       }
-      // Thêm bàn mới với thông tin loại bàn
+      
+      if (prev.length >= MAX_TABLES) {
+        setShowMaxTablesModal(true);
+        return prev;
+      }
+
+      const tableTypeInfo = tableTypes.find(t => t.tableTypeId === table.typeId);
       return [...prev, {
         id: table.id,
         name: table.name,
-        typeId: selectedTableType,
-        typeName: currentTableType?.name || ''
+        typeId: table.typeId,
+        typeName: tableTypeInfo?.typeName || ''
       }];
     });
   };
@@ -240,11 +379,14 @@ export default function BookingTableScreen() {
   useEffect(() => {
     const fetchAccountInfo = async () => {
       if (!user?.accountId) return;
+      setIsLoadingAccount(true);
       try {
         const data = await accountService.getAccountInfo(user.accountId);
         setAccountInfo(data);
       } catch (error) {
         console.error('Error fetching account info:', error);
+      } finally {
+        setIsLoadingAccount(false);
       }
     };
     
@@ -271,29 +413,36 @@ export default function BookingTableScreen() {
   const handleConfirmBooking = async () => {
     if (isBooking) return;
     setIsBooking(true);
+    setShowProcessingModal(true);
+    setBookingStatus('processing');
+    setBookingError('');
+    
     try {
-      // Tạo booking request với time format HH:mm
+      const bookingDate = selectedTime.includes('(+1 ngày)') 
+        ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+        : format(selectedDate, 'yyyy-MM-dd');
+
       const bookingRequest: BookingTableRequest = {
         barId: id as string,
-        bookingDate: format(selectedDate, 'yyyy-MM-dd'),
+        bookingDate,
         bookingTime: selectedTime.replace(' (+1 ngày)', '') + ':00',
         note: note,
         tableIds: selectedTables.map(table => table.id)
       };
 
-      console.log('Booking Request:', JSON.stringify(bookingRequest, null, 2));
-
       await bookingTableService.bookTable(bookingRequest);
+      setBookingStatus('success');
       setShowConfirmModal(false);
-      router.push('/booking-history');
+      
+      // Delay trước khi chuyển trang
+      setTimeout(() => {
+        setShowProcessingModal(false);
+        router.push('/booking-history');
+      }, 1500);
     } catch (error) {
-      if (error && typeof error === 'object' && 'response' in error) {
-        const axiosError = error as { response?: { data: any } };
-        // if (axiosError.response) {
-        //   console.log('Error Response:', JSON.stringify(axiosError.response.data, null, 2));
-        // }
-      }
       console.error('Error booking tables:', error);
+      setBookingStatus('error');
+      setBookingError('Có lỗi xảy ra khi đặt bàn. Vui lòng thử lại.');
     } finally {
       setIsBooking(false);
     }
@@ -307,7 +456,7 @@ export default function BookingTableScreen() {
           <View className="flex-row items-center mt-4">
             <TouchableOpacity 
               onPress={() => router.back()}
-              className="w-10 h-10 items-center justify-center rounded-full bg-white/20"
+              className="w-10 h-10 items-center justify-center rounded-full bg-white/0"
             >
               <Ionicons name="arrow-back" size={24} color="white" />
             </TouchableOpacity>
@@ -347,8 +496,12 @@ export default function BookingTableScreen() {
               <View className="flex-row justify-between">
                 <View className="flex-row items-center">
                   <Ionicons name="time-outline" size={16} color="#EAB308" />
-                  <Text className="text-white/60 ml-1">
-                    {barDetail.startTime} - {barDetail.endTime}
+                  <Text className={`ml-1 ${
+                    getOperatingHours(selectedDate, barDetail).isOpen 
+                      ? 'text-white/60' 
+                      : 'text-red-500'
+                  }`}>
+                    {getOperatingHours(selectedDate, barDetail).hours}
                   </Text>
                 </View>
                 <View className="flex-row items-center">
@@ -360,53 +513,98 @@ export default function BookingTableScreen() {
               </View>
             </View>
           ) : (
-            <View className="animate-pulse">
-              <View className="flex-row items-center mb-4">
-                <View className="w-16 h-16 rounded-xl bg-white/10" />
+            <Animated.View 
+              entering={FadeIn}
+              className="space-y-4"
+            >
+              {/* Skeleton cho phần header */}
+              <View className="flex-row items-center">
+                {/* Skeleton cho ảnh */}
+                <View className="w-16 h-16 rounded-xl bg-white/10 animate-pulse" />
+                
                 <View className="ml-4 flex-1">
-                  <View className="h-6 bg-white/10 rounded w-3/4 mb-2" />
-                  <View className="h-4 bg-white/10 rounded w-1/2" />
+                  {/* Skeleton cho tên quán */}
+                  <View className="h-7 w-48 bg-white/10 rounded-lg animate-pulse mb-2" />
+                  
+                  {/* Skeleton cho địa chỉ */}
+                  <View className="flex-row items-center">
+                    <View className="w-4 h-4 rounded-full bg-white/10 animate-pulse" />
+                    <View className="h-4 w-56 bg-white/10 rounded animate-pulse ml-1" />
+                  </View>
                 </View>
               </View>
+
+              {/* Skeleton cho phần thông tin thêm */}
               <View className="flex-row justify-between">
-                <View className="h-4 bg-white/10 rounded w-1/3" />
-                <View className="h-4 bg-white/10 rounded w-1/3" />
+                {/* Skeleton cho giờ mở cửa */}
+                <View className="flex-row items-center">
+                  <View className="w-4 h-4 rounded-full bg-white/10 animate-pulse" />
+                  <View className="h-4 w-32 bg-white/10 rounded animate-pulse ml-1" />
+                </View>
+                
+                {/* Skeleton cho số điện thoại */}
+                <View className="flex-row items-center">
+                  <View className="w-4 h-4 rounded-full bg-white/10 animate-pulse" />
+                  <View className="h-4 w-24 bg-white/10 rounded animate-pulse ml-1" />
+                </View>
               </View>
-            </View>
+            </Animated.View>
           )}
         </View>
 
         <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 150 }}>
           {/* Thông tin khách hàng */}
           <View className="bg-neutral-900 px-6 py-6">
-            <View className="flex-row items-center">
-              <Image 
-                source={{ 
-                  uri: accountInfo?.image || 'https://ui-avatars.com/api/?name=' + accountInfo?.fullname 
-                }} 
-                className="w-12 h-12 rounded-full"
-                onError={() => {
-                  setAccountInfo(prev => prev ? {
-                    ...prev,
-                    image: `https://ui-avatars.com/api/?name=${prev.fullname}`
-                  } : null)
-                }}
-              />
-              <View className="ml-3 flex-1">
-                <Text className="text-white font-bold text-lg">
-                  {accountInfo?.fullname || ''}
-                </Text>
-                <View className="flex-row items-center mt-1">
-                  <Text className="text-white/60">
-                    {accountInfo?.email || ''}
+            {isLoadingAccount ? (
+              <Animated.View 
+                entering={FadeIn}
+                className="flex-row items-center"
+              >
+                {/* Skeleton cho avatar */}
+                <View className="w-12 h-12 rounded-full bg-white/10 animate-pulse" />
+                
+                <View className="ml-3 flex-1">
+                  {/* Skeleton cho tên */}
+                  <View className="h-6 w-40 bg-white/10 rounded-lg animate-pulse mb-2" />
+                  
+                  {/* Skeleton cho email và số điện thoại */}
+                  <View className="flex-row items-center">
+                    <View className="h-4 w-32 bg-white/10 rounded animate-pulse" />
+                    <View className="w-1.5 h-1.5 rounded-full bg-white/20 mx-2" />
+                    <View className="h-4 w-24 bg-white/10 rounded animate-pulse" />
+                  </View>
+                </View>
+              </Animated.View>
+            ) : (
+              <View className="flex-row items-center">
+                <Image 
+                  source={{ 
+                    uri: accountInfo?.image || 'https://ui-avatars.com/api/?name=' + accountInfo?.fullname 
+                  }} 
+                  className="w-12 h-12 rounded-full"
+                  onError={() => {
+                    setAccountInfo(prev => prev ? {
+                      ...prev,
+                      image: `https://ui-avatars.com/api/?name=${prev.fullname}`
+                    } : null)
+                  }}
+                />
+                <View className="ml-3 flex-1">
+                  <Text className="text-white font-bold text-lg">
+                    {accountInfo?.fullname || ''}
                   </Text>
-                  <View className="w-1.5 h-1.5 rounded-full bg-white/20 mx-2" />
-                  <Text className="text-white/60">
-                    {accountInfo?.phone || ''}
-                  </Text>
+                  <View className="flex-row items-center mt-1">
+                    <Text className="text-white/60">
+                      {accountInfo?.email || ''}
+                    </Text>
+                    <View className="w-1.5 h-1.5 rounded-full bg-white/20 mx-2" />
+                    <Text className="text-white/60">
+                      {accountInfo?.phone || ''}
+                    </Text>
+                  </View>
                 </View>
               </View>
-            </View>
+            )}
           </View>
 
           {/* Phần còn lại */}
@@ -445,64 +643,103 @@ export default function BookingTableScreen() {
               <View>
                 <Text className="text-white text-lg font-bold mb-4">Chọn loại bàn</Text>
                 
-                {/* Danh sách loại bàn nằm ngang */}
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  className="mb-4"
-                >
-                  {tableTypes.map((type) => (
-                    <TouchableOpacity
-                      key={type.tableTypeId}
-                      onPress={() => handleTableTypeSelect(type.tableTypeId)}
-                      className={`mr-4 px-6 py-3 rounded-xl ${
-                        selectedTableType === type.tableTypeId ? 'bg-yellow-500' : 'bg-white/10'
-                      }`}
-                    >
-                      <Text className={`${
-                        selectedTableType === type.tableTypeId ? 'text-black' : 'text-white'
-                      }`}>
-                        {type.typeName}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-
-                {/* Description panel */}
-                {showTypeDescription && selectedTableType && (
+                {isLoadingTableTypes ? (
                   <Animated.View 
                     entering={FadeIn}
-                    className="bg-white/5 rounded-xl p-4 mb-6"
+                    className="space-x-3 flex-row mb-6"
                   >
-                    {tableTypes.map(type => {
-                      if (type.tableTypeId === selectedTableType) {
-                        return (
-                          <View key={type.tableTypeId}>
-                            <Text className="text-white/60 mb-2">
-                              {type.description}
-                            </Text>
-                            <View className="flex-row justify-between items-center">
-                              <Text className="text-yellow-500">
-                                Tối thiểu {type.minimumPrice.toLocaleString('vi-VN')}đ
-                              </Text>
-                              <TouchableOpacity 
-                                onPress={() => setShowTypeDescription(false)}
-                                className="bg-white/10 rounded-full p-2"
-                              >
-                                <Ionicons name="close" size={16} color="white" />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        );
-                      }
-                      return null;
-                    })}
+                    {[1,2,3].map((i) => (
+                      <View key={i} className="h-12 w-32 bg-white/10 rounded-xl animate-pulse" />
+                    ))}
                   </Animated.View>
+                ) : tableTypes.length === 0 ? (
+                  <View className="bg-white/5 rounded-xl p-6 mb-6">
+                    <View className="items-center">
+                      <View className="bg-white/10 p-4 rounded-full mb-4">
+                        <MaterialCommunityIcons
+                          name="table-chair"
+                          size={40}
+                          color="#9CA3AF"
+                        />
+                      </View>
+                      <Text className="text-gray-300 text-lg font-medium text-center">
+                        Quán chưa cập nhật loại bàn
+                      </Text>
+                      <Text className="text-gray-500 text-sm text-center mt-2">
+                        Thông tin loại bàn đang được cập nhật. Vui lòng quay lại sau hoặc liên hệ trực tiếp với quán để biết thêm chi tiết.
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => Linking.openURL(`tel:${barDetail?.phoneNumber}`)}
+                        className="bg-yellow-500 px-6 py-3 rounded-xl mt-4"
+                      >
+                        <Text className="text-black font-bold">Liên h quán</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <View className="mb-6">
+                    <ScrollView 
+                      horizontal 
+                      showsHorizontalScrollIndicator={false}
+                      className="flex-row"
+                    >
+                      {tableTypes.map((type) => (
+                        <TouchableOpacity
+                          key={type.tableTypeId}
+                          onPress={() => {
+                            setSelectedTableType(type.tableTypeId);
+                            setCurrentTableType({
+                              id: type.tableTypeId,
+                              name: type.typeName
+                            });
+                            setShowTypeDescription(true);
+                          }}
+                          className={`bg-white/10 px-4 py-3 rounded-xl mr-3 ${
+                            selectedTableType === type.tableTypeId ? 'border border-yellow-500' : ''
+                          }`}
+                        >
+                          <Text className="text-white font-medium">{type.typeName}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+
+                    {/* Description */}
+                    {showTypeDescription && selectedTableType && (
+                      <Animated.View 
+                        entering={FadeIn}
+                        className="bg-white/5 rounded-xl p-4 mt-4"
+                      >
+                        {tableTypes.map(type => {
+                          if (type.tableTypeId === selectedTableType) {
+                            return (
+                              <View key={type.tableTypeId}>
+                                <Text className="text-white/60 mb-2">
+                                  {type.description}
+                                </Text>
+                                <View className="flex-row justify-between items-center">
+                                  <Text className="text-yellow-500">
+                                    Tối thiểu {type.minimumPrice.toLocaleString('vi-VN')}đ
+                                  </Text>
+                                  <TouchableOpacity 
+                                    onPress={() => setShowTypeDescription(false)}
+                                    className="bg-white/10 rounded-full p-2"
+                                  >
+                                    <Ionicons name="close" size={16} color="white" />
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            );
+                          }
+                          return null;
+                        })}
+                      </Animated.View>
+                    )}
+                  </View>
                 )}
 
-                {/* Nút Tìm bàn */}
+                {/* Nút Tìm bàn - luôn hiển thị bên dưới */}
                 <TouchableOpacity
-                  className={`w-full py-4 rounded-xl mb-6 ${
+                  className={`w-full py-4 rounded-xl ${
                     selectedDate && selectedTime && selectedTableType
                       ? 'bg-yellow-500'
                       : 'bg-white/10'
@@ -523,7 +760,7 @@ export default function BookingTableScreen() {
                 {isSearching && (
                   <Animated.View 
                     entering={FadeIn}
-                    className="space-y-4"
+                    className="space-y-4 mt-4"
                   >
                     <View className="h-6 bg-white/10 rounded-xl animate-pulse" />
                     <View className="flex-row justify-between space-x-2">
@@ -537,7 +774,7 @@ export default function BookingTableScreen() {
                 {/* Kết quả tìm bàn */}
                 {!isSearching && availableTables.length > 0 && (
                   <Animated.View entering={FadeIn}>
-                    <Text className="text-white text-lg font-bold mb-4">Chọn Bàn</Text>
+                    <Text className="text-white text-lg font-bold mb-4 mt-4">Chọn Bàn</Text>
                     <View className="flex-row flex-wrap justify-between">
                       {availableTables.map((table) => (
                         <TouchableOpacity
@@ -606,9 +843,10 @@ export default function BookingTableScreen() {
           <DateTimePicker
             value={selectedDate}
             mode="date"
-            display={Platform.OS === 'ios' ? 'inline' : 'default'}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={handleDateChange}
-            minimumDate={new Date()}
+            minimumDate={minDate}
+            maximumDate={maxDate}
           />
         )}
 
@@ -649,7 +887,7 @@ export default function BookingTableScreen() {
                   ))
                 ) : (
                   <Text className="text-white text-center">
-                    Không có khung giờ no khả dụng
+                    Không có khung giờ nào khả dụng
                   </Text>
                 )}
               </ScrollView>
@@ -663,12 +901,16 @@ export default function BookingTableScreen() {
             <View className="px-6 py-3"> 
               {/* Phần hiển thị bàn đã chọn */}
               <View className="flex-row justify-between items-center mb-2">
-                <Text className="text-white font-bold text-sm">Bàn đã chọn:</Text> 
+                <Text className="text-white font-bold text-sm">
+                  Bàn đã chọn: {selectedTables.length}/{MAX_TABLES}
+                </Text> 
                 <TouchableOpacity 
                   onPress={() => setShowSelectedTablesModal(true)}
                   className="bg-white/10 px-2 py-0.5 rounded-full"
                 >
-                  <Text className="text-white text-xs">Xem tất cả ({selectedTables.length})</Text>
+                  <Text className="text-white text-xs">
+                    Xem tất cả ({selectedTables.length})
+                  </Text>
                 </TouchableOpacity>
               </View>
               
@@ -902,6 +1144,262 @@ export default function BookingTableScreen() {
             </View>
           </View>
         </Modal>
+
+        {/* UI thông báo không có bàn */}
+        {hasSearched && !isSearching && availableTables.length === 0 && (
+          <Modal
+            visible={hasSearched && !isSearching && availableTables.length === 0}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setHasSearched(false)}
+          >
+            <TouchableOpacity 
+              activeOpacity={1} 
+              onPress={() => setHasSearched(false)}
+              className="flex-1 justify-center items-center bg-black/50"
+            >
+              <TouchableOpacity 
+                activeOpacity={1}
+                onPress={e => e.stopPropagation()} 
+                className="bg-neutral-800 w-[85%] rounded-xl p-6"
+              >
+                <View className="items-center">
+                  {/* Header với nút đóng */}
+                  <View className="w-full flex-row justify-end mb-4">
+                    <TouchableOpacity 
+                      onPress={() => setHasSearched(false)}
+                      className="p-1"
+                    >
+                      <Ionicons name="close" size={24} color="white" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Icon và nội dung */}
+                  <View className="bg-white/10 p-4 rounded-full mb-4">
+                    <MaterialCommunityIcons
+                      name="table-furniture"
+                      size={40}
+                      color="#9CA3AF"
+                    />
+                  </View>
+                  <Text className="text-white text-lg font-medium text-center mb-2">
+                    Không có bàn cho loại này
+                  </Text>
+                  <Text className="text-gray-400 text-center mb-6">
+                    Hiện tại không có bàn nào thuộc loại {currentTableType?.name} có sẵn
+                  </Text>
+                  
+                  {/* Nút tác vụ */}
+                  <View className="w-full">
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setSelectedTableType('');
+                        setCurrentTableType(null);
+                        setShowTypeDescription(false);
+                        setHasSearched(false);
+                      }}
+                      className="flex-row items-center justify-center bg-white/10 p-4 rounded-xl"
+                    >
+                      <MaterialCommunityIcons name="table-chair" size={20} color="#EAB308" className="mr-2" />
+                      <Text className="text-white ml-2">Chọn loại bàn khác</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
+        )}
+
+        {/* Modal thông báo quán đóng cửa */}
+        {showClosedModal && (
+          <Modal
+            visible={showClosedModal}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setShowClosedModal(false)}
+          >
+            <TouchableOpacity 
+              activeOpacity={1} 
+              onPress={() => setShowClosedModal(false)}
+              className="flex-1 justify-center items-center bg-black/50"
+            >
+              <TouchableOpacity 
+                activeOpacity={1}
+                onPress={e => e.stopPropagation()} 
+                className="bg-neutral-800 w-[85%] rounded-xl p-6"
+              >
+                <View className="items-center">
+                  {/* Header với nút đóng */}
+                  <View className="w-full flex-row justify-end mb-4">
+                    <TouchableOpacity 
+                      onPress={() => setShowClosedModal(false)}
+                      className="p-1"
+                    >
+                      <Ionicons name="close" size={24} color="white" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Icon và nội dung */}
+                  <View className="bg-white/10 p-4 rounded-full mb-4">
+                    <Ionicons
+                      name="time-outline"
+                      size={40}
+                      color="#9CA3AF"
+                    />
+                  </View>
+                  <Text className="text-white text-lg font-medium text-center mb-2">
+                    Quán đóng cửa
+                  </Text>
+                  <Text className="text-gray-400 text-center mb-6">
+                    {closedMessage}
+                  </Text>
+                  
+                  {/* Nút tác vụ */}
+                  <View className="w-full">
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setShowClosedModal(false); // Đóng modal trước
+                        setTimeout(() => {
+                          setShowDatePicker(true); // Mở date picker sau một khoảng thời gian ngắn
+                        }, 100);
+                      }}
+                      className="flex-row items-center justify-center bg-white/10 p-4 rounded-xl"
+                    >
+                      <Ionicons name="calendar-outline" size={20} color="#EAB308" className="mr-2" />
+                      <Text className="text-white ml-2">Chọn ngày khác</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
+        )}
+
+        {/* Modal thông báo đã chọn tối đa bàn */}
+        {showMaxTablesModal && (
+          <Modal
+            visible={showMaxTablesModal}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => setShowMaxTablesModal(false)}
+          >
+            <TouchableOpacity 
+              activeOpacity={1} 
+              onPress={() => setShowMaxTablesModal(false)}
+              className="flex-1 justify-center items-center bg-black/50"
+            >
+              <TouchableOpacity 
+                activeOpacity={1}
+                onPress={e => e.stopPropagation()} 
+                className="bg-neutral-800 w-[85%] rounded-xl p-6"
+              >
+                <View className="items-center">
+                  {/* Header với nút đóng */}
+                  <View className="w-full flex-row justify-end mb-4">
+                    <TouchableOpacity 
+                      onPress={() => setShowMaxTablesModal(false)}
+                      className="p-1"
+                    >
+                      <Ionicons name="close" size={24} color="white" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Icon và nội dung */}
+                  <View className="bg-white/10 p-4 rounded-full mb-4">
+                    <MaterialCommunityIcons
+                      name="table-furniture"
+                      size={40}
+                      color="#9CA3AF"
+                    />
+                  </View>
+                  <Text className="text-white text-lg font-medium text-center mb-2">
+                    Đã đạt giới hạn bàn
+                  </Text>
+                  <Text className="text-gray-400 text-center mb-6">
+                    Bạn chỉ có thể chọn tối đa {MAX_TABLES} bàn cho mỗi lần đặt
+                  </Text>
+                  
+                  {/* Nút tác vụ */}
+                  <View className="w-full">
+                    <TouchableOpacity 
+                      onPress={() => setShowMaxTablesModal(false)}
+                      className="flex-row items-center justify-center bg-white/10 p-4 rounded-xl"
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={20} color="#EAB308" className="mr-2" />
+                      <Text className="text-white ml-2">Đã hiểu</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            </TouchableOpacity>
+          </Modal>
+        )}
+
+        {/* Modal xử lý booking */}
+        {showProcessingModal && (
+          <Modal
+            visible={showProcessingModal}
+            transparent={true}
+            animationType="fade"
+          >
+            <View className="flex-1 justify-center items-center bg-black/50">
+              <View className="bg-neutral-800 w-[85%] rounded-xl p-6">
+                <View className="items-center">
+                  {bookingStatus === 'processing' && (
+                    <>
+                      <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+                      <Text className="text-white text-lg font-medium text-center">
+                        Đang xử lý đặt bàn...
+                      </Text>
+                    </>
+                  )}
+
+                  {bookingStatus === 'success' && (
+                    <>
+                      <View className="bg-white/10 p-4 rounded-full mb-4">
+                        <Ionicons name="checkmark-circle-outline" size={40} color="#22C55E" />
+                      </View>
+                      <Text className="text-white text-lg font-medium text-center mb-2">
+                        Đặt bàn thành công!
+                      </Text>
+                      <Text className="text-gray-400 text-center">
+                        Bạn sẽ được chuyển đến trang lịch sử đặt bàn
+                      </Text>
+                    </>
+                  )}
+
+                  {bookingStatus === 'error' && (
+                    <>
+                      <View className="bg-white/10 p-4 rounded-full mb-4">
+                        <Ionicons name="alert-circle-outline" size={40} color="#EF4444" />
+                      </View>
+                      <Text className="text-white text-lg font-medium text-center mb-2">
+                        Đặt bàn thất bại
+                      </Text>
+                      <Text className="text-gray-400 text-center mb-6">
+                        {bookingError}
+                      </Text>
+                      <View className="w-full space-y-3">
+                        <TouchableOpacity 
+                          onPress={() => setShowProcessingModal(false)}
+                          className="bg-white/10 py-4 rounded-xl"
+                        >
+                          <Text className="text-white text-center">Đóng</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          onPress={handleConfirmBooking}
+                          className="bg-yellow-500 py-4 rounded-xl"
+                        >
+                          <Text className="text-black text-center font-bold">Thử lại</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
       </SafeAreaView>
     </View>
   );

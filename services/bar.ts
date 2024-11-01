@@ -31,6 +31,7 @@ export type BarDetail = {
   images: string;
   discount: number;
   status: boolean;
+  timeSlot: number;
   isAnyTableAvailable: boolean;
   feedBacks: Array<{
     bookingId: string;

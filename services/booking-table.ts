@@ -62,8 +62,16 @@ class BookingTableService {
       );
       return response.data.data;
     } catch (error) {
-      console.error('Error finding available tables:', error);
-      throw error;
+      return {
+        tableTypeId: filter.tableTypeId,
+        typeName: '',
+        description: '',
+        bookingTables: [{
+          reservationDate: filter.date,
+          reservationTime: filter.timeSpan,
+          tables: []
+        }]
+      };
     }
   }
 

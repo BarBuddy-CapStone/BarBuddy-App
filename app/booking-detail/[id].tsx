@@ -127,7 +127,7 @@ const BookingInfo = ({ booking }: { booking: BookingDetail }) => (
   <View className="px-6 mb-4">
     <View className="bg-white/5 rounded-2xl p-4">
       <View className="flex-row items-center justify-between mb-4">
-        <Text className="text-white/60">Mã đặt chỗ</Text>
+        <Text className="text-white/60">Mã đặt bàn</Text>
         <Text className="text-white font-medium">{booking.bookingCode}</Text>
       </View>
 
@@ -667,7 +667,7 @@ export default function BookingDetailScreen() {
                         onPress={() => setShowCancelModal(true)}
                       >
                         <Text className="text-white font-bold text-center text-lg">
-                            Hủy đặt chỗ
+                            Hủy đặt bàn
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -714,14 +714,14 @@ export default function BookingDetailScreen() {
                     <View className="items-center py-4">
                       <ActivityIndicator size="large" color="#EAB308" />
                       <Text className="text-white text-lg font-bold mt-4">
-                        Đang hủy đặt chỗ...
+                        Đang hủy đặt bàn...
                       </Text>
                     </View>
                   ) : cancelStatus === 'success' ? (
                     <View className="items-center py-4">
                       <Ionicons name="checkmark-circle" size={48} color="#22C55E" />
                       <Text className="text-white text-lg font-bold mt-4">
-                        Đã hủy đặt chỗ thành công
+                        Đã hủy đặt bàn thành công
                       </Text>
                     </View>
                   ) : cancelStatus === 'error' ? (
@@ -729,7 +729,7 @@ export default function BookingDetailScreen() {
                       <View className="items-center py-4">
                         <Ionicons name="alert-circle" size={48} color="#EF4444" />
                         <Text className="text-white text-lg font-bold mt-4">
-                          Không thể hủy đặt chỗ
+                          Không thể hủy đặt bàn
                         </Text>
                         <Text className="text-white/60 text-center mt-2">
                           {errorMessage}
@@ -756,10 +756,10 @@ export default function BookingDetailScreen() {
                   ) : (
                     <>
                       <Text className="text-white text-lg font-bold text-center mb-2">
-                        Xác nhận hủy đặt chỗ
+                        Xác nhận hủy đặt bàn
                       </Text>
                       <Text className="text-white/60 text-center mb-6">
-                        Bạn có chắc chắn muốn hủy đặt chỗ này không?
+                        Bạn có chắc chắn muốn hủy đặt bàn này không?
                       </Text>
                       
                       <View className="flex-row space-x-3">
@@ -777,7 +777,7 @@ export default function BookingDetailScreen() {
                           disabled={isCanceling}
                         >
                           <Text className="text-white font-semibold text-center">
-                            Hủy đặt chỗ
+                            Hủy đặt bàn
                           </Text>
                         </TouchableOpacity>
                       </View>

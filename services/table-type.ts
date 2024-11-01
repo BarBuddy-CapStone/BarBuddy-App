@@ -9,12 +9,12 @@ export interface TableType {
 }
 
 class TableTypeService {
-  async getTableTypes(): Promise<TableType[]> {
+  async getTableTypesOfBar(barId: string): Promise<TableType[]> {
     try {
-      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/TableType`);
+      const response = await axios.get(`${API_CONFIG.BASE_URL}/api/TableType/getTTOfBar/${barId}`);
       return response.data.data;
     } catch (error) {
-      console.error('Error fetching table types:', error);
+      console.error('Error fetching table types of bar:', error);
       return [];
     }
   }

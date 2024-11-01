@@ -34,6 +34,29 @@ export interface BookingTableRequest {
     tableIds: string[];
 }
 
+export interface DrinkOrderItem {
+  drinkId: string;
+  quantity: number;
+}
+
+export interface SelectedTableInfo {
+  id: string;
+  name: string;
+  typeId: string;
+  typeName: string;
+}
+
+export interface BookingDrinkRequest {
+  barId: string;
+  bookingDate: string;
+  bookingTime: string;
+  note: string;
+  tableIds: string[];
+  selectedTables: SelectedTableInfo[];
+  paymentDestination: string;
+  drinks: DrinkOrderItem[];
+}
+
 class BookingTableService {
   private async getAuthHeader() {
     const token = await AsyncStorage.getItem('userToken');
@@ -86,6 +109,36 @@ class BookingTableService {
       return response.data;
     } catch (error) {
       console.error('Error booking table:', error);
+      throw error;
+    }
+  }
+
+  async bookTableWithDrinks(request: BookingDrinkRequest) {
+    try {
+      const headers = await this.getAuthHeader();
+      
+      // Log request để debug
+      console.log('Booking request details:', {
+        url: `${API_CONFIG.BASE_URL}/api/Booking/booking-drink/mobile`,
+        headers,
+        requestBody: JSON.stringify(request, null, 2)
+      });
+
+      const response = await axios.post(
+        `${API_CONFIG.BASE_URL}/api/Booking/booking-drink/mobile`,
+        request,
+        { headers }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error booking table with drinks:', error);
+      // Log thêm response error nếu có
+      if (axios.isAxiosError(error)) {
+        console.error('Error response:', {
+          status: error.response?.status,
+          data: error.response?.data
+        });
+      }
       throw error;
     }
   }

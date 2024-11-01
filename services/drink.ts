@@ -57,11 +57,6 @@ class DrinkService {
       return null;
     }
   }
-
-  async getDrinkCategories(): Promise<DrinkCategory[]> {
-    const response = await axios.get('/api/drinks/categories');
-    return response.data;
-  }
 }
 
 export const drinkService = new DrinkService();

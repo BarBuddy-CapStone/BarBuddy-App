@@ -14,6 +14,7 @@ class GoogleAuthService {
 
     try {
       await GoogleSignin.configure({
+        iosClientId: '294668771815-0oslkkj1gg5sov5o7npbbf6beo7aknni.apps.googleusercontent.com',
         webClientId: '294668771815-0ofnuitrmh09f1gs9ift8ap8qnodsnac.apps.googleusercontent.com',
         offlineAccess: true,
         forceCodeForRefreshToken: true,

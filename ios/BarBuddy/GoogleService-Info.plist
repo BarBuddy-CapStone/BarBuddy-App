@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>294668771815-0oslkkj1gg5sov5o7npbbf6beo7aknni.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.294668771815-0oslkkj1gg5sov5o7npbbf6beo7aknni</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>294668771815-f26bdgb6u33t0a8p964lfrtajgbuifgm.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCb_Vh_GfTfjx_UV2DLImMiKY-nW__EKrM</string>
+	<key>GCM_SENDER_ID</key>
+	<string>294668771815</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.fptu.barbuddy</string>
+	<key>PROJECT_ID</key>
+	<string>barbuddy-b2026</string>
+	<key>STORAGE_BUCKET</key>
+	<string>barbuddy-b2026.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:294668771815:ios:e59f86cf6f408e86b61d42</string>
+</dict>
+</plist>

@@ -15,8 +15,7 @@
     "ios": {
       "bundleIdentifier": "com.fptu.barbuddy",
       "buildNumber": "1.0.0",
-      "supportsTablet": true,
-      "associatedDomains": ["applinks:barbuddy.id.vn"]
+      "supportsTablet": true
     },
     "android": {
       "package": "com.fptu.barbuddy",

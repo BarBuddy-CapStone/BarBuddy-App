@@ -66,7 +66,7 @@ const FilterTab = ({
   <TouchableOpacity
     onPress={onPress}
     className={`px-4 py-2 rounded-full mr-2 ${
-      active ? 'bg-yellow-500' : 'bg-white/5'
+      active ? 'bg-yellow-500' : 'bg-neutral-900'
     }`}
   >
     <View className="flex-row items-center">
@@ -277,10 +277,24 @@ const BookingItem = ({ booking, onRefreshList }: {
   const remainingChars = 500 - comment.length;
   const isCommentTooShort = comment.trim().length < 10;
 
+  // Thêm function kiểm tra thời gian hủy
+  const canCancelBooking = useMemo(() => {
+    if (booking.status !== 0) return false;
+
+    const bookingTime = parseISO(booking.bookingDate);
+    const now = new Date();
+    
+    // Tính khoảng cách giữa thời điểm hiện tại và thời gian đặt bàn (tính bằng phút)
+    const diffInMinutes = (bookingTime.getTime() - now.getTime()) / (1000 * 60);
+    
+    // Cho phép hủy nếu còn hơn 120 phút (2 tiếng)
+    return diffInMinutes > 120;
+  }, [booking.status, booking.bookingDate]);
+
   return (
     <>
       <TouchableOpacity 
-        className="bg-white/[0.06] backdrop-blur-lg rounded-2xl p-4 mb-4"
+        className="bg-neutral-900 backdrop-blur-lg rounded-2xl p-4 mb-4"
         activeOpacity={0.7}
         onPress={() => router.push(`/booking-detail/${booking.bookingId}`)}
       >
@@ -358,12 +372,24 @@ const BookingItem = ({ booking, onRefreshList }: {
             )}
             
             {booking.status === 0 && (
-              <TouchableOpacity 
-                className="bg-red-500/10 px-4 py-2 rounded-full"
-                onPress={openCancelModal}
-              >
-                <Text className="text-red-500 font-bold text-sm">Hủy đặt bàn</Text>
-              </TouchableOpacity>
+              <>
+                {canCancelBooking ? (
+                  <TouchableOpacity 
+                    className="bg-red-500/10 px-4 py-2 rounded-full"
+                    onPress={openCancelModal}
+                  >
+                    <Text className="text-red-500 font-bold text-sm">
+                      Hủy đặt bàn
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View className="bg-neutral-800 px-4 py-2 rounded-full">
+                    <Text className="text-white/40 font-bold text-sm">
+                      Không thể hủy
+                    </Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>
@@ -375,7 +401,7 @@ const BookingItem = ({ booking, onRefreshList }: {
           statusBarTranslucent
         >
           <View className="flex-1 bg-black/50 justify-center items-center p-6">
-            <View className="bg-[#1C1C1E] rounded-2xl w-full p-6">
+            <View className="bg-neutral-800 rounded-2xl w-full p-6">
               {cancelStatus === 'loading' ? (
                 <View className="items-center py-4">
                   <ActivityIndicator size="large" color="#EAB308" />
@@ -471,7 +497,7 @@ const BookingItem = ({ booking, onRefreshList }: {
             onPress={(e) => e.stopPropagation()}
             className="w-full"
           >
-            <View className="bg-[#1C1C1E] rounded-2xl w-full overflow-hidden">
+            <View className="bg-neutral-800 rounded-2xl w-full overflow-hidden">
               {/* Header với ảnh bar */}
               <Image
                 source={{ uri: feedback?.barImage }}
@@ -523,7 +549,7 @@ const BookingItem = ({ booking, onRefreshList }: {
                 </View>
 
                 {/* Nội dung đánh giá */}
-                <View className="bg-white/5 rounded-xl p-4">
+                <View className="bg-neutral-700 rounded-xl p-4">
                   <Text className="text-white/90 leading-6">
                     {feedback?.comment}
                   </Text>
@@ -551,7 +577,7 @@ const BookingItem = ({ booking, onRefreshList }: {
             onPress={(e) => e.stopPropagation()}
             className="w-full"
           >
-            <View className="bg-[#1C1C1E] rounded-2xl w-full overflow-hidden">
+            <View className="bg-neutral-800 rounded-2xl w-full overflow-hidden">
               <Image 
                 source={{ uri: booking.image || 'https://placehold.co/60x60/333/FFF?text=Bar' }}
                 className="w-full h-32"
@@ -742,34 +768,97 @@ export default function BookingHistoryScreen() {
     onRefresh();
   };
 
+  const [searchText, setSearchText] = useState('');
+
   const filteredBookings = useMemo(() => {
     // Lọc theo status
-    const filtered = bookings.filter(booking => booking.status === selectedStatus);
+    let filtered = bookings.filter(booking => booking.status === selectedStatus);
+
+    // Lọc theo search text
+    if (searchText) {
+      const searchLower = searchText.toLowerCase();
+      filtered = filtered.filter(booking => {
+        // Tìm theo mã booking
+        if (booking.bookingCode.toLowerCase().includes(searchLower)) {
+          return true;
+        }
+
+        // Tìm theo giờ (định dạng HH:mm hoặc H:mm)
+        const bookingTimeFormatted = booking.bookingTime.slice(0, 5); // Lấy chỉ HH:mm
+        if (bookingTimeFormatted.includes(searchText)) {
+          return true;
+        }
+
+        try {
+          // Tìm theo ngày với nhiều định dạng
+          const searchDate = searchText.trim();
+          const bookingDate = parseISO(booking.bookingDate);
+          
+          // Trường hợp 1: Chỉ nhập ngày (1-31)
+          if (/^\d{1,2}$/.test(searchDate)) {
+            const day = parseInt(searchDate);
+            if (day === bookingDate.getDate()) {
+              return true;
+            }
+          }
+          
+          // Trường hợp 2: Ngày/tháng (dd/MM hoặc d/M)
+          if (/^\d{1,2}[-/]\d{1,2}$/.test(searchDate)) {
+            const [inputDay, inputMonth] = searchDate.split(/[-/]/).map(Number);
+            if (
+              inputDay === bookingDate.getDate() &&
+              inputMonth - 1 === bookingDate.getMonth()
+            ) {
+              return true;
+            }
+          }
+          
+          // Trường hợp 3: Ngày/tháng/năm đầy đủ (dd/MM/yyyy)
+          if (/^\d{1,2}[-/]\d{1,2}[-/]\d{4}$/.test(searchDate)) {
+            const [inputDay, inputMonth, inputYear] = searchDate.split(/[-/]/).map(Number);
+            if (
+              inputDay === bookingDate.getDate() &&
+              inputMonth - 1 === bookingDate.getMonth() &&
+              inputYear === bookingDate.getFullYear()
+            ) {
+              return true;
+            }
+          }
+          
+          // Trường hợp 4: Ngày/tháng/năm rút gọn (dd/MM/yy)
+          if (/^\d{1,2}[-/]\d{1,2}[-/]\d{2}$/.test(searchDate)) {
+            const [inputDay, inputMonth, inputYear] = searchDate.split(/[-/]/).map(Number);
+            const fullYear = 2000 + inputYear;
+            if (
+              inputDay === bookingDate.getDate() &&
+              inputMonth - 1 === bookingDate.getMonth() &&
+              fullYear === bookingDate.getFullYear()
+            ) {
+              return true;
+            }
+          }
+
+        } catch (error) {
+          console.error('Error parsing date:', error);
+        }
+
+        return false;
+      });
+    }
 
     // Sort theo lựa chọn filter
     return filtered.sort((a, b) => {
       if (filterBy === 'createAt') {
-        // Sort theo thời gian tạo đơn
         return new Date(b.createAt).getTime() - new Date(a.createAt).getTime();
       } else {
-        // Sort theo ngày và giờ sử dụng
-        // So sánh ngày trước
         const dateCompare = b.bookingDate.localeCompare(a.bookingDate);
         if (dateCompare !== 0) return dateCompare;
-
-        // Nếu cùng ngày, so sánh giờ
         const timeA = a.bookingTime.split(':');
         const timeB = b.bookingTime.split(':');
-        
-        // So sánh giờ
-        const hourCompare = Number(timeB[0]) - Number(timeA[0]);
-        if (hourCompare !== 0) return hourCompare;
-        
-        // So sánh phút nếu cùng giờ
-        return Number(timeB[1]) - Number(timeA[1]);
+        return timeB[0].localeCompare(timeA[0]) || timeB[1].localeCompare(timeA[1]);
       }
     });
-  }, [bookings, selectedStatus, filterBy]);
+  }, [bookings, selectedStatus, filterBy, searchText]);
 
   const statusCounts = useMemo(() => ({
     all: bookings.length,
@@ -851,22 +940,37 @@ export default function BookingHistoryScreen() {
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
-        {/* Header với nút filter */}
-        <View className="px-6 py-4 border-b border-white/10">
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-yellow-500 text-2xl font-bold">
-              Lịch sử đặt bàn
-            </Text>
-            
+        {/* Header và Search */}
+        <View className="px-4 pt-1 mb-4">
+          {/* Search và Filter */}
+          <View className="flex-row items-center space-x-3 mb-4">
+            <View className="flex-1 bg-neutral-900 rounded-full flex-row items-center h-9 px-3">
+              <Ionicons name="search" size={16} color="#9CA3AF" />
+              <TextInput
+                placeholder="Tìm theo ngày, giờ, mã đặt bàn..."
+                placeholderTextColor="#9CA3AF"
+                className="flex-1 ml-2 text-white text-sm"
+                value={searchText}
+                onChangeText={setSearchText}
+              />
+              {searchText !== '' && (
+                <TouchableOpacity onPress={() => setSearchText('')}>
+                  <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Filter button */}
             <TouchableOpacity 
               onPress={() => setShowFilterModal(true)}
-              className="bg-white/10 p-2 rounded-full"
+              className="h-9 w-9 rounded-full items-center justify-center bg-neutral-900"
             >
-              <Ionicons name="filter" size={20} color="#EAB308" />
+              <Ionicons name="filter" size={18} color="white" />
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-2">
+          {/* Status Tabs */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <FilterTab
               active={selectedStatus === 0}
               label="Đang chờ"
@@ -894,6 +998,8 @@ export default function BookingHistoryScreen() {
           </ScrollView>
         </View>
 
+        <View className="h-[1px] bg-neutral-900" />
+
         {/* Modal Filter */}
         <Modal
           visible={showFilterModal}
@@ -910,7 +1016,7 @@ export default function BookingHistoryScreen() {
             <TouchableOpacity 
               activeOpacity={1}
               onPress={e => e.stopPropagation()}
-              className="bg-[#1C1C1E] w-full rounded-2xl overflow-hidden"
+              className="bg-neutral-800 w-full rounded-2xl overflow-hidden"
             >
               <View className="p-4 border-b border-white/10">
                 <Text className="text-white text-lg font-bold text-center">

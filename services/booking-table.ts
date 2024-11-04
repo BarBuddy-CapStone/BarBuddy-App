@@ -116,13 +116,6 @@ class BookingTableService {
   async bookTableWithDrinks(request: BookingDrinkRequest) {
     try {
       const headers = await this.getAuthHeader();
-      
-      // Log request để debug
-      console.log('Booking request details:', {
-        url: `${API_CONFIG.BASE_URL}/api/Booking/booking-drink/mobile`,
-        headers,
-        requestBody: JSON.stringify(request, null, 2)
-      });
 
       const response = await axios.post(
         `${API_CONFIG.BASE_URL}/api/Booking/booking-drink/mobile`,

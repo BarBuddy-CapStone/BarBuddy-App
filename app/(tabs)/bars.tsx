@@ -10,7 +10,7 @@ import { formatRating } from '@/utils/rating';
 
 // Thêm component BarSkeleton
 const BarSkeleton = () => (
-  <View className="overflow-hidden rounded-3xl mb-6 animate-pulse">
+  <View className="overflow-hidden rounded-3xl mb-4">
     <View className="relative">
       {/* Image skeleton */}
       <View className="w-full h-[380px] bg-white/10" />
@@ -140,52 +140,47 @@ export default function BarsScreen() {
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
         {/* Header và Search */}
-        <View className="px-6 py-4 border-b border-white/10">
-          <Text className="text-yellow-500 text-2xl font-bold mb-4">
-            Quán Bar
-          </Text>
-          
-          {/* Search bar with integrated filter */}
-          <View className="flex-row items-center space-x-2">
-            <View className="flex-1 flex-row items-center bg-white/10 rounded-xl h-11">
-              <View className="flex-row items-center flex-1 px-4">
-                <Ionicons name="search" size={20} color="#9CA3AF" />
-                <TextInput
-                  placeholder="Tìm kiếm quán Bar, địa chỉ quán Bar..."
-                  placeholderTextColor="#9CA3AF"
-                  className="flex-1 ml-2 text-white"
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery !== '' && (
-                  <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <Ionicons name="close-circle" size={20} color="#9CA3AF" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* Filter button */}
-            <TouchableOpacity
-              onPress={() => setShowOpenOnly(!showOpenOnly)}
-              className={`items-center justify-center w-11 h-11 rounded-xl ${
-                showOpenOnly ? 'bg-yellow-500' : 'bg-white/10'
-              }`}
-            >
-              <Ionicons 
-                name={showOpenOnly ? "time" : "time-outline"} 
-                size={20} 
-                color={showOpenOnly ? "black" : "#9CA3AF"} 
+        <View className="px-4 pt-1 flex-row items-center justify-between mb-4">
+          <View className="flex-row items-center flex-1">
+            <View className="flex-1 bg-neutral-900 rounded-full flex-row items-center h-9 px-3">
+              <Ionicons name="search" size={16} color="#9CA3AF" />
+              <TextInput
+                placeholder="Tìm kiếm quán Bar, địa chỉ quán Bar..."
+                placeholderTextColor="#9CA3AF"
+                className="flex-1 ml-2 text-white text-sm"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
               />
-            </TouchableOpacity>
+              {searchQuery !== '' && (
+                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                  <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
+
+          {/* Filter button */}
+          <TouchableOpacity
+            onPress={() => setShowOpenOnly(!showOpenOnly)}
+            className={`h-9 w-9 rounded-full items-center justify-center ml-3 ${
+              showOpenOnly ? 'bg-yellow-500' : 'bg-neutral-900'
+            }`}
+          >
+            <Ionicons 
+              name={showOpenOnly ? "time" : "time-outline"} 
+              size={18} 
+              color={showOpenOnly ? "black" : "white"} 
+            />
+          </TouchableOpacity>
         </View>
+
+        <View className="h-[1px] bg-neutral-900" />
 
         {/* Content */}
         {loading ? (
           <ScrollView 
             className="flex-1" 
-            contentContainerStyle={{ padding: 24 }}
+            contentContainerStyle={{ padding: 16 }}
             showsVerticalScrollIndicator={false}
           >
             {[1, 2, 3].map((item) => (
@@ -196,12 +191,12 @@ export default function BarsScreen() {
           <FlatList
             data={getFilteredBars()}
             keyExtractor={item => item.barId}
-            contentContainerStyle={{ padding: 24 }}
+            contentContainerStyle={{ padding: 16 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
-            ItemSeparatorComponent={() => <View className="h-6" />}
+            ItemSeparatorComponent={() => <View className="h-4" />}
             ListEmptyComponent={() => (
               <View className="flex-1 items-center justify-center py-20">
                 <Ionicons 

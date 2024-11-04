@@ -204,7 +204,7 @@ export default function BookingDrinkScreen() {
           </View>
 
           {/* Thông tin chi tiết */}
-          <View className="bg-white/5 rounded-xl p-4 mb-6">
+          <View className="bg-neutral-900 rounded-xl p-4 mb-6">
             <Text className="text-white font-medium mb-2">Mô tả:</Text>
             <Text className="text-gray-400 leading-6">{drink.description}</Text>
           </View>
@@ -327,15 +327,15 @@ export default function BookingDrinkScreen() {
         {/* Header với search và categories */}
         <View className="border-b border-white/10">
           {/* Search bar và nút back */}
-          <View className="px-4 pt-1 pb-2 flex-row items-center justify-between">
+          <View className="px-4 pt-1 flex-row items-center justify-between">
             <View className="flex-row items-center flex-1">
               <TouchableOpacity 
                 onPress={() => router.back()}
-                className="w-8 h-8 bg-white/10 rounded-full items-center justify-center mr-3"
+                className="h-9 w-9 bg-neutral-800 rounded-full items-center justify-center mr-3"
               >
                 <Ionicons name="arrow-back" size={20} color="white" />
               </TouchableOpacity>
-              <View className="flex-1 bg-white/10 rounded-full flex-row items-center px-3 py-1.5">
+              <View className="flex-1 bg-neutral-800 rounded-full flex-row items-center px-3 py-1.5">
                 <Ionicons name="search" size={16} color="#9CA3AF" />
                 <TextInput
                   placeholder="Tìm thức uống..."
@@ -348,7 +348,7 @@ export default function BookingDrinkScreen() {
             </View>
             <TouchableOpacity
               onPress={() => setShowFilter(true)}
-              className="w-8 h-8 bg-white/10 rounded-full items-center justify-center ml-3"
+              className="h-9 w-9 bg-neutral-800 rounded-full items-center justify-center ml-3"
             >
               <Ionicons name="filter" size={18} color="white" />
             </TouchableOpacity>
@@ -365,7 +365,7 @@ export default function BookingDrinkScreen() {
               className={`px-3 py-1.5 rounded-full mr-2 ${
                 selectedCategory === 'all' 
                   ? 'bg-yellow-500' 
-                  : 'bg-white/10'
+                  : 'bg-neutral-800'
               }`}
             >
               <Text className={`text-sm ${
@@ -381,7 +381,7 @@ export default function BookingDrinkScreen() {
                 className={`px-3 py-1.5 rounded-full mr-2 ${
                   selectedCategory === category.drinksCategoryId 
                     ? 'bg-yellow-500' 
-                    : 'bg-white/10'
+                    : 'bg-neutral-800'
                 }`}
               >
                 <Text className={`text-sm ${
@@ -409,7 +409,7 @@ export default function BookingDrinkScreen() {
                   activeOpacity={0.7}
                   className="mb-4"
                 >
-                  <View className="bg-neutral-800/50 rounded-2xl overflow-hidden border border-white/5">
+                  <View className="bg-neutral-900 rounded-2xl overflow-hidden border border-white/5">
                     {/* Phần ảnh */}
                     <View className="relative">
                       <Image

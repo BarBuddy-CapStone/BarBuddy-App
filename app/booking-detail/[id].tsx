@@ -96,7 +96,7 @@ const BookingDetailSkeleton = () => (
 // Thêm component hiển thị danh sách đồ uống
 const DrinksList = ({ drinks }: { drinks: BookingDrink[] }) => (
   <View className="px-6 mb-4">
-    <View className="bg-white/5 rounded-2xl p-4">
+    <View className="bg-neutral-900 rounded-2xl p-4">
       <Text className="text-white/80 font-semibold mb-4">Đồ uống đã đặt</Text>
       <View className="space-y-4">
         {drinks.map((drink, index) => (
@@ -125,7 +125,7 @@ const DrinksList = ({ drinks }: { drinks: BookingDrink[] }) => (
 
 const BookingInfo = ({ booking }: { booking: BookingDetail }) => (
   <View className="px-6 mb-4">
-    <View className="bg-white/5 rounded-2xl p-4">
+    <View className="bg-neutral-900 rounded-2xl p-4">
       <View className="flex-row items-center justify-between mb-4">
         <Text className="text-white/60">Mã đặt bàn</Text>
         <Text className="text-white font-medium">{booking.bookingCode}</Text>
@@ -164,7 +164,7 @@ const BookingInfo = ({ booking }: { booking: BookingDetail }) => (
         <Text className="text-white/80 font-semibold mb-3">Bàn đã đặt</Text>
         <View className="flex-row flex-wrap gap-2">
           {booking.tableNameList.map((table, index) => (
-            <View key={index} className="bg-white/10 px-3 py-2 rounded-lg">
+            <View key={index} className="bg-neutral-800 px-3 py-2 rounded-lg">
               <Text className="text-white">{table}</Text>
             </View>
           ))}
@@ -176,7 +176,7 @@ const BookingInfo = ({ booking }: { booking: BookingDetail }) => (
 
 const CustomerInfo = ({ booking }: { booking: BookingDetail }) => (
   <View className="px-6 mb-4">
-    <View className="bg-white/5 rounded-2xl p-4">
+    <View className="bg-neutral-900 rounded-2xl p-4">
       <Text className="text-white/80 font-semibold mb-4">Thông tin khách hàng</Text>
       <View className="space-y-4">
         <View className="flex-row items-center">
@@ -209,7 +209,7 @@ const PaymentInfo = ({ booking }: { booking: BookingDetail }) => {
 
   return (
     <View className="px-6 mb-4">
-      <View className="bg-white/5 rounded-2xl p-4">
+      <View className="bg-neutral-900 rounded-2xl p-4">
         <Text className="text-white/80 font-semibold mb-4">Chi tiết thanh toán</Text>
         <View className="space-y-3">
           {/* Chỉ hiển thị khi có đặt nước */}
@@ -258,7 +258,7 @@ const QRTicket = ({ qrTicket }: { qrTicket: string }) => {
   return (
     <>
       <View className="px-6 mb-4">
-        <View className="bg-white/5 rounded-2xl p-4 items-center">
+        <View className="bg-neutral-900 rounded-2xl p-4 items-center">
           <Text className="text-white/80 font-semibold mb-4">Mã QR Check-in</Text>
           <TouchableOpacity
             onPress={() => setShowFullQR(true)}
@@ -304,6 +304,27 @@ const QRTicket = ({ qrTicket }: { qrTicket: string }) => {
       </Modal>
     </>
   );
+};
+
+// Sửa lại function kiểm tra thời gian hủy
+const canCancelBooking = (booking: BookingDetail) => {
+  if (booking.status !== 0) return false;
+
+  // Parse ngày và giờ đặt bàn
+  const [hours, minutes] = booking.bookingTime.split(':');
+  const bookingDateTime = parseISO(booking.bookingDate);
+  
+  // Set giờ và phút cho bookingDateTime
+  bookingDateTime.setHours(parseInt(hours));
+  bookingDateTime.setMinutes(parseInt(minutes));
+  
+  const now = new Date();
+  
+  // Tính khoảng cách giữa thời điểm hiện tại và thời gian đặt bàn (tính bằng phút)
+  const diffInMinutes = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60);
+  
+  // Cho phép hủy nếu còn hơn 120 phút (2 tiếng)
+  return diffInMinutes > 120;
 };
 
 export default function BookingDetailScreen() {
@@ -389,8 +410,17 @@ export default function BookingDetailScreen() {
   const [cancelStatus, setCancelStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Sửa lại handleCancelBooking để kiểm tra lại trước khi hủy
   const handleCancelBooking = async () => {
     if (!booking) return;
+    
+    // Kiểm tra lại một lần nữa trước khi hủy
+    if (!canCancelBooking(booking)) {
+      setCancelStatus('error');
+      setErrorMessage('Bạn chỉ có thể hủy đặt bàn trước 2 tiếng.');
+      return;
+    }
+
     try {
       setCancelStatus('loading');
       setIsCanceling(true);
@@ -653,7 +683,7 @@ export default function BookingDetailScreen() {
 
                   {booking.note && (
                     <View className="px-6 mb-4">
-                      <View className="bg-white/5 rounded-2xl p-4">
+                      <View className="bg-neutral-900 rounded-2xl p-4">
                         <Text className="text-white/80 font-semibold mb-2">Ghi chú</Text>
                         <Text className="text-white">{booking.note}</Text>
                       </View>
@@ -661,15 +691,23 @@ export default function BookingDetailScreen() {
                   )}
 
                   {booking.status === 0 && (
-                    <View className="px-6 mt-4">
-                      <TouchableOpacity
-                        className="bg-red-500 py-4 rounded-xl"
-                        onPress={() => setShowCancelModal(true)}
-                      >
-                        <Text className="text-white font-bold text-center text-lg">
+                    <View className="px-6 mt-1">
+                      {canCancelBooking(booking) ? (
+                        <TouchableOpacity
+                          className="bg-red-500 py-4 rounded-xl"
+                          onPress={() => setShowCancelModal(true)}
+                        >
+                          <Text className="text-white font-bold text-center text-lg">
                             Hủy đặt bàn
-                        </Text>
-                      </TouchableOpacity>
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View className="bg-neutral-800 py-4 rounded-xl">
+                          <Text className="text-white/40 font-bold text-center text-lg">
+                            Không thể hủy (chỉ được hủy trước 2 tiếng)
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>
@@ -681,17 +719,17 @@ export default function BookingDetailScreen() {
               <View className="absolute bottom-0 left-0 right-0 px-6 py-4 bg-black/0 backdrop-blur-sm">
                 {booking.isRated ? (
                   <TouchableOpacity 
-                    className="bg-neutral-800 backdrop-blur-sm py-4 rounded-xl"
+                    className="bg-yellow-500/95 backdrop-blur-sm py-4 rounded-xl"
                     onPress={fetchFeedback}
                     disabled={loadingFeedback}
                   >
-                    <Text className="text-white font-bold text-center text-lg">
+                    <Text className="text-black font-bold text-center text-lg">
                       {loadingFeedback ? 'Đang tải...' : 'Xem đánh giá'}
                     </Text>
                   </TouchableOpacity>
                 ) : (
                   <TouchableOpacity 
-                    className="bg-yellow-500 py-4 rounded-xl"
+                    className="bg-yellow-500/95 py-4 rounded-xl"
                     onPress={() => setShowRatingModal(true)}
                   >
                     <Text className="text-black font-bold text-center text-lg">
@@ -709,7 +747,7 @@ export default function BookingDetailScreen() {
               statusBarTranslucent
             >
               <View className="flex-1 bg-black/50 justify-center items-center p-6">
-                <View className="bg-[#1C1C1E] rounded-2xl w-full p-6">
+                <View className="bg-neutral-800 rounded-2xl w-full p-6">
                   {cancelStatus === 'loading' ? (
                     <View className="items-center py-4">
                       <ActivityIndicator size="large" color="#EAB308" />
@@ -804,7 +842,7 @@ export default function BookingDetailScreen() {
                   onPress={(e) => e.stopPropagation()}
                   className="w-full"
                 >
-                  <View className="bg-[#1C1C1E] rounded-2xl w-full overflow-hidden">
+                  <View className="bg-neutral-800 rounded-2xl w-full overflow-hidden">
                     {/* Header với ảnh bar */}
                     <Image
                       source={{ uri: feedback?.barImage }}
@@ -856,7 +894,7 @@ export default function BookingDetailScreen() {
                       </View>
 
                       {/* Nội dung đánh giá */}
-                      <View className="bg-white/5 rounded-xl p-4">
+                      <View className="bg-neutral-700 rounded-xl p-4">
                         <Text className="text-white/90 leading-6">
                           {feedback?.comment}
                         </Text>
@@ -885,7 +923,7 @@ export default function BookingDetailScreen() {
                   onPress={(e) => e.stopPropagation()}
                   className="w-full"
                 >
-                  <View className="bg-[#1C1C1E] rounded-2xl w-full overflow-hidden">
+                  <View className="bg-neutral-800 rounded-2xl w-full overflow-hidden">
                     <Image 
                       source={{ uri: booking?.images[0] }}
                       className="w-full h-32"

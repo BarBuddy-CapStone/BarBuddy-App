@@ -150,11 +150,6 @@ export default function ProfileScreen() {
     return (
       <View className="flex-1 bg-black">
         <SafeAreaView className="flex-1">
-          <View className="px-6 py-4 border-b border-white/10">
-            <Text className="text-yellow-500 text-2xl font-bold">
-              Hồ sơ
-            </Text>
-          </View>
           <View className="flex-1 justify-center">
             <GuestView />
           </View>
@@ -166,13 +161,6 @@ export default function ProfileScreen() {
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
-        {/* Header */}
-        <View className="px-6 py-4 border-b border-white/10">
-          <Text className="text-yellow-500 text-2xl font-bold">
-            Hồ sơ
-          </Text>
-        </View>
-
         <ScrollView 
           className="flex-1"
           refreshControl={
@@ -204,7 +192,7 @@ export default function ProfileScreen() {
 
               {/* Menu Items */}
               <View className="space-y-4">
-                <TouchableOpacity className="flex-row items-center bg-white/5 p-4 rounded-xl">
+                <TouchableOpacity className="flex-row items-center bg-neutral-900 p-4 rounded-xl">
                   <Ionicons name="person-outline" size={24} color="#EAB308" />
                   <View className="flex-1 ml-3">
                     <Text className="text-white font-medium">Thông tin cá nhân</Text>
@@ -213,7 +201,7 @@ export default function ProfileScreen() {
                   <Ionicons name="chevron-forward" size={24} color="white" />
                 </TouchableOpacity>
 
-                <TouchableOpacity className="flex-row items-center bg-white/5 p-4 rounded-xl">
+                <TouchableOpacity className="flex-row items-center bg-neutral-900 p-4 rounded-xl">
                   <Ionicons name="time-outline" size={24} color="#EAB308" />
                   <View className="flex-1 ml-3">
                     <Text className="text-white font-medium">Lịch sử giao dịch</Text>

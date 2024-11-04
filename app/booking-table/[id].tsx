@@ -122,57 +122,77 @@ export default function BookingTableScreen() {
   const [bookingError, setBookingError] = useState<string>('');
 
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
-    const now = new Date();
+    if (!barDetail?.barTimeResponses) {
+      return [];
+    }
+
     const dayOfWeek = selectedDate.getDay();
-    
-    // Tìm thông tin giờ mở cửa cho ngày được chọn
     const barTimeForSelectedDay = barDetail.barTimeResponses.find(
       time => time.dayOfWeek === dayOfWeek
     );
 
-    if (!barTimeForSelectedDay) {
-      return []; // Quán không mở cửa vào ngày này
+    if (!barTimeForSelectedDay?.startTime || !barTimeForSelectedDay?.endTime) {
+      return [];
     }
 
-    const startHour = parseInt(barTimeForSelectedDay.startTime.split(':')[0]);
-    let endHour = parseInt(barTimeForSelectedDay.endTime.split(':')[0]);
-    
-    // Xử lý trường hợp đóng cửa sau 0h
-    const isAfterMidnight = endHour < startHour;
-    if (isAfterMidnight) {
-      endHour += 24; // Chuyển 4h thành 28h để dễ tính toán
-    }
+    const currentDate = new Date();
+    const isToday = selectedDate.getDate() === currentDate.getDate() &&
+                    selectedDate.getMonth() === currentDate.getMonth() &&
+                    selectedDate.getFullYear() === currentDate.getFullYear();
 
-    const slots = [];
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    
-    // Kiểm tra nếu là ngày hiện tại
-    const isToday = selectedDate.getDate() === now.getDate() &&
-      selectedDate.getMonth() === now.getMonth() &&
-      selectedDate.getFullYear() === now.getFullYear();
+    try {
+      // Tạo date objects cho thời gian bắt đầu và kết thúc
+      const startTimeDate = new Date(selectedDate);
+      const [startHour, startMinute] = barTimeForSelectedDay.startTime.split(':');
+      startTimeDate.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
 
-    const timeInterval = barDetail.timeSlot || 1;
-    
-    for (let hour = startHour; hour < endHour; hour += timeInterval) {
-      const normalizedHour = hour % 24;
-      const timeString = `${normalizedHour.toString().padStart(2, '0')}:00`;
-      
-      // Kiểm tra điều kiện cho ngày hiện tại
-      if (!isToday || 
-          (normalizedHour > currentHour) || 
-          (normalizedHour === currentHour && currentMinute <= 30)) {
-        
-        // Thêm "(+1 ngày)" cho các giờ sau 0h
-        if (hour >= 24) {
-          slots.push(`${timeString} (+1 ngày)`);
-        } else {
-          slots.push(timeString);
-        }
+      const endTimeDate = new Date(selectedDate);
+      const [endHour, endMinute] = barTimeForSelectedDay.endTime.split(':');
+      endTimeDate.setHours(parseInt(endHour), parseInt(endMinute), 0, 0);
+
+      // Xử lý trường hợp đóng cửa sau nửa đêm
+      if (endTimeDate <= startTimeDate) {
+        endTimeDate.setDate(endTimeDate.getDate() + 1);
       }
-    }
 
-    return slots;
+      const timeSlots: string[] = [];
+      const slotInterval = barDetail.timeSlot || 1; // Sử dụng timeSlot từ barDetail hoặc mặc định 1 giờ
+
+      // Tạo thời gian cuối cùng có thể đặt (trừ đi 1 timeSlot từ giờ đóng cửa)
+      const lastPossibleSlot = new Date(endTimeDate);
+      lastPossibleSlot.setHours(lastPossibleSlot.getHours() - slotInterval);
+
+      const currentTime = new Date(startTimeDate);
+
+      while (currentTime <= lastPossibleSlot) {
+        const timeString = format(currentTime, 'HH:mm');
+        const isNextDay = currentTime.getDate() !== selectedDate.getDate();
+        const formattedTime = isNextDay ? `${timeString} (+1 ngày)` : timeString;
+
+        if (isToday) {
+          const now = new Date();
+          // Tạo thời điểm cho khung giờ tiếp theo
+          const nextSlot = new Date(now);
+          nextSlot.setHours(nextSlot.getHours() + 1, 0, 0, 0);
+
+          // Chỉ thêm time slot nếu nó là khung giờ tiếp theo hoặc sau đó
+          if (currentTime >= nextSlot) {
+            timeSlots.push(formattedTime);
+          }
+        } else {
+          timeSlots.push(formattedTime);
+        }
+
+        // Tăng thêm một khoảng thời gian slot
+        currentTime.setHours(currentTime.getHours() + slotInterval);
+      }
+
+      return timeSlots;
+
+    } catch (error) {
+      console.error('Error generating time slots:', error);
+      return [];
+    }
   };
 
   const handleTimeChange = (time: string) => {
@@ -235,14 +255,16 @@ export default function BookingTableScreen() {
 
   // Kiểm tra giờ mở cửa khi thay đổi ngày
   useEffect(() => {
-    if (!barDetail) return;
+    if (!barDetail) {
+      return;
+    }
 
     const dayOfWeek = selectedDate.getDay();
     const barTimeForSelectedDay = barDetail.barTimeResponses.find(
       time => time.dayOfWeek === dayOfWeek
     );
 
-    // Reset states
+    // Reset các state liên quan
     setAvailableTimeSlots([]);
     setSelectedTime('');
     setSelectedTables([]);
@@ -252,9 +274,8 @@ export default function BookingTableScreen() {
     setShowTypeDescription(false);
 
     if (!barTimeForSelectedDay) {
-      setClosedMessage(`Quán không mở cửa vào ${
-        dayOfWeek === 0 ? 'Chủ nhật' : `Thứ ${dayOfWeek + 1}`
-      }`);
+      const dayName = dayOfWeek === 0 ? 'Chủ nhật' : `Thứ ${dayOfWeek + 1}`;
+      setClosedMessage(`Quán không mở cửa vào ${dayName}`);
       setShowClosedModal(true);
       return;
     }
@@ -267,7 +288,7 @@ export default function BookingTableScreen() {
     } else {
       setShowClosedModal(false);
       setAvailableTimeSlots(slots);
-      setSelectedTime(slots[0]);
+      setSelectedTime(slots[0]); // Chọn khung giờ đầu tiên khả dụng
     }
   }, [selectedDate, barDetail]); // Chỉ phụ thuộc vào selectedDate và barDetail
 
@@ -476,14 +497,14 @@ export default function BookingTableScreen() {
         {/* Header mới với thông tin quán */}
         <View className="border-b border-white/10">
           {/* Phần navigation */}
-          <View className="px-4 pt-2 pb-2 flex-row items-center">
+          <View className="px-4 pt-1.5 pb-2 flex-row items-center">
             <TouchableOpacity 
               onPress={() => router.back()}
-              className="w-8 h-8 bg-white/10 rounded-full items-center justify-center mr-3"
+              className="h-9 w-9 bg-neutral-800 rounded-full items-center justify-center mr-3"
             >
               <Ionicons name="arrow-back" size={20} color="white" />
             </TouchableOpacity>
-            <Text className="text-yellow-500 text-lg font-bold ml-3">
+            <Text className="text-yellow-500 text-lg font-bold">
               Đặt bàn
             </Text>
           </View>
@@ -1085,8 +1106,8 @@ export default function BookingTableScreen() {
           animationType="fade"
           onRequestClose={() => setShowConfirmModal(false)}
         >
-          <View className="flex-1 justify-center items-center bg-black/50">
-            <View className="bg-neutral-900 rounded-xl w-[90%] max-w-md overflow-hidden">
+          <View className="flex-1 justify-center items-center bg-black/50 px-4">
+            <View className="bg-neutral-900 rounded-xl w-full max-w-md max-h-[85%]">
               {/* Header */}
               <View className="border-b border-white/10 p-4">
                 <Text className="text-white text-xl font-bold text-center">
@@ -1094,71 +1115,85 @@ export default function BookingTableScreen() {
                 </Text>
               </View>
 
-              {/* Content */}
-              <View className="p-6">
-                {/* Thông tin quán */}
-                <View className="mb-6">
-                  <Text className="text-yellow-500 font-bold mb-2">Thông tin quán</Text>
-                  <Text className="text-white text-lg font-medium mb-1">
-                    {barDetail?.barName}
-                  </Text>
-                  <Text className="text-white/60">
-                    {barDetail?.address}
-                  </Text>
-                </View>
-
-                {/* Thông tin đặt bàn */}
-                <View className="bg-white/5 rounded-xl p-4 mb-4">
-                  <View className="flex-row items-center mb-3">
-                    <Ionicons name="calendar-outline" size={20} color="#ffffff" />
-                    <Text className="text-white ml-2">
-                      {format(selectedDate, 'EEEE, dd/MM/yyyy', { locale: vi })}
+              {/* Wrap content trong ScrollView */}
+              <ScrollView className="max-h-full">
+                <View className="p-6">
+                  {/* Thông tin quán */}
+                  <View className="mb-6">
+                    <Text className="text-yellow-500 font-bold mb-1">Thông tin quán</Text>
+                    <Text className="text-white text-lg font-medium mb-1">
+                      {barDetail?.barName}
                     </Text>
-                  </View>
-                  
-                  <View className="flex-row items-center mb-3">
-                    <Ionicons name="time-outline" size={20} color="#ffffff" />
-                    <Text className="text-white ml-2">
-                      {selectedTime.replace(' (+1 ngày)', '')}
+                    <Text className="text-white/60">
+                      {barDetail?.address}
                     </Text>
                   </View>
 
-                  <View className="flex-row items-center mb-3">
-                    <MaterialCommunityIcons 
-                      name="table-chair"  // hoặc "table" tùy theo icon pack
-                      size={20} 
-                      color="#ffffff" 
-                    />
-                    <Text className="text-white ml-2">
-                      {selectedTables.length} bàn đã chọn
-                    </Text>
-                  </View>
-
-                  {/* Danh sách bàn */}
-                  <View className="bg-white/5 rounded-lg p-3 mb-3">
-                    {selectedTables.map((table, index) => (
-                      <Text key={table.id} className="text-white/80 text-sm">
-                        {index + 1}. {table.name} ({table.typeName})
+                  {/* Thông tin đặt bàn */}
+                  <View className="bg-white/5 rounded-xl p-4 mb-4">
+                    <View className="flex-row items-center mb-3">
+                      <Ionicons name="calendar-outline" size={20} color="#ffffff" />
+                      <Text className="text-white ml-2">
+                        {format(selectedDate, 'EEEE, dd/MM/yyyy', { locale: vi })}
                       </Text>
-                    ))}
+                    </View>
+                    
+                    <View className="flex-row items-center mb-3">
+                      <Ionicons name="time-outline" size={20} color="#ffffff" />
+                      <Text className="text-white ml-2">
+                        {selectedTime.replace(' (+1 ngày)', '')}
+                      </Text>
+                    </View>
+
+                    <View className="flex-row items-center">
+                      <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
+                      <Text className="text-white ml-2">
+                        {selectedTables.length} bàn đã chọn
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Danh sách bàn - Tách thành khối riêng */}
+                  <View className="bg-white/5 rounded-xl p-4 mb-4">
+                    <Text className="text-white/80 font-medium mb-3">Bàn đã chọn</Text>
+                    <View className="space-y-3">
+                      {selectedTables.map((table, index) => (
+                        <View key={table.id} className="flex-row items-center justify-between">
+                          <View className="flex-row items-center">
+                            <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
+                            <View className="ml-3">
+                              <Text className="text-white font-medium">Bàn {table.name}</Text>
+                              <Text className="text-white/60 text-sm">{table.typeName}</Text>
+                            </View>
+                          </View>
+                          {index < selectedTables.length - 1 && (
+                            <View className="h-[1px] bg-white/10 my-2" />
+                          )}
+                        </View>
+                      ))}
+                    </View>
                   </View>
 
                   {note && (
-                    <View className="flex-row items-start">
-                      <Ionicons name="document-text-outline" size={20} color="#ffffff" />
-                      <Text className="text-white/80 ml-2 flex-1">
-                        Ghi chú: {note}
-                      </Text>
+                    <View className="bg-white/5 rounded-xl p-4 mb-4">
+                      <View className="flex-row items-start">
+                        <Ionicons name="document-text-outline" size={20} color="#ffffff" />
+                        <Text className="text-white/80 ml-2 flex-1">
+                          Ghi chú: {note}
+                        </Text>
+                      </View>
                     </View>
                   )}
+
+                  {/* Điều khoản */}
+                  <Text className="text-white/60 text-sm mb-6 text-center">
+                    Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản đặt bàn của chúng tôi
+                  </Text>
                 </View>
+              </ScrollView>
 
-                {/* Điều khoản */}
-                <Text className="text-white/60 text-sm mb-6 text-center">
-                  Bằng cách nhấn "Xác nhận", bạn đồng ý với các đi��u khoản đặt bàn của chúng tôi
-                </Text>
-
-                {/* Buttons */}
+              {/* Footer buttons */}
+              <View className="p-4 border-t border-white/10">
                 <View className="flex-row space-x-3">
                   <TouchableOpacity 
                     onPress={() => setShowConfirmModal(false)}

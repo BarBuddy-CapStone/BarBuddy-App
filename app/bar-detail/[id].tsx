@@ -175,7 +175,7 @@ const OperatingHours = ({
       {/* Header - Always visible */}
       <TouchableOpacity
         onPress={toggleExpand}
-        className="flex-row items-center justify-between p-3 rounded-lg bg-white/5 my-2"
+        className="flex-row items-center justify-between p-3 rounded-lg bg-neutral-900 my-2"
       >
         <View className="flex-row items-center space-x-2">
           <Ionicons name="time-outline" size={20} color="#9CA3AF" />
@@ -209,7 +209,7 @@ const OperatingHours = ({
               <View
                 key={day}
                 className={`flex-row items-center justify-between p-3 rounded-lg ${
-                  isToday ? "bg-yellow-500/20" : "bg-white/5"
+                  isToday ? "bg-yellow-500/20" : "bg-neutral-900"
                 }`}
               >
                 <View className="flex-row items-center">
@@ -276,7 +276,7 @@ const FeedbackItem = memo(
     }, [feedback.rating]);
 
     return (
-      <View className="bg-white/5 rounded-xl p-4 mb-3">
+      <View className="bg-neutral-900 rounded-xl p-4 mb-3">
         <View className="flex-row items-center mb-3">
           <View className="relative">
             {feedback.imageAccount && !imageError ? (
@@ -326,62 +326,79 @@ const FilterButton = ({
   rating,
   isSelected,
   onPress,
+  count
 }: {
   rating: number;
   isSelected: boolean;
   onPress: () => void;
+  count: number;
 }) => (
   <TouchableOpacity
     onPress={onPress}
-    className={`flex-row items-center px-3 py-1.5 rounded-full border ${
-      isSelected ? "bg-yellow-500 border-yellow-500" : "border-gray-500"
+    className={`mr-2 px-4 py-2 rounded-full ${
+      isSelected ? "bg-yellow-500" : "bg-neutral-900"
     }`}
   >
-    <Text
-      className={`mr-1 font-medium ${isSelected ? "text-black" : "text-white"}`}
-    >
-      {rating}
-    </Text>
-    <Ionicons name="star" size={14} color={isSelected ? "#000" : "#9CA3AF"} />
+    <View className="flex-row items-center">
+      <Text className={`${isSelected ? "text-black font-bold" : "text-white"}`}>
+        {rating} <Ionicons name="star" size={14} color={isSelected ? "#000" : "#9CA3AF"} />
+      </Text>
+      {isSelected && (
+        <View className="bg-black/20 px-2 py-0.5 rounded-full ml-2">
+          <Text className="text-black text-xs font-medium">
+            {count}
+          </Text>
+        </View>
+      )}
+    </View>
   </TouchableOpacity>
 );
 
 // Thêm component DrinkItem
-const DrinkItem = ({
-  drink,
-  onPress,
-}: {
-  drink: Drink;
-  onPress?: () => void;
-}) => (
-  <TouchableOpacity
-    onPress={onPress}
-    activeOpacity={0.7}
-    className="flex-row bg-white/5 rounded-xl p-4 mb-3"
-  >
-    <Image
-      source={{ uri: drink.images.split(",")[0] }}
-      className="w-24 h-24 rounded-lg"
-      resizeMode="cover"
-    />
-    <View className="flex-1 ml-4 justify-between">
-      <View>
-        <Text className="text-white font-bold text-lg">{drink.drinkName}</Text>
-        <Text className="text-gray-400 text-sm mt-1">{drink.description}</Text>
-      </View>
-      <View className="flex-row items-center justify-between">
-        <Text className="text-yellow-500 font-bold">
+const DrinkItem = memo(({ 
+  drink, 
+  onPress 
+}: { 
+  drink: Drink; 
+  onPress: () => void;
+}) => {
+  const images = useMemo(() => getImageArray(drink.images), [drink.images]);
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="flex-row items-center p-3 mb-3 bg-neutral-900 rounded-xl active:opacity-70"
+    >
+      <Image
+        source={{ uri: images[0] }}
+        className="w-20 h-20 rounded-lg"
+        resizeMode="cover"
+      />
+      
+      <View className="flex-1 ml-3">
+        <Text 
+          numberOfLines={1} 
+          ellipsizeMode="tail"
+          className="text-white font-medium mb-1"
+        >
+          {drink.drinkName}
+        </Text>
+        
+        <Text 
+          numberOfLines={2}
+          ellipsizeMode="tail"
+          className="text-gray-400 text-sm min-h-[40px]" // Thêm min-height để fix cứng 2 dòng
+        >
+          {drink.description || "Chưa có mô tả"}
+        </Text>
+        
+        <Text className="text-yellow-500 font-bold mt-1">
           {drink.price.toLocaleString("vi-VN")}đ
         </Text>
-        <View className="bg-white/10 px-3 py-1 rounded-full">
-          <Text className="text-gray-300 text-sm">
-            {drink.drinkCategoryResponse.drinksCategoryName}
-          </Text>
-        </View>
       </View>
-    </View>
-  </TouchableOpacity>
-);
+    </TouchableOpacity>
+  );
+});
 
 // Components con
 const DrinkDetailSkeleton = () => (
@@ -437,7 +454,7 @@ const DrinkDetailContent = ({ drink }: { drink: Drink }) => {
         </View>
 
         {/* Thông tin chi tiết */}
-        <View className="bg-white/5 rounded-xl p-4 mb-6">
+        <View className="bg-neutral-900 rounded-xl p-4 mb-6">
           <Text className="text-white font-medium mb-2">Mô tả:</Text>
           <Text className="text-gray-400 leading-6">{drink.description}</Text>
         </View>
@@ -603,49 +620,40 @@ const ReviewModal = memo(
             </View>
 
             {/* Rating filters */}
-            <View className="px-4 pb-4">
+            <View className="px-4">
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                className="flex-row space-x-2"
+                className="mb-4"
               >
                 <TouchableOpacity
                   onPress={() => setSelectedRating(null)}
-                  className={`px-4 py-2 rounded-full border ${
-                    !selectedRating
-                      ? "bg-yellow-500 border-yellow-500"
-                      : "border-gray-500"
+                  className={`mr-2 px-4 py-2 rounded-full ${
+                    !selectedRating ? "bg-yellow-500" : "bg-neutral-900"
                   }`}
                 >
-                  <Text
-                    className={!selectedRating ? "text-black" : "text-white"}
-                  >
-                    Tất cả
-                  </Text>
-                </TouchableOpacity>
-                {[5, 4, 3, 2, 1].map((rating) => (
-                  <TouchableOpacity
-                    key={rating}
-                    onPress={() => setSelectedRating(rating)}
-                    className={`flex-row items-center px-3 py-1.5 rounded-full border ${
-                      selectedRating === rating
-                        ? "bg-yellow-500 border-yellow-500"
-                        : "border-gray-500"
-                    }`}
-                  >
-                    <Text
-                      className={`mr-1 font-medium ${
-                        selectedRating === rating ? "text-black" : "text-white"
-                      }`}
-                    >
-                      {rating}
+                  <View className="flex-row items-center">
+                    <Text className={`${!selectedRating ? "text-black font-bold" : "text-white"}`}>
+                      Tất cả
                     </Text>
-                    <Ionicons 
-                      name="star" 
-                      size={14} 
-                      color={selectedRating === rating ? "#000" : "#9CA3AF"} 
-                    />
-                  </TouchableOpacity>
+                    {!selectedRating && (
+                      <View className="bg-black/20 px-2 py-0.5 rounded-full ml-2">
+                        <Text className="text-black text-xs font-medium">
+                          {feedbacks.length}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                {[5, 4, 3, 2, 1].map((rating) => (
+                  <FilterButton
+                    key={rating}
+                    rating={rating}
+                    isSelected={selectedRating === rating}
+                    onPress={() => setSelectedRating(rating)}
+                    count={getRatingCount(feedbacks, rating)}
+                  />
                 ))}
               </ScrollView>
             </View>
@@ -1131,7 +1139,7 @@ export default function BarDetailScreen() {
                         <View className="flex-row items-center">
                           <Ionicons name="star" size={16} color="#EAB308" />
                           <Text className="text-white ml-1 font-medium">
-                            {formatRating(averageRating)}
+                            {formatRating(averageRating) == "0" ? "Chưa có đánh giá" : formatRating(averageRating)}
                           </Text>
                         </View>
 
@@ -1322,8 +1330,8 @@ export default function BarDetailScreen() {
                     </View>
 
                     {drinks.length === 0 ? (
-                      <View className="bg-white/5 rounded-xl p-6 items-center">
-                        <View className="bg-white/10 p-4 rounded-full mb-4">
+                      <View className="bg-neutral-900 rounded-xl p-6 items-center">
+                        <View className="bg-neutral-800 p-4 rounded-full mb-4">
                           <Ionicons
                             name="wine-outline"
                             size={40}
@@ -1409,7 +1417,7 @@ export default function BarDetailScreen() {
                         {/* Header */}
                         <View className="p-4 border-b border-white/10">
                           {/* Bỏ thanh trượt */}
-                          <View className="flex-row justify-between items-center mb-4">
+                          <View className="flex-row justify-between items-center mb-3">
                             <Text className="text-white text-lg font-bold">
                               Tất cả thức uống
                             </Text>
@@ -1425,48 +1433,63 @@ export default function BarDetailScreen() {
                           </View>
 
                           {/* Category Filters */}
-                          <ScrollView
-                            horizontal
+                          <ScrollView 
+                            horizontal 
                             showsHorizontalScrollIndicator={false}
-                            className="flex-row space-x-2"
+                            className=""
                           >
                             <TouchableOpacity
                               onPress={() => setSelectedCategory(null)}
-                              className={`px-4 py-2 rounded-full border ${
-                                !selectedCategory
-                                  ? "bg-yellow-500 border-yellow-500"
-                                  : "border-gray-500"
+                              className={`mr-2 px-4 py-2 rounded-full ${
+                                !selectedCategory 
+                                  ? "bg-yellow-500" 
+                                  : "bg-neutral-900"
                               }`}
                             >
-                              <Text
-                                className={
-                                  !selectedCategory
-                                    ? "text-black"
+                              <View className="flex-row items-center">
+                                <Text className={`${
+                                  !selectedCategory 
+                                    ? "text-black font-bold" 
                                     : "text-white"
-                                }
-                              >
-                                Tất cả
-                              </Text>
+                                }`}>
+                                  Tất cả
+                                </Text>
+                                {!selectedCategory && (
+                                  <View className="bg-black/20 px-2 py-0.5 rounded-full ml-2">
+                                    <Text className="text-black text-xs font-medium">
+                                      {drinks.length}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
                             </TouchableOpacity>
+
                             {drinkCategories.map((category) => (
                               <TouchableOpacity
                                 key={category.id}
                                 onPress={() => setSelectedCategory(category.id)}
-                                className={`px-4 py-2 rounded-full border ${
-                                  selectedCategory === category.id
-                                    ? "bg-yellow-500 border-yellow-500"
-                                    : "border-gray-500"
+                                className={`mr-2 px-4 py-2 rounded-full ${
+                                  selectedCategory === category.id 
+                                    ? "bg-yellow-500" 
+                                    : "bg-neutral-900"
                                 }`}
                               >
-                                <Text
-                                  className={
-                                    selectedCategory === category.id
-                                      ? "text-black"
+                                <View className="flex-row items-center">
+                                  <Text className={`${
+                                    selectedCategory === category.id 
+                                      ? "text-black font-bold" 
                                       : "text-white"
-                                  }
-                                >
-                                  {category.name}
-                                </Text>
+                                  }`}>
+                                    {category.name}
+                                  </Text>
+                                  {selectedCategory === category.id && (
+                                    <View className="bg-black/20 px-2 py-0.5 rounded-full ml-2">
+                                      <Text className="text-black text-xs font-medium">
+                                        {drinks.filter(d => d.drinkCategoryResponse.drinksCategoryId === category.id).length}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
                               </TouchableOpacity>
                             ))}
                           </ScrollView>
@@ -1474,7 +1497,7 @@ export default function BarDetailScreen() {
 
                         {/* Drinks List */}
                         <ScrollView
-                          className="flex-1 px-4"
+                          className="flex-1 px-4 mt-4"
                           nestedScrollEnabled={true}
                           showsVerticalScrollIndicator={false}
                         >
@@ -1533,7 +1556,7 @@ export default function BarDetailScreen() {
                           <FeedbackItem key={index} feedback={feedback} />
                         ))
                     ) : (
-                      <View className="bg-white/5 rounded-xl p-4 items-center">
+                      <View className="bg-neutral-900 rounded-xl p-4 items-center">
                         <Ionicons
                           name="star-outline"
                           size={40}

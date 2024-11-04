@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect } from 'react';
 import { router, Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -50,6 +50,9 @@ function RootLayoutNav() {
         <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(auth)" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="payment/success/[paymentId]" />
+        <Stack.Screen name="payment/failure/[paymentId]" />
+        <Stack.Screen name="payment/error/[paymentId]" />
       </Stack>
     </ThemeProvider>
   );

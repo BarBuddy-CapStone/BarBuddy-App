@@ -86,6 +86,56 @@ const getBookingDate = (date: Date, time: string) => {
   return format(date, 'yyyy-MM-dd');
 };
 
+// Thêm LoadingPopup component với đầy đủ trạng thái
+const LoadingPopup = ({ 
+  visible, 
+  status, 
+  errorMessage 
+}: { 
+  visible: boolean;
+  status: 'processing' | 'success' | 'error';
+  errorMessage?: string;
+}) => (
+  <Modal transparent visible={visible}>
+    <View className="flex-1 bg-black/50 items-center justify-center">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4">
+        {status === 'processing' && (
+          <>
+            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đang xử lý đặt bàn...
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng không tắt ứng dụng
+            </Text>
+          </>
+        )}
+
+        {status === 'success' && (
+          <>
+            <Ionicons name="checkmark-circle" size={48} color="#22C55E" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đặt bàn thành công
+            </Text>
+          </>
+        )}
+
+        {status === 'error' && (
+          <>
+            <Ionicons name="alert-circle" size={48} color="#EF4444" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đặt bàn thất bại
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {errorMessage}
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  </Modal>
+);
+
 export default function BookingTableScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -456,6 +506,7 @@ export default function BookingTableScreen() {
   const handleConfirmBooking = async () => {
     if (isBooking) return;
     setIsBooking(true);
+    setShowConfirmModal(false);
     setShowProcessingModal(true);
     setBookingStatus('processing');
     setBookingError('');
@@ -475,17 +526,23 @@ export default function BookingTableScreen() {
 
       await bookingTableService.bookTable(bookingRequest);
       setBookingStatus('success');
-      setShowConfirmModal(false);
       
-      // Delay trước khi chuyển trang
+      // Delay trước khi chuyển trang để người dùng thấy trạng thái thành công
       setTimeout(() => {
         setShowProcessingModal(false);
         router.push('/booking-history');
       }, 1500);
     } catch (error) {
-      console.error('Error booking tables:', error);
       setBookingStatus('error');
-      setBookingError('Có lỗi xảy ra khi đặt bàn. Vui lòng thử lại.');
+      if (error instanceof Error) {
+        setBookingError(error.message);
+      } else {
+        setBookingError('Có lỗi xảy ra khi đặt bàn. Vui lòng thử lại.');
+      }
+      // Tự động đóng thông báo lỗi sau 2s
+      setTimeout(() => {
+        setShowProcessingModal(false);
+      }, 2000);
     } finally {
       setIsBooking(false);
     }
@@ -1187,7 +1244,7 @@ export default function BookingTableScreen() {
 
                   {/* Điều khoản */}
                   <Text className="text-white/60 text-sm mb-6 text-center">
-                    Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản đặt bàn của chúng tôi
+                    Bằng cách nhấn "Xác nhận", bạn đã đồng ý với các điều khoản đặt bàn của chúng tôi.
                   </Text>
                 </View>
               </ScrollView>
@@ -1413,71 +1470,12 @@ export default function BookingTableScreen() {
           </Modal>
         )}
 
-        {/* Modal xử lý booking */}
-        {showProcessingModal && (
-          <Modal
-            visible={showProcessingModal}
-            transparent={true}
-            animationType="fade"
-          >
-            <View className="flex-1 justify-center items-center bg-black/50">
-              <View className="bg-neutral-800 w-[85%] rounded-xl p-6">
-                <View className="items-center">
-                  {bookingStatus === 'processing' && (
-                    <>
-                      <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
-                      <Text className="text-white text-lg font-medium text-center">
-                        Đang xử lý đặt bàn...
-                      </Text>
-                    </>
-                  )}
-
-                  {bookingStatus === 'success' && (
-                    <>
-                      <View className="bg-white/10 p-4 rounded-full mb-4">
-                        <Ionicons name="checkmark-circle-outline" size={40} color="#22C55E" />
-                      </View>
-                      <Text className="text-white text-lg font-medium text-center mb-2">
-                        Đặt bàn thành công!
-                      </Text>
-                      <Text className="text-gray-400 text-center">
-                        Bàn sẽ được chuyển đến trang lịch sử đặt bàn
-                      </Text>
-                    </>
-                  )}
-
-                  {bookingStatus === 'error' && (
-                    <>
-                      <View className="bg-white/10 p-4 rounded-full mb-4">
-                        <Ionicons name="alert-circle-outline" size={40} color="#EF4444" />
-                      </View>
-                      <Text className="text-white text-lg font-medium text-center mb-2">
-                        Đặt bàn thất bại
-                      </Text>
-                      <Text className="text-gray-400 text-center mb-6">
-                        {bookingError}
-                      </Text>
-                      <View className="w-full space-y-3">
-                        <TouchableOpacity 
-                          onPress={() => setShowProcessingModal(false)}
-                          className="bg-white/10 py-4 rounded-xl"
-                        >
-                          <Text className="text-white text-center">Đóng</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          onPress={handleConfirmBooking}
-                          className="bg-yellow-500 py-4 rounded-xl"
-                        >
-                          <Text className="text-black text-center font-bold">Thử lại</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  )}
-                </View>
-              </View>
-            </View>
-          </Modal>
-        )}
+        {/* Thay thế modal processing cũ bằng LoadingPopup */}
+        <LoadingPopup 
+          visible={showProcessingModal} 
+          status={bookingStatus}
+          errorMessage={bookingError}
+        />
       </SafeAreaView>
     </View>
   );

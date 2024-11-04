@@ -10,6 +10,22 @@ import { vi } from 'date-fns/locale';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { BarDetail, barService } from '@/services/bar';
 
+const LoadingPopup = ({ visible }: { visible: boolean }) => (
+  <Modal transparent visible={visible}>
+    <View className="flex-1 bg-black/50 items-center justify-center">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4">
+        <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+        <Text className="text-white text-center font-medium">
+          Đang xử lý thanh toán...
+        </Text>
+        <Text className="text-white/60 text-center text-sm mt-2">
+          Vui lòng không tắt ứng dụng
+        </Text>
+      </View>
+    </View>
+  </Modal>
+);
+
 export default function PaymentDetailScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -17,7 +33,8 @@ export default function PaymentDetailScreen() {
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [barDetail, setBarDetail] = useState<BarDetail | null>(null);
-  
+  const [showLoadingPopup, setShowLoadingPopup] = useState(false);
+
   const bookingRequest: BookingDrinkRequest = JSON.parse(params.bookingRequest as string);
   const discount = Number(params.discount) || 0;
   const originalPrice = Number(params.originalPrice) || 0;
@@ -58,10 +75,12 @@ export default function PaymentDetailScreen() {
     
     try {
       setIsProcessing(true);
+      setShowLoadingPopup(true);
+      setShowConfirmModal(false);
+      
       const response = await bookingTableService.bookTableWithDrinks(bookingRequest);
       
       if (response.data?.paymentUrl) {
-        setShowConfirmModal(false);
         await Linking.openURL(response.data.paymentUrl);
       } else {
         Alert.alert('Lỗi', 'Không nhận được đường dẫn thanh toán');
@@ -78,6 +97,7 @@ export default function PaymentDetailScreen() {
       Alert.alert('Lỗi', error.message || 'Có lỗi xảy ra khi đặt bàn và nước uống');
     } finally {
       setIsProcessing(false);
+      setShowLoadingPopup(false);
     }
   };
 
@@ -127,7 +147,7 @@ export default function PaymentDetailScreen() {
   const DrinksList = () => (
     <View className="px-4 mb-4">
       <View className="bg-neutral-900 rounded-2xl p-4">
-        <Text className="text-white/80 font-semibold mb-4">Đồ uống đã chọn</Text>
+        <Text className="text-white/80 font-semibold mb-4">Thức uống đã chọn</Text>
         <View className="space-y-4">
           {bookingRequest.drinks.map((orderDrink) => {
             const drink = drinks.find(d => d.drinkId === orderDrink.drinkId);
@@ -560,6 +580,8 @@ export default function PaymentDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <LoadingPopup visible={showLoadingPopup} />
     </View>
   );
 }

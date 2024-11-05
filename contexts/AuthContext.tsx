@@ -24,6 +24,7 @@ type AuthContextType = {
   error: string | null;
   resetAllStorage: () => Promise<void>;
   allowNavigation: boolean;
+  updateUserData: (newUserData: Partial<UserInfo>) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -200,6 +201,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Thêm hàm helper để update user trong storage và state
+  const updateUserData = async (newUserData: Partial<UserInfo>) => {
+    try {
+      // Lấy data hiện tại từ storage
+      const authValue = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+      if (authValue) {
+        const authData = JSON.parse(authValue);
+        // Update user data với dữ liệu mới
+        const updatedUser = {
+          ...authData.user,
+          ...newUserData
+        };
+        // Lưu lại vào storage
+        await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+          user: updatedUser
+        }));
+        // Update state
+        setUser(updatedUser);
+      }
+    } catch (error) {
+      console.error('Error updating user data:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -215,6 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         error,
         resetAllStorage,
         allowNavigation,
+        updateUserData,
       }}>
       {children}
     </AuthContext.Provider>

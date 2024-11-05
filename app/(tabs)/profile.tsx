@@ -227,7 +227,7 @@ export default function ProfileScreen() {
       title: 'Thông tin cá nhân',
       subtitle: 'Xem và chỉnh sửa thông tin của bạn',
       variant: 'default',
-      onPress: () => router.push('/profile/edit' as any)
+      onPress: () => router.push(`/profile-detail/${user?.accountId}` as any)
     },
     {
       id: '2',
@@ -235,7 +235,7 @@ export default function ProfileScreen() {
       title: 'Lịch sử giao dịch',
       subtitle: 'Xem lại các giao dịch của bạn',
       variant: 'default',
-      onPress: () => router.push('/profile/history' as any)
+      onPress: () => router.push(`/payment-history/${user?.accountId}` as any)
     },
     {
       id: '3',

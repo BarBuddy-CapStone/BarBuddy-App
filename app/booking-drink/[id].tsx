@@ -1,7 +1,7 @@
 import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Alert, Modal, GestureResponderEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { DrinkOrderItem, BookingDrinkRequest, bookingTableService, SelectedTableInfo } from '@/services/booking-table';
 import { Drink, drinkService } from '@/services/drink';
@@ -155,10 +155,10 @@ export default function BookingDrinkScreen() {
     setFilteredDrinks(filtered);
   }, [drinks, selectedCategory, searchText, sortOrder]);
 
-  const handleOpenDrinkDetail = (drink: Drink) => {
+  const handleOpenDrinkDetail = useCallback((drink: Drink) => {
     setSelectedDrink(drink);
     setIsDrinkDetailVisible(true);
-  };
+  }, []);
 
   const DrinkDetailContent = ({ drink }: { drink: Drink }) => {
     const [isImageViewVisible, setIsImageViewVisible] = useState(false);
@@ -264,25 +264,44 @@ export default function BookingDrinkScreen() {
     drink: Drink | null;
     onClose: () => void;
   }) => {
+    const [isClosing, setIsClosing] = useState(false);
     const [isImageViewVisible, setIsImageViewVisible] = useState(false);
+    
     const images = useMemo(() => 
       drink?.images.split(',').map(url => ({ uri: url.trim() })) || [], 
       [drink?.images]
     );
 
+    const handleClose = useCallback(() => {
+      setIsClosing(true);
+    }, []);
+
     return (
       <ReactNativeModal
-        isVisible={isVisible}
-        onBackdropPress={onClose}
-        onSwipeComplete={onClose}
+        isVisible={isVisible && !isClosing}
+        onBackdropPress={handleClose}
+        onSwipeComplete={handleClose}
         swipeDirection={['down']}
-        className="m-0 mt-16"
         style={{ margin: 0 }}
         statusBarTranslucent
+        useNativeDriver={true}
         useNativeDriverForBackdrop
         propagateSwipe
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        animationInTiming={250}
+        animationOutTiming={200}
+        backdropTransitionInTiming={250}
+        backdropTransitionOutTiming={0}
+        hideModalContentWhileAnimating={true}
+        onModalHide={() => {
+          if (isClosing) {
+            setIsClosing(false);
+            onClose();
+          }
+        }}
       >
-        <View className="flex-1 bg-black rounded-t-3xl">
+        <View className="flex-1 mt-16 bg-black rounded-t-3xl">
           <View className="items-center pt-2">
             <View className="w-10 h-1 bg-white/20 rounded-full" />
           </View>
@@ -291,7 +310,7 @@ export default function BookingDrinkScreen() {
             <View className="flex-row justify-between items-center">
               <Text className="text-white text-lg font-bold">Chi tiết thức uống</Text>
               <TouchableOpacity 
-                onPress={onClose}
+                onPress={handleClose}
                 className="w-8 h-8 items-center justify-center rounded-full bg-white/10"
               >
                 <Ionicons name="close" size={20} color="white" />
@@ -323,7 +342,7 @@ export default function BookingDrinkScreen() {
 
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1" edges={['top']}>
         {/* Header với search và categories */}
         <View className="border-b border-white/10">
           {/* Search bar và nút back */}
@@ -503,7 +522,7 @@ export default function BookingDrinkScreen() {
 
         {/* Bottom Sheet nhỏ gọn */}
         <View className="border-t border-white/10 bg-neutral-900/95">
-          <View className="px-4 py-3 flex-row items-center justify-between">
+          <View className="px-4 py-3 flex-row items-center justify-between mb-4">
             <View>
               {discount > 0 ? (
                 <>

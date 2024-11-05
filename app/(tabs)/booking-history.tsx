@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { BookingHistory, bookingService } from '@/services/booking';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -52,7 +52,7 @@ const GuestView = () => {
   );
 };
 
-const FilterTab = ({ 
+const FilterTab = memo(({ 
   active, 
   label, 
   count, 
@@ -82,9 +82,15 @@ const FilterTab = ({
       </View>
     </View>
   </TouchableOpacity>
-);
+), (prevProps, nextProps) => {
+  return (
+    prevProps.active === nextProps.active &&
+    prevProps.label === nextProps.label &&
+    prevProps.count === nextProps.count
+  );
+});
 
-const BookingItem = ({ booking, onRefreshList }: { 
+const BookingItem = memo(({ booking, onRefreshList }: { 
   booking: BookingHistory;
   onRefreshList: () => void;
 }) => {
@@ -125,29 +131,53 @@ const BookingItem = ({ booking, onRefreshList }: {
     return diffInDays <= 14;
   }, [booking.status, booking.isRated, booking.bookingDate]);
 
+  // States cho cancel booking
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [isCanceling, setIsCanceling] = useState(false);
   const [cancelStatus, setCancelStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isCanceling, setIsCanceling] = useState(false);
 
-  const openCancelModal = () => {
-    setShowCancelModal(true);
-  };
+  // Kiểm tra thời gian hủy
+  const canCancelBooking = useMemo(() => {
+    if (booking.status !== 0) return false;
 
+    // Parse ngày và giờ đặt bàn
+    const [hours, minutes] = booking.bookingTime.split(':');
+    const bookingDateTime = parseISO(booking.bookingDate);
+    
+    // Set giờ và phút cho bookingDateTime
+    bookingDateTime.setHours(parseInt(hours));
+    bookingDateTime.setMinutes(parseInt(minutes));
+    
+    const now = new Date();
+    
+    // Tính khoảng cách giữa thời điểm hiện tại và thời gian đặt bàn (tính bằng phút)
+    const diffInMinutes = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60);
+    
+    // Cho phép hủy nếu còn hơn 120 phút (2 tiếng)
+    return diffInMinutes > 120;
+  }, [booking.status, booking.bookingDate, booking.bookingTime]);
+
+  // Xử lý hủy đặt bàn
   const handleCancelBooking = async () => {
+    // Kiểm tra lại một lần nữa trước khi hủy
+    if (!canCancelBooking) {
+      setCancelStatus('error');
+      setErrorMessage('Bạn chỉ có thể hủy đặt bàn trước 2 tiếng.');
+      return;
+    }
+
     try {
       setCancelStatus('loading');
       setIsCanceling(true);
       await bookingService.cancelBooking(booking.bookingId);
       
-      // Đánh dấu thành công
       setCancelStatus('success');
       
-      // Cập nhật lại danh sách booking sau 1.5s
+      // Đợi 1.5s để hiển thị thông báo thành công
       setTimeout(() => {
-        onRefreshList();
         setShowCancelModal(false);
-        setCancelStatus('idle');
+        onRefreshList();
       }, 1500);
       
     } catch (error: any) {
@@ -277,19 +307,12 @@ const BookingItem = ({ booking, onRefreshList }: {
   const remainingChars = 500 - comment.length;
   const isCommentTooShort = comment.trim().length < 10;
 
-  // Thêm function kiểm tra thời gian hủy
-  const canCancelBooking = useMemo(() => {
-    if (booking.status !== 0) return false;
-
-    const bookingTime = parseISO(booking.bookingDate);
-    const now = new Date();
-    
-    // Tính khoảng cách giữa thời điểm hiện tại và thời gian đặt bàn (tính bằng phút)
-    const diffInMinutes = (bookingTime.getTime() - now.getTime()) / (1000 * 60);
-    
-    // Cho phép hủy nếu còn hơn 120 phút (2 tiếng)
-    return diffInMinutes > 120;
-  }, [booking.status, booking.bookingDate]);
+  // Thêm hàm openCancelModal
+  const openCancelModal = () => {
+    setShowCancelModal(true);
+    setCancelStatus('idle');
+    setErrorMessage('');
+  };
 
   return (
     <>
@@ -712,9 +735,15 @@ const BookingItem = ({ booking, onRefreshList }: {
       </Modal>
     </>
   );
-};
+}, (prevProps, nextProps) => {
+  return (
+    prevProps.booking.bookingId === nextProps.booking.bookingId &&
+    prevProps.booking.status === nextProps.booking.status &&
+    prevProps.booking.isRated === nextProps.booking.isRated
+  );
+});
 
-const BookingSkeleton = () => (
+const BookingSkeleton = memo(() => (
   <View className="bg-white/5 rounded-xl p-4 mb-4 animate-pulse">
     <View className="flex-row mb-3">
       {/* Ảnh */}
@@ -744,32 +773,98 @@ const BookingSkeleton = () => (
       <View className="h-4 w-48 bg-white/10 rounded-full" />
     </View>
   </View>
-);
+), () => true);
 
 export default function BookingHistoryScreen() {
   const { isGuest, user } = useAuth();
+  const params = useLocalSearchParams();
+  
+  // Nhóm tất cả useState hooks
   const [bookings, setBookings] = useState<BookingHistory[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [pageIndex, setPageIndex] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<number>(0);
-  const params = useLocalSearchParams();
-
-  // Thêm states cho filter
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filterBy, setFilterBy] = useState<'createAt' | 'bookingTime'>('createAt');
-
-  // Thêm hàm xử lý filter
-  const handleFilterChange = (type: 'createAt' | 'bookingTime') => {
-    setFilterBy(type);
-    setShowFilterModal(false);
-    // Thực hiện filter dữ liệu ở đây
-    onRefresh();
-  };
-
   const [searchText, setSearchText] = useState('');
 
+  // Nhóm tất cả useCallback hooks
+  const handleFilterChange = useCallback((type: 'createAt' | 'bookingTime') => {
+    setFilterBy(type);
+    setShowFilterModal(false);
+    onRefresh();
+  }, []);
+
+  const fetchBookings = useCallback(async (page: number, refresh = false) => {
+    if (!user?.accountId) return;
+    
+    try {
+      setLoading(true);
+      const response = await bookingService.getBookingHistory(
+        user.accountId,
+        page,
+        10
+      );
+      
+      if (refresh) {
+        setBookings(response.data.response);
+      } else {
+        setBookings(prev => [...prev, ...response.data.response]);
+      }
+      
+      setHasMore(page < response.data.totalPage);
+    } catch (error) {
+      console.error('Error fetching bookings:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user?.accountId]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    setPageIndex(1);
+    fetchBookings(1, true);
+  }, [fetchBookings]);
+
+  const loadMore = useCallback(() => {
+    if (!loading && hasMore) {
+      const nextPage = pageIndex + 1;
+      setPageIndex(nextPage);
+      fetchBookings(nextPage);
+    }
+  }, [loading, hasMore, pageIndex, fetchBookings]);
+
+  const renderBookingItem = useCallback(({ item }: { item: BookingHistory }) => (
+    <BookingItem 
+      booking={item} 
+      onRefreshList={onRefresh}
+    />
+  ), [onRefresh]);
+
+  const ListEmptyComponent = useCallback(() => (
+    !loading && (
+      <View className="flex-1 items-center justify-center py-20">
+        <Ionicons name="calendar-outline" size={48} color="#EAB308" />
+        <Text className="text-white text-lg font-bold mt-4">
+          Chưa có lịch sử đặt bàn
+        </Text>
+        <Text className="text-white/60 text-center mt-2">
+          Không có đơn đặt bàn nào ở trạng thái này
+        </Text>
+      </View>
+    )
+  ), [loading]);
+
+  const ListFooterComponent = useCallback(() => (
+    loading && bookings.length > 0 ? <BookingSkeleton /> : null
+  ), [loading, bookings.length]);
+
+  const keyExtractor = useCallback((item: BookingHistory) => item.bookingId, []);
+
+  // Nhóm tất cả useMemo hooks
   const filteredBookings = useMemo(() => {
     // Lọc theo status
     let filtered = bookings.filter(booking => booking.status === selectedStatus);
@@ -868,70 +963,28 @@ export default function BookingHistoryScreen() {
     completed: bookings.filter(b => b.status === 3).length,
   }), [bookings]);
 
-  const fetchBookings = async (page: number, refresh = false) => {
-    if (!user?.accountId) return;
-    
-    try {
-      setLoading(true);
-      const response = await bookingService.getBookingHistory(
-        user.accountId,
-        page,
-        10
-      );
-      
-      if (refresh) {
-        setBookings(response.data.response);
-      } else {
-        setBookings(prev => [...prev, ...response.data.response]);
-      }
-      
-      setHasMore(page < response.data.totalPage);
-    } catch (error) {
-      console.error('Error fetching bookings:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setPageIndex(1);
-    fetchBookings(1, true);
-  }, []);
-
-  const loadMore = () => {
-    if (!loading && hasMore) {
-      const nextPage = pageIndex + 1;
-      setPageIndex(nextPage);
-      fetchBookings(nextPage);
-    }
-  };
-
+  // Nhóm tất cả useEffect hooks
   useEffect(() => {
     if (user?.accountId) {
       fetchBookings(1, true);
     }
-  }, [user?.accountId]);
+  }, [user?.accountId, fetchBookings]);
 
   useEffect(() => {
     if (params.reload === 'true') {
       onRefresh();
-      // Reset param reload
       router.setParams({ reload: 'false' });
     }
     
-    // Kiểm tra và chuyển đổi kiểu dữ liệu cho status
     const statusParam = params.status;
     if (typeof statusParam === 'string') {
       const newStatus = parseInt(statusParam);
       if (!isNaN(newStatus)) {
         setSelectedStatus(newStatus);
       }
-      // Reset param status
       router.setParams({ status: undefined });
     }
-  }, [params.reload, params.status]);
+  }, [params.reload, params.status, onRefresh]);
 
   if (isGuest || !user?.accountId) {
     return <GuestView />;
@@ -1062,13 +1115,8 @@ export default function BookingHistoryScreen() {
         ) : (
           <FlatList
             data={filteredBookings}
-            renderItem={({ item }) => (
-              <BookingItem 
-                booking={item} 
-                onRefreshList={onRefresh}
-              />
-            )}
-            keyExtractor={item => item.bookingId}
+            renderItem={renderBookingItem}
+            keyExtractor={keyExtractor}
             contentContainerStyle={{ padding: 16 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
@@ -1080,22 +1128,14 @@ export default function BookingHistoryScreen() {
             }
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
-            ListFooterComponent={() => (
-              loading && bookings.length > 0 ? <BookingSkeleton /> : null
-            )}
-            ListEmptyComponent={() => (
-              !loading && (
-                <View className="flex-1 items-center justify-center py-20">
-                  <Ionicons name="calendar-outline" size={48} color="#EAB308" />
-                  <Text className="text-white text-lg font-bold mt-4">
-                    Chưa có lịch sử đặt bàn
-                  </Text>
-                  <Text className="text-white/60 text-center mt-2">
-                    Không có đơn đặt bàn nào ở trạng thái này
-                  </Text>
-                </View>
-              )
-            )}
+            // Thêm các prop để tối ưu hiệu suất
+            removeClippedSubviews={true}
+            maxToRenderPerBatch={5}
+            updateCellsBatchingPeriod={50}
+            windowSize={5}
+            initialNumToRender={5}
+            ListFooterComponent={ListFooterComponent}
+            ListEmptyComponent={ListEmptyComponent}
           />
         )}
       </SafeAreaView>

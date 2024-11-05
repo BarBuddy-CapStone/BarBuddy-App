@@ -11,10 +11,16 @@ export default function TabLayout() {
         headerShown: false,
         tabBarStyle: {
           backgroundColor: '#000',
-          borderTopColor: '#333',
-          height: 64,  // Tăng chiều cao của tabBar
-          paddingBottom: 8,  // Thêm padding bottom
-          paddingTop: 8,     // Thêm padding top
+          height: 72,
+          paddingBottom: 16,
+          paddingTop: 8,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          elevation: 0,
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(255,255,255,0.1)',
         },
         tabBarLabelStyle: {
           fontSize: 12,
@@ -39,12 +45,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="booking-history"
+        name="bars"
         options={{
-          title: 'Lịch sử',
+          title: 'Quán Bar',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'calendar' : 'calendar-outline'} 
+              name={focused ? 'globe' : 'globe-outline'} 
               size={24} 
               color={color} 
             />
@@ -52,12 +58,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="bars"
+        name="booking-history"
         options={{
-          title: 'Quán Bar',
+          title: 'Lịch sử',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'globe' : 'globe-outline'} 
+              name={focused ? 'calendar' : 'calendar-outline'} 
               size={24} 
               color={color} 
             />

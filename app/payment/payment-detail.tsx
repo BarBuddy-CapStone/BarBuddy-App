@@ -366,7 +366,7 @@ export default function PaymentDetailScreen() {
 
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1 mt-0.5">
+      <SafeAreaView className="flex-1 mt-0.5" edges={['top']}>
         <View className="px-4 pt-1 pb-2 flex-row items-center border-b border-white/10">
           <TouchableOpacity 
             onPress={() => router.back()}
@@ -393,7 +393,7 @@ export default function PaymentDetailScreen() {
           </Text>
         </ScrollView>
 
-        <View className="border-t border-white/10 p-4">
+        <View className="border-t border-white/10 p-4 mb-2">
           <TouchableOpacity
             onPress={handlePaymentConfirm}
             disabled={isProcessing}

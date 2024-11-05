@@ -1,7 +1,7 @@
 import { View, Text, TouchableOpacity, Image, ScrollView, RefreshControl, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef, memo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { barService, type Bar } from '@/services/bar';
 import { Link, router } from 'expo-router';
@@ -12,8 +12,30 @@ import { formatRating } from '@/utils/rating';
 
 const screenWidth = Dimensions.get('window').width;
 
+// Thêm các interface ở đầu file
+interface Banner {
+  id: number;
+  image: string;
+  title: string;
+  description: string;
+}
+
+// Định nghĩa type cho props của các component
+interface BannerItemProps {
+  banner: Banner;
+  width: number;
+}
+
+interface BarItemProps {
+  bar: Bar;
+  onPress: () => void;
+  getCurrentDayTime: (barTimes: Bar['barTimeResponses']) => string;
+  isBarOpen: (barTimes: Bar['barTimeResponses']) => boolean;
+  getAverageRating: (feedBacks: Array<{ rating: number }>) => number | null;
+}
+
 // Thêm mảng banners cứng
-const BANNERS = [
+const BANNERS: Banner[] = [
   {
     id: 1,
     image: 'https://cdn-kvweb.kiotviet.vn/kiotviet-website/wp-content/uploads/2019/09/kinh-doanh-qu%C3%A1n-bar.jpg',
@@ -33,6 +55,112 @@ const BANNERS = [
     description: 'Live cùng các band nhạc mỗi tối Thứ 7 và Chủ nhật'
   }
 ];
+
+// Tách BannerItem thành component riêng
+const BannerItem = memo(({ banner, width }: BannerItemProps) => (
+  <View style={{ width }}>
+    <Image
+      source={{ uri: banner.image }}
+      style={{ 
+        width,
+        height: width * 0.5
+      }}
+      resizeMode="cover"
+    />
+    <LinearGradient
+      colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+      className="absolute bottom-0 left-0 right-0 h-40"
+    >
+      <View className="absolute bottom-0 p-5 w-full">
+        <Text className="text-yellow-500 text-xl font-bold mb-2">
+          {banner.title}
+        </Text>
+        <Text className="text-gray-400 text-sm">
+          {banner.description}
+        </Text>
+      </View>
+    </LinearGradient>
+  </View>
+));
+
+// Tách BarItem thành component riêng
+const BarItem = memo(({ 
+  bar, 
+  onPress,
+  getCurrentDayTime,
+  isBarOpen,
+  getAverageRating
+}: BarItemProps) => (
+  <TouchableOpacity 
+    className="w-72 overflow-hidden"
+    activeOpacity={0.7}
+    onPress={onPress}
+  >
+    <View className="relative">
+      <Image
+        source={{ uri: bar.images.split(',')[0].trim() }}
+        className="w-full h-[380px] rounded-3xl"
+        resizeMode="cover"
+      />
+      
+      {/* Status badges container */}
+      <View className="absolute top-4 w-full flex-row justify-between px-4">
+        <View>
+          {isBarOpen(bar.barTimeResponses) && (
+            <View className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
+              bar.isAnyTableAvailable ? 'bg-green-500/90' : 'bg-red-500/90'
+            }`}>
+              <Text className="text-white font-medium text-xs">
+                {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
+              </Text>
+            </View>
+          )}
+        </View>
+        
+        <View>
+          {bar.discount > 0 && (
+            <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full h-7 items-center justify-center">
+              <Text className="text-black font-bold text-xs">-{bar.discount}%</Text>
+            </View>
+          )}
+        </View>
+      </View>
+      
+      <LinearGradient
+        colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+        className="absolute bottom-0 left-0 right-0 h-40 rounded-b-3xl"
+      >
+        <View className="absolute bottom-0 p-5 w-full">
+          <Text className="text-yellow-500 text-xl font-bold mb-2">
+            {bar.barName}
+          </Text>
+          
+          <View className="flex-row items-center mb-2">
+            <Ionicons name="location-outline" size={14} color="#9CA3AF" />
+            <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
+              {bar.address}
+            </Text>
+          </View>
+
+          <View className="flex-row items-center space-x-4">
+            <View className="flex-row items-center">
+              <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+              <Text className="text-gray-400 text-xs ml-1">
+                {getCurrentDayTime(bar.barTimeResponses)}
+              </Text>
+            </View>
+            <View className="flex-row items-center">
+              <Ionicons name="star" size={14} color="#EAB308" />
+              <Text className="text-white ml-1 text-xs font-medium">
+                {formatRating(getAverageRating(bar.feedBacks))}
+              </Text>
+            </View>
+          </View>
+        </View>
+      </LinearGradient>
+    </View>
+  </TouchableOpacity>
+));
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -124,29 +252,7 @@ export default function HomeScreen() {
           }}
           scrollEventThrottle={16}
           renderItem={({ item: banner }) => (
-            <View style={{ width: screenWidth }}>
-              <Image
-                source={{ uri: banner.image }}
-                style={{ 
-                  width: screenWidth,
-                  height: screenWidth * 0.5
-                }}
-                resizeMode="cover"
-              />
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
-                className="absolute bottom-0 left-0 right-0 h-40"
-              >
-                <View className="absolute bottom-0 p-5 w-full">
-                  <Text className="text-yellow-500 text-xl font-bold mb-2">
-                    {banner.title}
-                  </Text>
-                  <Text className="text-gray-400 text-sm">
-                    {banner.description}
-                  </Text>
-                </View>
-              </LinearGradient>
-            </View>
+            <BannerItem banner={banner} width={screenWidth} />
           )}
         />
       </View>
@@ -194,6 +300,25 @@ export default function HomeScreen() {
     
     return true; // Tạm thời return true vì logic check giờ phức tạp hơn cần xử lý riêng
   };
+
+  const renderBannerItem = useCallback(({ item: banner }: { item: Banner }) => (
+    <BannerItem banner={banner} width={screenWidth} />
+  ), [screenWidth]);
+
+  const renderBarItem = useCallback(({ item: bar }: { item: Bar }) => (
+    <BarItem 
+      bar={bar}
+      onPress={() => router.push(`./bar-detail/${bar.barId}`)}
+      getCurrentDayTime={getCurrentDayTime}
+      isBarOpen={isBarOpen}
+      getAverageRating={getAverageRating}
+    />
+  ), []);
+
+  const keyExtractor = useCallback((item: Banner | Bar) => {
+    if ('id' in item) return item.id.toString();
+    return item.barId;
+  }, []);
 
   return (
     <View className="flex-1 bg-black">
@@ -252,87 +377,12 @@ export default function HomeScreen() {
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={{ paddingHorizontal: 24 }}
                   ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
-                  renderItem={({ item: bar }) => {
-                    return (
-                      <TouchableOpacity 
-                        className="w-72 overflow-hidden"
-                        activeOpacity={0.7}
-                        onPress={() => router.push(`./bar-detail/${bar.barId}`)}
-                      >
-                        <View className="relative">
-                          <Image
-                            source={{ uri: bar.images.split(',')[0].trim() }}
-                            className="w-full h-[380px] rounded-3xl"
-                            resizeMode="cover"
-                          />
-                          
-                          {/* Status badges container */}
-                          <View className="absolute top-4 w-full flex-row justify-between px-4">
-                            {/* Left side - Table availability badge */}
-                            <View>
-                              {isBarOpen(bar.barTimeResponses) && (
-                                <View 
-                                  className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
-                                    bar.isAnyTableAvailable 
-                                      ? 'bg-green-500/90' 
-                                      : 'bg-red-500/90'
-                                  }`}
-                                >
-                                  <Text className="text-white font-medium text-xs">
-                                    {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-                            
-                            {/* Right side - Discount badge */}
-                            <View>
-                              {bar.discount > 0 && (
-                                <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full h-7 items-center justify-center">
-                                  <Text className="text-black font-bold text-xs">-{bar.discount}%</Text>
-                                </View>
-                              )}
-                            </View>
-                          </View>
-                          
-                          {/* Existing gradient and content */}
-                          <LinearGradient
-                            colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
-                            className="absolute bottom-0 left-0 right-0 h-40 rounded-b-3xl"
-                          >
-                            {/* Content overlay */}
-                            <View className="absolute bottom-0 p-5 w-full">
-                              <Text className="text-yellow-500 text-xl font-bold mb-2">
-                                {bar.barName}
-                              </Text>
-                              
-                              <View className="flex-row items-center mb-2">
-                                <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                                <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
-                                  {bar.address}
-                                </Text>
-                              </View>
-
-                              <View className="flex-row items-center space-x-4">
-                                <View className="flex-row items-center">
-                                  <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-                                  <Text className="text-gray-400 text-xs ml-1">
-                                    {getCurrentDayTime(bar.barTimeResponses)}
-                                  </Text>
-                                </View>
-                                <View className="flex-row items-center">
-                                  <Ionicons name="star" size={14} color="#EAB308" />
-                                  <Text className="text-white ml-1 text-xs font-medium">
-                                    {formatRating(getAverageRating(bar.feedBacks))}
-                                  </Text>
-                                </View>
-                              </View>
-                            </View>
-                          </LinearGradient>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  }}
+                  renderItem={renderBarItem}
+                  keyExtractor={keyExtractor}
+                  maxToRenderPerBatch={5}
+                  windowSize={5}
+                  removeClippedSubviews={true}
+                  initialNumToRender={3}
                 />
               </Animated.View>
             )}

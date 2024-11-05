@@ -354,7 +354,7 @@ const FilterButton = ({
   </TouchableOpacity>
 );
 
-// Thêm component DrinkItem
+// 1. Tối ưu DrinkItem component
 const DrinkItem = memo(({ 
   drink, 
   onPress 
@@ -362,6 +362,7 @@ const DrinkItem = memo(({
   drink: Drink; 
   onPress: () => void;
 }) => {
+  // Sử dụng useMemo cho images array
   const images = useMemo(() => getImageArray(drink.images), [drink.images]);
 
   return (
@@ -387,7 +388,7 @@ const DrinkItem = memo(({
         <Text 
           numberOfLines={2}
           ellipsizeMode="tail"
-          className="text-gray-400 text-sm min-h-[40px]" // Thêm min-height để fix cứng 2 dòng
+          className="text-gray-400 text-sm min-h-[40px]"
         >
           {drink.description || "Chưa có mô tả"}
         </Text>
@@ -397,6 +398,41 @@ const DrinkItem = memo(({
         </Text>
       </View>
     </TouchableOpacity>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function
+  return prevProps.drink.drinkId === nextProps.drink.drinkId;
+});
+
+// 2. Tối ưu danh sách drinks trong modal
+const DrinksList = memo(({
+  drinks,
+  onDrinkPress
+}: {
+  drinks: Drink[];
+  onDrinkPress: (drink: Drink) => void;
+}) => {
+  if (drinks.length === 0) {
+    return (
+      <View className="py-8 items-center">
+        <Ionicons name="wine-outline" size={40} color="#9CA3AF" />
+        <Text className="text-gray-400 mt-2 text-center">
+          Không có thức uống nào
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {drinks.map((drink) => (
+        <DrinkItem
+          key={drink.drinkId}
+          drink={drink}
+          onPress={() => onDrinkPress(drink)}
+        />
+      ))}
+    </>
   );
 });
 
@@ -414,6 +450,7 @@ const DrinkDetailSkeleton = () => (
   </View>
 );
 
+// Tách DrinkDetailContent thành component riêng
 const DrinkDetailContent = ({ drink }: { drink: Drink }) => {
   const [isImageViewVisible, setIsImageViewVisible] = useState(false);
   const images = useMemo(() => getImageArray(drink.images), [drink.images]);
@@ -503,7 +540,7 @@ const DrinkDetailContent = ({ drink }: { drink: Drink }) => {
         animationType="fade"
         HeaderComponent={({ imageIndex }) => (
           <SafeAreaView edges={["top"]}>
-            <View className="w-full flex-row justify-between items-center px-4 py-2">
+            <View className="w-full flex-row justify-between items-center px-4 py-2 mt-16">
               <TouchableOpacity
                 onPress={() => setIsImageViewVisible(false)}
                 className="bg-black/50 rounded-full p-2"
@@ -521,29 +558,50 @@ const DrinkDetailContent = ({ drink }: { drink: Drink }) => {
   );
 };
 
-// Sửa lại DrinkDetailModal
+// Cập nhật DrinkDetailModal
 const DrinkDetailModal = memo(
   ({
     isVisible,
     onClose,
     drink,
+    isTransitioning,
   }: {
     isVisible: boolean;
     onClose: () => void;
     drink: Drink | null;
+    isTransitioning: boolean;
   }) => {
-    if (!drink) return null;
+    const [isClosing, setIsClosing] = useState(false);
+
+    // Hàm xử lý đóng modal
+    const handleClose = useCallback(() => {
+      setIsClosing(true);
+    }, []);
+
+    if (!drink || isTransitioning) return null;
 
     return (
       <Modal
-        isVisible={isVisible}
-        onBackdropPress={onClose}
+        isVisible={isVisible && !isClosing}
+        onBackdropPress={handleClose}
         style={{ margin: 0 }}
         statusBarTranslucent
         useNativeDriverForBackdrop
-        onSwipeComplete={onClose}
+        onSwipeComplete={handleClose}
         swipeDirection="down"
         propagateSwipe={true}
+        animationIn="slideInUp"
+        animationOut="slideOutDown"
+        animationInTiming={250}
+        animationOutTiming={200}
+        backdropTransitionOutTiming={0}
+        hideModalContentWhileAnimating={true}
+        onModalHide={() => {
+          if (isClosing) {
+            setIsClosing(false);
+            onClose();
+          }
+        }}
       >
         <View className="flex-1 mt-16 bg-black rounded-t-3xl">
           <View className="items-center pt-4 pb-2">
@@ -554,7 +612,7 @@ const DrinkDetailModal = memo(
             <Text className="text-white text-lg font-bold">
               Chi tiết thức uống
             </Text>
-            <TouchableOpacity onPress={onClose}>
+            <TouchableOpacity onPress={handleClose}>
               <Ionicons name="close" size={24} color="white" />
             </TouchableOpacity>
           </View>
@@ -773,6 +831,10 @@ export default function BarDetailScreen() {
     useState(false);
   const [selectedDrink, setSelectedDrink] = useState<Drink | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Thêm state để theo dõi modal trước đó
+  const [shouldReopenDrinksModal, setShouldReopenDrinksModal] = useState(false);
 
   // Memoized values
   const images = useMemo(() => {
@@ -862,10 +924,17 @@ export default function BarDetailScreen() {
     fetchData();
   }, [id]);
 
-  const handleOpenDrinkDetail = (drink: Drink) => {
-    setSelectedDrink(drink);
-    setIsDrinkDetailModalVisible(true);
-  };
+  const handleOpenDrinkDetail = useCallback((drink: Drink) => {
+    if (isDrinkModalVisible) {
+      setIsTransitioning(true);
+      setSelectedDrink(drink);
+      setShouldReopenDrinksModal(true); // Đánh dấu để mở lại sau
+      setIsDrinkModalVisible(false);
+    } else {
+      setSelectedDrink(drink);
+      setIsDrinkDetailModalVisible(true);
+    }
+  }, [isDrinkModalVisible]);
 
   // Thêm state và hooks cần thiết
   const { isAuthenticated, user, isGuest } = useAuth();
@@ -879,7 +948,7 @@ export default function BarDetailScreen() {
       return;
     }
 
-    // Nếu đã đăng nhập và là CUSTOMER thì cho phép đặt bàn
+    // Nếu đ đăng nhập và là CUSTOMER thì cho phép đặt bàn
     if (barDetail?.barId) {
       router.push(`/booking-table/${barDetail.barId}` as any);
     }
@@ -986,7 +1055,7 @@ export default function BarDetailScreen() {
 
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1" edges={['top']}>
         {/* Thay header cũ bằng animated header */}
         <Animated.View
           className="absolute top-0 left-0 right-0 z-50"
@@ -1016,7 +1085,7 @@ export default function BarDetailScreen() {
                     <View className="flex-row items-center">
                       <Ionicons name="star" size={14} color="#EAB308" />
                       <Text className="text-white ml-1 text-sm">
-                        {formatRating(averageRating)}
+                        {formatRating(averageRating) == "0" ? "Chưa có đánh giá" : formatRating(averageRating)}
                       </Text>
                     </View>
                   </View>
@@ -1298,7 +1367,7 @@ export default function BarDetailScreen() {
                     animationType="fade"
                     HeaderComponent={({ imageIndex }) => (
                       <SafeAreaView edges={["top"]}>
-                        <View className="w-full flex-row justify-between items-center px-4 py-2">
+                        <View className="w-full flex-row justify-between items-center px-4 py-2 mt-16">
                           <TouchableOpacity
                             onPress={() => setIsImageViewVisible(false)}
                             className="bg-black/50 rounded-full p-2"
@@ -1395,9 +1464,18 @@ export default function BarDetailScreen() {
                     <DrinkDetailModal
                       isVisible={isDrinkDetailModalVisible}
                       drink={selectedDrink}
+                      isTransitioning={isTransitioning}
                       onClose={() => {
                         setIsDrinkDetailModalVisible(false);
                         setSelectedDrink(null);
+                        // Mở lại Drinks Modal nếu cần
+                        if (shouldReopenDrinksModal) {
+                          // Đợi modal drinks detail đóng hoàn toàn
+                          setTimeout(() => {
+                            setIsDrinkModalVisible(true);
+                            setShouldReopenDrinksModal(false);
+                          }, 0); // Tăng delay lên 200ms
+                        }
                       }}
                     />
 
@@ -1408,15 +1486,31 @@ export default function BarDetailScreen() {
                         setIsDrinkModalVisible(false);
                         setSelectedCategory(null);
                       }}
-                      className="m-0 mt-16"
+                      onModalHide={() => {
+                        if (isTransitioning) {
+                          setTimeout(() => {
+                            setIsDrinkDetailModalVisible(true);
+                            setIsTransitioning(false);
+                          }, 100);
+                        }
+                      }}
                       style={{ margin: 0 }}
                       statusBarTranslucent
                       useNativeDriverForBackdrop
+                      animationIn="slideInUp"
+                      animationOut="slideOutDown"
+                      animationInTiming={250}
+                      animationOutTiming={200}
+                      backdropTransitionOutTiming={0}
+                      hideModalContentWhileAnimating={true}
+                      presentationStyle="overFullScreen"
+                      propagateSwipe={true}
+                      useNativeDriver={true}
                     >
-                      <View className="flex-1 bg-black rounded-t-3xl">
+                      <View className="flex-1 bg-black rounded-t-3xl mt-16">
                         {/* Header */}
                         <View className="p-4 border-b border-white/10">
-                          {/* Bỏ thanh trượt */}
+                          {/* B thanh trượt */}
                           <View className="flex-row justify-between items-center mb-3">
                             <Text className="text-white text-lg font-bold">
                               Tất cả thức uống
@@ -1501,26 +1595,10 @@ export default function BarDetailScreen() {
                           nestedScrollEnabled={true}
                           showsVerticalScrollIndicator={false}
                         >
-                          {getFilteredDrinks().length > 0 ? (
-                            getFilteredDrinks().map((drink) => (
-                              <DrinkItem
-                                key={drink.drinkId}
-                                drink={drink}
-                                onPress={() => handleOpenDrinkDetail(drink)}
-                              />
-                            ))
-                          ) : (
-                            <View className="py-8 items-center">
-                              <Ionicons
-                                name="wine-outline"
-                                size={40}
-                                color="#9CA3AF"
-                              />
-                              <Text className="text-gray-400 mt-2 text-center">
-                                Không có thức uống nào
-                              </Text>
-                            </View>
-                          )}
+                          <DrinksList 
+                            drinks={getFilteredDrinks()}
+                            onDrinkPress={handleOpenDrinkDetail}
+                          />
                         </ScrollView>
                       </View>
                     </Modal>
@@ -1587,8 +1665,8 @@ export default function BarDetailScreen() {
               </View>
             </Animated.ScrollView>
 
-            {/* Nút Đặt bàn ngay */}
-            <View className="absolute bottom-0 left-0 right-0">
+            {/* Nút Đt bàn ngay */}
+            <View className="absolute bottom-0 left-0 right-0 mb-2">
               <LinearGradient
                 colors={["transparent", "rgba(0,0,0,0.8)", "rgba(0,0,0,1)"]}
                 className="absolute inset-0"

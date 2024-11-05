@@ -581,13 +581,13 @@ export default function BookingDetailScreen() {
 
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1" edges={['top']}>
         {/* Header luôn hiển thị */}
         <Animated.View 
           className="absolute top-0 left-0 right-0 z-50"
           style={headerAnimatedStyle}
         >
-          <SafeAreaView edges={['top']}>
+          <SafeAreaView >
             <View className="px-4 py-2 flex-row items-center justify-between">
               <TouchableOpacity
                 onPress={() => {
@@ -716,7 +716,7 @@ export default function BookingDetailScreen() {
 
             {/* Footer trong suốt cho nút đánh giá */}
             {booking?.status === 3 && (
-              <View className="absolute bottom-0 left-0 right-0 px-6 py-4 bg-black/0 backdrop-blur-sm">
+              <View className="absolute bottom-0 left-0 right-0 px-6 py-4 bg-black/0 backdrop-blur-sm mb-2">
                 {booking.isRated ? (
                   <TouchableOpacity 
                     className="bg-yellow-500/95 backdrop-blur-sm py-4 rounded-xl"

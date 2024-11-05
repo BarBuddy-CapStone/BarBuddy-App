@@ -170,6 +170,8 @@ export default function BookingTableScreen() {
   const [showProcessingModal, setShowProcessingModal] = useState(false);
   const [bookingStatus, setBookingStatus] = useState<'processing' | 'success' | 'error'>('processing');
   const [bookingError, setBookingError] = useState<string>('');
+  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [tempDate, setTempDate] = useState<Date>(selectedDate);
 
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
     if (!barDetail?.barTimeResponses) {
@@ -364,21 +366,37 @@ export default function BookingTableScreen() {
   };
 
   const handleDateChange = (event: any, date?: Date) => {
-    setShowDatePicker(false);
-    
-    // Nếu người dùng cancel hoặc không chọn ngày
-    if (!date || event.type === 'dismissed') {
-      return;
-    }
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      setIsDatePickerVisible(false);
+      
+      if (!date || event.type === 'dismissed') {
+        return;
+      }
 
-    // Khi người dùng chọn ngày mới
-    setSelectedDate(date);
-    // Reset các state liên quan
+      setSelectedDate(date);
+      setSelectedTables([]);
+      setAvailableTables([]);
+      setCurrentTableType(null);
+      setHasSearched(false);
+      setShowTypeDescription(false);
+    } else {
+      // iOS: Chỉ cập nhật tempDate
+      if (date) {
+        setTempDate(date);
+      }
+    }
+  };
+
+  const handleConfirmDate = () => {
+    setSelectedDate(tempDate);
     setSelectedTables([]);
     setAvailableTables([]);
     setCurrentTableType(null);
     setHasSearched(false);
     setShowTypeDescription(false);
+    setShowDatePicker(false);
+    setIsDatePickerVisible(false);
   };
 
   const handleSearchTables = async () => {
@@ -976,15 +994,60 @@ export default function BookingTableScreen() {
           </View>
         </ScrollView>
 
-        {showDatePicker && (
-          <DateTimePicker
-            value={selectedDate}
-            mode="date"
-            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleDateChange}
-            minimumDate={minDate}
-            maximumDate={maxDate}
-          />
+        {Platform.OS === 'ios' ? (
+          <Modal
+            visible={showDatePicker}
+            transparent={true}
+            animationType="slide"
+            onRequestClose={() => {
+              setShowDatePicker(false);
+              setIsDatePickerVisible(false);
+              setTempDate(selectedDate); // Reset tempDate khi đóng modal
+            }}
+          >
+            <View className="flex-1 justify-end bg-black/50">
+              <View className="bg-neutral-800 rounded-t-3xl">
+                <View className="flex-row justify-between items-center p-4 border-b border-white/10">
+                  <TouchableOpacity 
+                    onPress={() => {
+                      setShowDatePicker(false);
+                      setIsDatePickerVisible(false);
+                      setTempDate(selectedDate); // Reset tempDate khi huỷ
+                    }}
+                  >
+                    <Text className="text-white">Huỷ</Text>
+                  </TouchableOpacity>
+                  <Text className="text-white font-bold">Chọn ngày</Text>
+                  <TouchableOpacity onPress={handleConfirmDate}>
+                    <Text className="text-yellow-500 font-bold">Xong</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={tempDate}
+                  mode="date"
+                  display="spinner"
+                  minimumDate={new Date()}
+                  maximumDate={getMaxBookingDate()}
+                  onChange={handleDateChange}
+                  textColor="white"
+                  locale="vi"
+                  style={{ backgroundColor: '#262626' }}
+                />
+              </View>
+            </View>
+          </Modal>
+        ) : (
+          // Android giữ nguyên
+          showDatePicker && (
+            <DateTimePicker
+              value={selectedDate}
+              mode="date"
+              display="default"
+              minimumDate={new Date()}
+              maximumDate={getMaxBookingDate()}
+              onChange={handleDateChange}
+            />
+          )
         )}
 
         <Modal
@@ -1033,13 +1096,13 @@ export default function BookingTableScreen() {
         </Modal>
 
         {/* Footer hiển thị bàn đã chọn */}
-        {selectedTables.length > 0 && (
+        {selectedTables.length > 0 && !isDatePickerVisible && (
           <Animated.View 
             entering={FadeIn}
             className="absolute bottom-0 left-0 right-0 border-t border-white/10 bg-neutral-900/95"
           >
             <SafeAreaView edges={['bottom']}>
-              <View className="px-6 py-3 space-y-4">
+              <View className="px-4 pt-4 space-y-4">
                 {/* Thông tin bàn đã chọn */}
                 <View className="flex-row items-center justify-between">
                   <View className="flex-row items-center">
@@ -1058,10 +1121,10 @@ export default function BookingTableScreen() {
                 </View>
 
                 {/* Nút đặt bàn */}
-                <View className="flex-row space-x-3">
+                <View className="flex-row space-x-4">
                   <TouchableOpacity 
                     onPress={() => handleBookingNow()}
-                    className="flex-1 bg-yellow-500 py-2 rounded-2xl"
+                    className="flex-1 bg-yellow-500 py-3.5 rounded-2xl"
                   >
                     <Text className="text-black text-center font-bold">
                       Đặt bàn ngay
@@ -1070,7 +1133,7 @@ export default function BookingTableScreen() {
 
                   <TouchableOpacity 
                     onPress={() => handleBookingWithDrinks()}
-                    className="flex-1 bg-white/10 py-2 rounded-2xl relative"
+                    className="flex-1 bg-white/10 py-3.5 rounded-2xl relative"
                   >
                     <Text className="text-white text-center font-bold">
                       Đặt kèm thức uống

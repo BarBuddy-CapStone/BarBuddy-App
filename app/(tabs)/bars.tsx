@@ -1,6 +1,6 @@
 import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, memo } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { barService, type Bar } from '@/services/bar';
 import { router } from 'expo-router';
@@ -78,6 +78,93 @@ const isBarOpen = (barTimes: Bar['barTimeResponses']) => {
   return true; // Tạm thời return true vì logic check giờ phức tạp hơn cần xử lý riêng
 };
 
+// Tách BarItem thành một component riêng và sử dụng React.memo
+const BarItem = memo(({ bar, onPress }: { bar: Bar; onPress: () => void }) => {
+  const getAverageRating = useCallback((feedBacks: Array<{ rating: number }>) => {
+    if (!feedBacks || feedBacks.length === 0) return null;
+    const sum = feedBacks.reduce((acc, curr) => acc + curr.rating, 0);
+    return sum / feedBacks.length;
+  }, []);
+
+  return (
+    <Animated.View entering={FadeIn}>
+      <TouchableOpacity
+        className="overflow-hidden rounded-3xl"
+        activeOpacity={0.7}
+        onPress={onPress}
+      >
+        <View className="relative">
+          <Image
+            source={{ uri: bar.images.split(',')[0].trim() }}
+            className="w-full h-[380px]"
+            resizeMode="cover"
+          />
+          
+          {/* Status badges container */}
+          <View className="absolute top-4 w-full flex-row justify-between px-4">
+            {/* Left side - Table availability badge */}
+            <View>
+              {isBarOpen(bar.barTimeResponses) && (
+                <View 
+                  className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
+                    bar.isAnyTableAvailable 
+                      ? 'bg-green-500/90' 
+                      : 'bg-red-500/90'
+                  }`}
+                >
+                  <Text className="text-white font-medium text-xs">
+                    {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
+                  </Text>
+                </View>
+              )}
+            </View>
+            
+            {/* Right side - Discount badge */}
+            {bar.discount > 0 && (
+              <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full h-7 items-center justify-center">
+                <Text className="text-black font-bold text-xs">-{bar.discount}%</Text>
+              </View>
+            )}
+          </View>
+
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+            className="absolute bottom-0 left-0 right-0 h-40"
+          >
+            <View className="absolute bottom-0 p-5 w-full">
+              <Text className="text-yellow-500 text-xl font-bold mb-2">
+                {bar.barName}
+              </Text>
+              
+              <View className="flex-row items-center mb-2">
+                <Ionicons name="location-outline" size={14} color="#9CA3AF" />
+                <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
+                  {bar.address}
+                </Text>
+              </View>
+
+              <View className="flex-row items-center space-x-4">
+                <View className="flex-row items-center">
+                  <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+                  <Text className="text-gray-400 text-xs ml-1">
+                    {getCurrentDayTime(bar.barTimeResponses)}
+                  </Text>
+                </View>
+                <View className="flex-row items-center">
+                  <Ionicons name="star" size={14} color="#EAB308" />
+                  <Text className="text-white ml-1 text-xs font-medium">
+                    {formatRating(getAverageRating(bar.feedBacks))}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
 export default function BarsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [bars, setBars] = useState<Bar[]>([]);
@@ -130,11 +217,16 @@ export default function BarsScreen() {
     fetchBars();
   }, []);
 
-  const getAverageRating = (feedBacks: Array<{ rating: number }>) => {
-    if (!feedBacks || feedBacks.length === 0) return null;
-    const sum = feedBacks.reduce((acc, curr) => acc + curr.rating, 0);
-    return sum / feedBacks.length;
-  };
+  const renderItem = useCallback(({ item: bar }: { item: Bar }) => {
+    return (
+      <BarItem 
+        bar={bar} 
+        onPress={() => router.push(`/bar-detail/${bar.barId}`)}
+      />
+    );
+  }, []);
+
+  const keyExtractor = useCallback((item: Bar) => item.barId, []);
 
   return (
     <View className="flex-1 bg-black">
@@ -190,13 +282,18 @@ export default function BarsScreen() {
         ) : (
           <FlatList
             data={getFilteredBars()}
-            keyExtractor={item => item.barId}
+            renderItem={renderItem}
+            keyExtractor={keyExtractor}
             contentContainerStyle={{ padding: 16 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
             ItemSeparatorComponent={() => <View className="h-4" />}
+            maxToRenderPerBatch={5}
+            windowSize={5}
+            removeClippedSubviews={true}
+            initialNumToRender={3}
             ListEmptyComponent={() => (
               <View className="flex-1 items-center justify-center py-20">
                 <Ionicons 
@@ -211,87 +308,6 @@ export default function BarsScreen() {
                   {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử lại vào thời điểm khác'}
                 </Text>
               </View>
-            )}
-            renderItem={({ item: bar }) => (
-              <Animated.View entering={FadeIn}>
-                <TouchableOpacity
-                  className="overflow-hidden rounded-3xl"
-                  activeOpacity={0.7}
-                  onPress={() => router.push(`/bar-detail/${bar.barId}`)}
-                >
-                  <View className="relative">
-                    <Image
-                      source={{ uri: bar.images.split(',')[0].trim() }}
-                      className="w-full h-[380px]"
-                      resizeMode="cover"
-                    />
-                    
-                    {/* Status badges container */}
-                    <View className="absolute top-4 w-full flex-row justify-between px-4">
-                      {/* Left side - Table availability badge */}
-                      <View>
-                        {isBarOpen(bar.barTimeResponses) && (
-                          <View 
-                            className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
-                              bar.isAnyTableAvailable 
-                                ? 'bg-green-500/90' 
-                                : 'bg-red-500/90'
-                            }`}
-                          >
-                            <Text className="text-white font-medium text-xs">
-                              {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bn hôm nay'}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      
-                      {/* Right side - Discount badge */}
-                      <View>
-                        {bar.discount > 0 && (
-                          <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full h-7 items-center justify-center">
-                            <Text className="text-black font-bold text-xs">-{bar.discount}%</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-
-                    {/* Gradient overlay */}
-                    <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
-                      className="absolute bottom-0 left-0 right-0 h-40"
-                    >
-                      {/* Content overlay */}
-                      <View className="absolute bottom-0 p-5 w-full">
-                        <Text className="text-yellow-500 text-xl font-bold mb-2">
-                          {bar.barName}
-                        </Text>
-                        
-                        <View className="flex-row items-center mb-2">
-                          <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                          <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
-                            {bar.address}
-                          </Text>
-                        </View>
-
-                        <View className="flex-row items-center space-x-4">
-                          <View className="flex-row items-center">
-                            <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-                            <Text className="text-gray-400 text-xs ml-1">
-                              {getCurrentDayTime(bar.barTimeResponses)}
-                            </Text>
-                          </View>
-                          <View className="flex-row items-center">
-                            <Ionicons name="star" size={14} color="#EAB308" />
-                            <Text className="text-white ml-1 text-xs font-medium">
-                              {formatRating(getAverageRating(bar.feedBacks))}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    </LinearGradient>
-                  </View>
-                </TouchableOpacity>
-              </Animated.View>
             )}
           />
         )}

@@ -29,7 +29,6 @@
         <array>
           <string>com.fptu.barbuddy</string>
           <string>com.fptu.barbuddy</string>
-          <string>com.googleusercontent.apps.294668771815-0oslkkj1gg5sov5o7npbbf6beo7aknni</string>
         </array>
       </dict>
     </array>
@@ -44,6 +43,12 @@
       <key>NSAllowsLocalNetworking</key>
       <true/>
     </dict>
+    <key>NSCameraUsageDescription</key>
+    <string>Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới.</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Ứng dụng cần quyền truy cập vào thư viện ảnh để thay đổi ảnh đại diện của bạn.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>
@@ -74,7 +79,5 @@
     <string>Dark</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
-    <key>GIDClientID</key>
-    <string>294668771815-0oslkkj1gg5sov5o7npbbf6beo7aknni.apps.googleusercontent.com</string>
   </dict>
 </plist>

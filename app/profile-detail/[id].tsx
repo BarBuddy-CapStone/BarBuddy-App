@@ -57,7 +57,12 @@ const LoadingPopup = ({
     <Modal 
       transparent 
       visible={showModal}
-      onRequestClose={onClose}
+      onRequestClose={() => {
+        // Chỉ cho phép đóng khi không phải đang loading
+        if (status !== 'loading') {
+          onClose?.();
+        }
+      }}
     >
       <RNAnimated.View 
         style={{
@@ -70,7 +75,12 @@ const LoadingPopup = ({
       >
         <TouchableOpacity
           activeOpacity={1}
-          onPress={onClose}
+          onPress={() => {
+            // Chỉ cho phép đóng khi không phải đang loading
+            if (status !== 'loading') {
+              onClose?.();
+            }
+          }}
           className="flex-1 w-full items-center justify-center"
         >
           <TouchableOpacity 
@@ -323,8 +333,8 @@ export default function ProfileDetailScreen() {
       if (status !== 'granted') {
         Toast.show({
           type: 'error',
-          text1: 'Lỗi',
-          text2: 'Bạn cần cấp quyền truy cập thư viện ảnh',
+          text1: 'Cần cấp quyền',
+          text2: 'Vui lòng cấp quyền truy cập thư viện ảnh để thay đổi ảnh đại diện',
           position: 'bottom'
         });
         return;

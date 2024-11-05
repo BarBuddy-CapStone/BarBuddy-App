@@ -15,7 +15,11 @@
     "ios": {
       "bundleIdentifier": "com.fptu.barbuddy",
       "buildNumber": "1.0.0",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Ứng dụng cần quyền truy cập vào thư viện ảnh để thay đổi ảnh đại diện của bạn.",
+        "NSCameraUsageDescription": "Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới."
+      }
     },
     "android": {
       "package": "com.fptu.barbuddy",
@@ -46,7 +50,14 @@
     },
     "plugins": [
       "expo-router",
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ứng dụng cần quyền truy cập vào thư viện ảnh để thay đổi ảnh đại diện của bạn.",
+          "cameraPermission": "Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -1121,7 +1121,7 @@ export default function BookingTableScreen() {
                 </View>
 
                 {/* Nút đặt bàn */}
-                <View className="flex-row space-x-4 mb-4">
+                <View className={`flex-row space-x-4 ${Platform.OS !== 'ios' ? 'mb-4' : ''}`}>
                   <TouchableOpacity 
                     onPress={() => handleBookingNow()}
                     className="flex-1 bg-yellow-500 py-3.5 rounded-2xl"

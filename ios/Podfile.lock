@@ -20,6 +20,8 @@ PODS:
     - React-Core
   - ExpoAsset (10.0.10):
     - ExpoModulesCore
+  - ExpoClipboard (6.0.3):
+    - ExpoModulesCore
   - ExpoFileSystem (17.0.1):
     - ExpoModulesCore
   - ExpoFont (12.0.10):
@@ -1336,6 +1338,7 @@ DEPENDENCIES:
   - Expo (from `../node_modules/expo`)
   - "ExpoAdapterGoogleSignIn (from `../node_modules/@react-native-google-signin/google-signin/expo/ios`)"
   - ExpoAsset (from `../node_modules/expo-asset/ios`)
+  - ExpoClipboard (from `../node_modules/expo-clipboard/ios`)
   - ExpoFileSystem (from `../node_modules/expo-file-system/ios`)
   - ExpoFont (from `../node_modules/expo-font/ios`)
   - ExpoHead (from `../node_modules/expo-router/ios`)
@@ -1431,6 +1434,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-google-signin/google-signin/expo/ios"
   ExpoAsset:
     :path: "../node_modules/expo-asset/ios"
+  ExpoClipboard:
+    :path: "../node_modules/expo-clipboard/ios"
   ExpoFileSystem:
     :path: "../node_modules/expo-file-system/ios"
   ExpoFont:
@@ -1580,6 +1585,7 @@ SPEC CHECKSUMS:
   Expo: 9b6666ef2fedcfc89c5b9be2aa1ce12b81f9e7f5
   ExpoAdapterGoogleSignIn: da10ae7e7c1d73a10c2facebcdfe5ebea8e073ce
   ExpoAsset: 323700f291684f110fb55f0d4022a3362ea9f875
+  ExpoClipboard: 23d203f5d4843699fbc45be1cc4fe1fbd811a6fa
   ExpoFileSystem: 80bfe850b1f9922c16905822ecbf97acd711dc51
   ExpoFont: 00756e6c796d8f7ee8d211e29c8b619e75cbf238
   ExpoHead: fcb28a68ed4ba28f177394d2dfb8a0a8824cd103

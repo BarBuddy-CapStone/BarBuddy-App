@@ -11,7 +11,7 @@ export type Account = {
   fullname: string;
   phone: string;
   dob: string;
-  image: string;
+  image?: string | null; 
 };
 
 export type UpdateAccountData = {

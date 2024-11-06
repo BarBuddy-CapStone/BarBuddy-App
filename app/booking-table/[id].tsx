@@ -693,7 +693,15 @@ export default function BookingTableScreen() {
                   <Image 
                     source={{ 
                       uri: accountInfo?.image || `https://ui-avatars.com/api/?name=${accountInfo?.fullname}&background=334155&color=fff`
-                    }} 
+                    }}
+                    defaultSource={require('@/assets/images/default-avatar.png')}
+                    onError={() => {
+                      // Khi có lỗi load ảnh, set lại state với image là undefined
+                      setAccountInfo(prev => prev ? {
+                        ...prev,
+                        image: undefined
+                      } : null);
+                    }}
                     className="w-20 h-20 rounded-full bg-slate-600"
                   />
 

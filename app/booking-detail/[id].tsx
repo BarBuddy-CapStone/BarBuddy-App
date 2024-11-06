@@ -1,7 +1,7 @@
-import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator, Modal, Alert, TextInput } from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, ActivityIndicator, Modal, Alert, TextInput, Keyboard, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -334,6 +334,8 @@ export default function BookingDetailScreen() {
   const [loadingBooking, setLoadingBooking] = useState(true);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const scrollY = useSharedValue(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
@@ -579,6 +581,28 @@ export default function BookingDetailScreen() {
   const remainingChars = 500 - comment.length;
   const isCommentTooShort = comment.trim().length < 10;
 
+  // Thêm useEffect theo dõi keyboard
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1" edges={['top']}>
@@ -587,21 +611,19 @@ export default function BookingDetailScreen() {
           className="absolute top-0 left-0 right-0 z-50"
           style={headerAnimatedStyle}
         >
-          <SafeAreaView >
-            <View className="px-4 py-2 flex-row items-center justify-between">
+          <SafeAreaView edges={['top']}>
+            <View className="px-4 h-14 flex-row items-center justify-between">
               <TouchableOpacity
                 onPress={() => {
                   if (hasRated) {
-                    // Nếu đã đánh giá thì chuyển về history với param reload và status=3 (đã hoàn thành)
                     router.push({
                       pathname: '/(tabs)/booking-history',
                       params: { 
                         reload: 'true',
-                        status: '3' // Thêm param status
+                        status: '3'
                       }
                     });
                   } else {
-                    // Nếu chưa đánh giá thì back bình thường
                     router.back();
                   }
                 }}
@@ -869,7 +891,11 @@ export default function BookingDetailScreen() {
                       </Text>
                       <View className="flex-row items-center mb-4">
                         <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                        <Text className="text-gray-400 text-sm ml-1 flex-1">
+                        <Text 
+                          className="text-gray-400 text-sm ml-1 flex-1"
+                          numberOfLines={1}
+                          ellipsizeMode="tail"
+                        >
                           {feedback?.barAddress}
                         </Text>
                       </View>
@@ -914,145 +940,162 @@ export default function BookingDetailScreen() {
               onRequestClose={resetRatingModal}
             >
               <TouchableOpacity 
-                className="flex-1 bg-black/50 justify-center items-center p-6"
                 activeOpacity={1}
                 onPress={resetRatingModal}
+                className="flex-1 bg-black/50 justify-center items-center"
               >
                 <TouchableOpacity 
-                  activeOpacity={1} 
+                  activeOpacity={1}
                   onPress={(e) => e.stopPropagation()}
-                  className="w-full"
+                  className={`w-[90%] max-h-[90%] ${keyboardHeight > 0 ? 'mb-5' : ''}`}
+                  style={{ 
+                    marginBottom: keyboardHeight > 0 ? keyboardHeight : 0
+                  }}
                 >
-                  <View className="bg-neutral-800 rounded-2xl w-full overflow-hidden">
-                    <Image 
-                      source={{ uri: booking?.images[0] }}
-                      className="w-full h-32"
-                      resizeMode="cover"
-                    />
-                    <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.8)']}
-                      className="absolute top-0 left-0 right-0 h-32"
-                    />
+                  <ScrollView
+                    ref={scrollViewRef}
+                    bounces={false}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    <View className="bg-neutral-800 rounded-2xl overflow-hidden">
+                      <Image 
+                        source={{ uri: booking?.images[0] }}
+                        className="w-full h-32"
+                        resizeMode="cover"
+                      />
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.8)']}
+                        className="absolute top-0 left-0 right-0 h-32"
+                      />
 
-                    <TouchableOpacity
-                      className="absolute top-3 right-3 bg-black/20 p-2 rounded-full"
-                      onPress={resetRatingModal}
-                    >
-                      <Ionicons name="close" size={20} color="white" />
-                    </TouchableOpacity>
+                      <TouchableOpacity
+                        className="absolute top-3 right-3 bg-black/20 p-2 rounded-full"
+                        onPress={resetRatingModal}
+                      >
+                        <Ionicons name="close" size={20} color="white" />
+                      </TouchableOpacity>
 
-                    <View className="p-6">
-                      <Text className="text-yellow-500 text-xl font-bold mb-1">
-                        {booking?.barName}
-                      </Text>
+                      <View className="p-6">
+                        <Text className="text-yellow-500 text-xl font-bold mb-4">
+                          {booking?.barName}
+                        </Text>
 
-                      {ratingStatus === 'loading' ? (
-                        <View className="items-center py-8">
-                          <ActivityIndicator size="large" color="#EAB308" />
-                          <Text className="text-white text-lg font-bold mt-4">
-                            Đang gửi đánh giá...
-                          </Text>
-                        </View>
-                      ) : ratingStatus === 'success' ? (
-                        <View className="items-center py-8">
-                          <Ionicons name="checkmark-circle" size={48} color="#22C55E" />
-                          <Text className="text-white text-lg font-bold mt-4">
-                            Đã gửi đánh giá thành công
-                          </Text>
-                        </View>
-                      ) : ratingStatus === 'error' ? (
-                        <>
-                          <View className="items-center py-4">
-                            <Ionicons name="alert-circle" size={48} color="#EF4444" />
+                        {ratingStatus === 'loading' ? (
+                          <View className="items-center py-8">
+                            <ActivityIndicator size="large" color="#EAB308" />
                             <Text className="text-white text-lg font-bold mt-4">
-                              Không thể gửi đánh giá
-                            </Text>
-                            <Text className="text-white/60 text-center mt-2">
-                              {ratingError}
+                              Đang gửi đánh giá...
                             </Text>
                           </View>
-                          <View className="flex-row space-x-3 mt-4">
-                            <TouchableOpacity
-                              className="flex-1 bg-white/10 py-3 rounded-xl"
-                              onPress={resetRatingModal}
-                            >
-                              <Text className="text-white font-semibold text-center">Đóng</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              className="flex-1 bg-yellow-500 py-3 rounded-xl"
-                              onPress={() => setRatingStatus('idle')}
-                            >
-                              <Text className="text-black font-semibold text-center">Thử lại</Text>
-                            </TouchableOpacity>
+                        ) : ratingStatus === 'success' ? (
+                          <View className="items-center py-8">
+                            <Ionicons name="checkmark-circle" size={48} color="#22C55E" />
+                            <Text className="text-white text-lg font-bold mt-4">
+                              Đã gửi đánh giá thành công
+                            </Text>
                           </View>
-                        </>
-                      ) : (
-                        <>
-                          <Text className="text-white/60 text-base mb-6">
-                            Hãy chia sẻ trải nghiệm của bạn về quán bar này
-                          </Text>
-
-                          {/* Rating stars */}
-                          <View className="flex-row justify-center space-x-2 mb-6">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <TouchableOpacity
-                                key={star}
-                                onPress={() => setRating(star)}
-                              >
-                                <Ionicons
-                                  name={star <= rating ? "star" : "star-outline"}
-                                  size={32}
-                                  color="#EAB308"
-                                />
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-
-                          {/* Comment input */}
-                          <View className="mb-6">
-                            <TextInput
-                              className={`bg-white/5 rounded-xl p-4 text-white ${
-                                isCommentTooShort ? 'border border-red-500' : ''
-                              }`}
-                              placeholder="Nhập đánh giá của bạn (ít nhất 10 ký tự)..."
-                              placeholderTextColor="#9CA3AF"
-                              multiline
-                              numberOfLines={4}
-                              value={comment}
-                              onChangeText={setComment}
-                              style={{ textAlignVertical: 'top' }}
-                              maxLength={500}
-                            />
-                            <View className="flex-row justify-between mt-2">
-                              {isCommentTooShort && (
-                                <Text className="text-red-500 text-xs">
-                                  Còn thiếu {10 - comment.trim().length} ký tự
-                                </Text>
-                              )}
-                              <Text className={`text-xs ${
-                                remainingChars <= 50 ? 'text-red-500' : 'text-gray-400'
-                              }`}>
-                                {remainingChars} ký tự còn lại
+                        ) : ratingStatus === 'error' ? (
+                          <>
+                            <View className="items-center py-4">
+                              <Ionicons name="alert-circle" size={48} color="#EF4444" />
+                              <Text className="text-white text-lg font-bold mt-4">
+                                Không thể gửi đánh giá
+                              </Text>
+                              <Text className="text-white/60 text-center mt-2">
+                                {ratingError}
                               </Text>
                             </View>
-                          </View>
-
-                          {/* Submit button */}
-                          <TouchableOpacity
-                            className={`py-3 rounded-xl ${
-                              isCommentTooShort ? 'bg-yellow-500/50' : 'bg-yellow-500'
-                            }`}
-                            onPress={handleSubmitRating}
-                            disabled={isSubmitting || isCommentTooShort}
-                          >
-                            <Text className="text-black font-semibold text-center text-lg">
-                              Gửi đánh giá
+                            <View className="flex-row space-x-3 mt-4">
+                              <TouchableOpacity
+                                className="flex-1 bg-white/10 py-3 rounded-xl"
+                                onPress={resetRatingModal}
+                              >
+                                <Text className="text-white font-semibold text-center">Đóng</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                className="flex-1 bg-yellow-500 py-3 rounded-xl"
+                                onPress={() => setRatingStatus('idle')}
+                              >
+                                <Text className="text-black font-semibold text-center">Thử lại</Text>
+                              </TouchableOpacity>
+                            </View>
+                          </>
+                        ) : (
+                          <>
+                            <Text className="text-white/60 text-base mb-6">
+                              Hãy chia sẻ trải nghiệm của bạn về quán bar này
                             </Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
+
+                            {/* Rating stars */}
+                            <View className="flex-row justify-center space-x-2 mb-6">
+                              {[1, 2, 3, 4, 5].map((star) => (
+                                <TouchableOpacity
+                                  key={star}
+                                  onPress={() => setRating(star)}
+                                >
+                                  <Ionicons
+                                    name={star <= rating ? "star" : "star-outline"}
+                                    size={32}
+                                    color="#EAB308"
+                                  />
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+
+                            {/* Comment input với character counter */}
+                            <View className="mb-6">
+                              <TextInput
+                                className={`bg-white/5 rounded-xl p-4 text-white ${
+                                  isCommentTooShort ? 'border border-red-500' : ''
+                                }`}
+                                placeholder="Nhập đánh giá của bạn (ít nhất 10 ký tự)..."
+                                placeholderTextColor="#9CA3AF"
+                                multiline
+                                numberOfLines={4}
+                                value={comment}
+                                onChangeText={setComment}
+                                style={{ 
+                                  textAlignVertical: 'top',
+                                  minHeight: 120,
+                                  maxHeight: 200
+                                }}
+                                maxLength={500}
+                                onFocus={() => {
+                                  setTimeout(() => {
+                                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                                  }, 100);
+                                }}
+                              />
+                              <View className="flex-row justify-between mt-2">
+                                <Text className={`${
+                                  isCommentTooShort ? 'text-red-500' : 'text-white/60'
+                                }`}>
+                                  {isCommentTooShort ? 'Tối thiểu 10 ký tự' : ''}
+                                </Text>
+                                <Text className="text-white/60">
+                                  {remainingChars}/500
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Submit button */}
+                            <TouchableOpacity
+                              className={`py-3 rounded-xl ${
+                                isCommentTooShort ? 'bg-yellow-500/50' : 'bg-yellow-500'
+                              }`}
+                              onPress={handleSubmitRating}
+                              disabled={isSubmitting || isCommentTooShort}
+                            >
+                              <Text className="text-black font-semibold text-center text-lg">
+                                Gửi đánh giá
+                              </Text>
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
                     </View>
-                  </View>
+                  </ScrollView>
                 </TouchableOpacity>
               </TouchableOpacity>
             </Modal>

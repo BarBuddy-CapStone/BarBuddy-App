@@ -1,7 +1,7 @@
-import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Image, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Image, ActivityIndicator, Alert, Linking, Keyboard, Dimensions, ViewProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format, addDays } from 'date-fns';
@@ -9,10 +9,10 @@ import { vi } from 'date-fns/locale';
 import { BarDetail, barService } from '@/services/bar';
 import { TableType, tableTypeService } from '@/services/table-type';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Account, accountService } from '@/services/account';
 import { useAuth } from '@/contexts/AuthContext';
 import { BookingTableFilter, BookingTableRequest, bookingTableService } from '@/services/booking-table';
+import { useFocusEffect } from '@react-navigation/native';
 
 // Thêm interface cho state availableTables
 interface TableUI {
@@ -90,51 +90,80 @@ const getBookingDate = (date: Date, time: string) => {
 const LoadingPopup = ({ 
   visible, 
   status, 
-  errorMessage 
+  errorMessage,
+  onClose
 }: { 
   visible: boolean;
   status: 'processing' | 'success' | 'error';
   errorMessage?: string;
-}) => (
-  <Modal transparent visible={visible}>
-    <View className="flex-1 bg-black/50 items-center justify-center">
-      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4">
-        {status === 'processing' && (
-          <>
-            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
-            <Text className="text-white text-center font-medium">
-              Đang xử lý đặt bàn...
-            </Text>
-            <Text className="text-white/60 text-center text-sm mt-2">
-              Vui lòng không tắt ứng dụng
-            </Text>
-          </>
-        )}
+  onClose: () => void;
+}) => {
+  // Thêm useEffect để handle auto close
+  useEffect(() => {
+    if (status === 'success' || status === 'error') {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 2000); // Tự động đóng sau 2 giây
 
-        {status === 'success' && (
-          <>
-            <Ionicons name="checkmark-circle" size={48} color="#22C55E" className="mb-4" />
-            <Text className="text-white text-center font-medium">
-              Đặt bàn thành công
-            </Text>
-          </>
-        )}
+      return () => clearTimeout(timer);
+    }
+  }, [status, onClose]);
 
-        {status === 'error' && (
-          <>
-            <Ionicons name="alert-circle" size={48} color="#EF4444" className="mb-4" />
-            <Text className="text-white text-center font-medium">
-              Đặt bàn thất bại
-            </Text>
-            <Text className="text-white/60 text-center text-sm mt-2">
-              {errorMessage}
-            </Text>
-          </>
-        )}
-      </View>
-    </View>
-  </Modal>
-);
+  return (
+    <Modal 
+      transparent 
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={status !== 'processing' ? onClose : undefined}
+        className="flex-1 bg-black/50 items-center justify-center"
+      >
+        <Animated.View 
+          entering={FadeIn.duration(200)}
+          className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[85%] max-w-[240px]"
+        >
+          {status === 'processing' && (
+            <Animated.View entering={FadeIn.duration(200)} className="items-center">
+              <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+              <Text className="text-white text-center font-medium">
+                Đang xử lý đặt bàn...
+              </Text>
+              <Text className="text-white/60 text-center text-sm mt-2">
+                Vui lòng không tắt ứng dụng
+              </Text>
+            </Animated.View>
+          )}
+
+          {status === 'success' && (
+            <Animated.View entering={FadeIn.duration(200)} className="items-center">
+              <Ionicons name="checkmark-circle" size={48} color="#22C55E" className="mb-4" />
+              <Text className="text-white text-center font-medium mb-2">
+                Đặt bàn thành công
+              </Text>
+              <Text className="text-white/60 text-center text-sm">
+                Nhân viên của quán có thể sẽ liên hệ với bạn trong tương lai
+              </Text>
+            </Animated.View>
+          )}
+
+          {status === 'error' && (
+            <Animated.View entering={FadeIn.duration(200)} className="items-center">
+              <Ionicons name="alert-circle" size={48} color="#EF4444" className="mb-4" />
+              <Text className="text-white text-center font-medium mb-2">
+                Đặt bàn thất bại
+              </Text>
+              <Text className="text-white/60 text-center text-sm">
+                {errorMessage}
+              </Text>
+            </Animated.View>
+          )}
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
 
 // Thêm enum để quản lý trạng thái modal
 enum ModalState {
@@ -186,6 +215,12 @@ export default function BookingTableScreen() {
 
   // Thay thế các state quản lý modal riêng lẻ bằng một state duy nhất
   const [currentModal, setCurrentModal] = useState<ModalState>(ModalState.NONE);
+
+  // Thêm state để theo dõi việc redirect từ profile-detail
+  const [isRedirectFromProfile, setIsRedirectFromProfile] = useState(false);
+
+  // Thêm state để theo dõi việc cần refresh account info
+  const [needRefreshAccount, setNeedRefreshAccount] = useState(false);
 
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
     if (!barDetail?.barTimeResponses) {
@@ -379,7 +414,7 @@ export default function BookingTableScreen() {
     }
   };
 
-  const handleDateChange = (event: any, date?: Date) => {
+  const handleDateChange = useCallback((event: any, date?: Date) => {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
       setIsDatePickerVisible(false);
@@ -395,12 +430,11 @@ export default function BookingTableScreen() {
       setHasSearched(false);
       setShowTypeDescription(false);
     } else {
-      // iOS: Chỉ cập nhật tempDate
       if (date) {
         setTempDate(date);
       }
     }
-  };
+  }, []);
 
   const handleConfirmDate = () => {
     setSelectedDate(tempDate);
@@ -516,12 +550,11 @@ export default function BookingTableScreen() {
         const data = await accountService.getAccountInfo(user.accountId);
         setAccountInfo(data);
         
-        // Sửa lại phần kiểm tra isValid
         if (data) {
           const isValid = validateUserInfo(data);
-          setIsUserValidated(isValid); // Giờ isValid là boolean
+          setIsUserValidated(isValid);
           
-          if (!isValid) {
+          if (!isValid && !isRedirectFromProfile) {
             setCurrentModal(ModalState.UPDATE_PROFILE);
           }
         } else {
@@ -621,6 +654,8 @@ export default function BookingTableScreen() {
   };
 
   const handleUpdateProfile = () => {
+    setIsRedirectFromProfile(true);
+    setNeedRefreshAccount(true);
     setCurrentModal(ModalState.NONE);
     router.push(`/profile-detail/${user?.accountId}`);
   };
@@ -693,11 +728,20 @@ export default function BookingTableScreen() {
             animationType="fade"
             onRequestClose={() => setCurrentModal(ModalState.NONE)}
           >
-            <View className="flex-1 bg-black/50 justify-center items-center px-4">
-              <View className="bg-neutral-800 w-full rounded-2xl p-6">
+            <TouchableOpacity 
+              activeOpacity={1}
+              onPress={() => setCurrentModal(ModalState.NONE)}
+              className="flex-1 justify-center items-center bg-black/50 px-4"
+            >
+              <TouchableOpacity 
+                activeOpacity={1}
+                onPress={e => e.stopPropagation()}
+                className="bg-neutral-800 w-[85%] max-w-[320px] rounded-xl p-6"
+              >
                 <View className="items-center">
+                  {/* Icon và nội dung */}
                   <View className="bg-white/10 p-4 rounded-full mb-4">
-                    <Ionicons name="time" size={40} color="#9CA3AF" />
+                    <Ionicons name="time" size={32} color="#9CA3AF" />
                   </View>
                   <Text className="text-white text-lg font-medium text-center mb-2">
                     Quán đóng cửa
@@ -705,26 +749,43 @@ export default function BookingTableScreen() {
                   <Text className="text-gray-400 text-center mb-6">
                     {closedMessage}
                   </Text>
-                  <TouchableOpacity 
-                    onPress={() => setCurrentModal(ModalState.NONE)}
-                    className="w-full bg-yellow-500 py-3 rounded-xl"
-                  >
-                    <Text className="text-black text-center font-medium">
-                      Chọn ngày khác
-                    </Text>
-                  </TouchableOpacity>
+                  
+                  {/* Nút tác vụ */}
+                  <View className="w-full space-y-3">
+                    <TouchableOpacity 
+                      onPress={() => {
+                        setCurrentModal(ModalState.NONE);
+                        setShowDatePicker(true);
+                      }}
+                      className="w-full bg-yellow-500 py-3 rounded-xl"
+                    >
+                      <Text className="text-black text-center font-medium">
+                        Chọn ngày khác
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity 
+                      onPress={() => setCurrentModal(ModalState.NONE)}
+                      className="w-full bg-white/10 py-3 rounded-xl"
+                    >
+                      <Text className="text-white text-center font-medium">
+                        Đóng
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </View>
+              </TouchableOpacity>
+            </TouchableOpacity>
           </Modal>
         );
 
       case ModalState.PROCESSING:
         return (
           <LoadingPopup 
-            visible={true}
+            visible={showProcessingModal}
             status={bookingStatus}
             errorMessage={bookingError}
+            onClose={() => setShowProcessingModal(false)}
           />
         );
 
@@ -733,9 +794,94 @@ export default function BookingTableScreen() {
     }
   };
 
+  // Thay thế useEffect cũ bằng useFocusEffect
+  useFocusEffect(
+    useCallback(() => {
+      const checkValidation = async () => {
+        if (isRedirectFromProfile || needRefreshAccount) {
+          // Reset flags
+          setIsRedirectFromProfile(false);
+          setNeedRefreshAccount(false);
+          
+          // Fetch lại thông tin account
+          if (user?.accountId) {
+            try {
+              const data = await accountService.getAccountInfo(user.accountId);
+              setAccountInfo(data);
+              
+              if (data) {
+                const isValid = validateUserInfo(data);
+                setIsUserValidated(isValid);
+                
+                if (!isValid) {
+                  setCurrentModal(ModalState.UPDATE_PROFILE);
+                }
+              }
+            } catch (error) {
+              console.error('Error refreshing account info:', error);
+            }
+          }
+        }
+      };
+
+      checkValidation();
+    }, [user?.accountId, isRedirectFromProfile, needRefreshAccount])
+  );
+
+  const operatingHours = useMemo(() => {
+    if (!barDetail || !selectedDate) return null;
+    return getOperatingHours(selectedDate, barDetail);
+  }, [barDetail, selectedDate]);
+
+  const availableSlots = useMemo(() => {
+    if (!barDetail || !selectedDate) return [];
+    return generateAvailableTimeSlots(selectedDate, barDetail);
+  }, [barDetail, selectedDate]);
+
+  const scrollViewRef = useRef<ScrollView>(null);
+  const noteInputRef = useRef<View>(null);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  // Cập nhật hàm scrollToNoteInput
+  const scrollToNoteInput = () => {
+    if (noteInputRef.current && scrollViewRef.current) {
+      noteInputRef.current.measure((x, y, width, height, pageX, pageY) => {
+        const offset = pageY - 0; // Trừ đi một khoảng để input không bị che
+        scrollViewRef.current?.scrollTo({
+          y: offset,
+          animated: true
+        });
+      });
+    }
+  };
+
+  // Cập nhật useEffect để theo dõi keyboard
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+        // Đợi một chút để bàn phím hiện lên hoàn toàn
+        setTimeout(scrollToNoteInput, 250);
+      }
+    );
+
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1" edges={['top']}>
         {/* Header mới với thông tin quán */}
         <View className="border-b border-white/10">
           {/* Phần navigation */}
@@ -769,7 +915,7 @@ export default function BookingTableScreen() {
                     >
                       {barDetail.barName}
                     </Text>
-                    {!getOperatingHours(selectedDate, barDetail).isOpen && (
+                    {!operatingHours?.isOpen && (
                       <View className="ml-2 px-2 py-0.5 bg-red-500/20 rounded">
                         <Text className="text-red-500 text-[10px] font-medium">Đóng cửa</Text>
                       </View>
@@ -809,7 +955,7 @@ export default function BookingTableScreen() {
                         className="text-gray-400 text-xs flex-1"
                         numberOfLines={1}
                       >
-                        {getOperatingHours(selectedDate, barDetail).hours}
+                        {operatingHours?.hours}
                       </Text>
                     </View>
                   </View>
@@ -834,10 +980,13 @@ export default function BookingTableScreen() {
         </View>
 
         <ScrollView 
+          ref={scrollViewRef}
           className="flex-1" 
           contentContainerStyle={{ 
-            paddingBottom: selectedTables.length > 0 ? 200 : 150 
+            paddingBottom: keyboardVisible ? 400 : (selectedTables.length > 0 ? 200 : 150)
           }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
         >
           {/* Thông tin khách hàng */}
           <View className="px-4 my-4">
@@ -1150,23 +1299,32 @@ export default function BookingTableScreen() {
               </View>
 
               {/* Khối ghi chú */}
-              <Animated.View entering={FadeIn}>
-                <View className="bg-neutral-900 rounded-2xl px-6 py-4">
-                  <Text className="text-white text-base font-bold mb-3">Ghi chú</Text>
-                  <View className="bg-white/10 rounded-xl p-4">
-                    <TextInput
-                      placeholder="Nhập ghi chú cho quán (không bắt buộc)"
-                      placeholderTextColor="#9CA3AF"
-                      value={note}
-                      onChangeText={setNote}
-                      multiline
-                      numberOfLines={3}
-                      className="text-white"
-                      style={{ textAlignVertical: 'top', minHeight: 72 }}
-                    />
-                  </View>
+              <View 
+                ref={noteInputRef}
+                className="bg-neutral-900 rounded-2xl px-6 py-4"
+              >
+                <Text className="text-white text-base font-bold mb-3">Ghi chú</Text>
+                <View className="bg-white/10 rounded-xl p-4">
+                  <TextInput
+                    placeholder="Nhập ghi chú cho quán (không bắt buộc)"
+                    placeholderTextColor="#9CA3AF"
+                    value={note}
+                    onChangeText={setNote}
+                    multiline
+                    numberOfLines={3}
+                    className="text-white"
+                    style={{ 
+                      textAlignVertical: 'top', 
+                      minHeight: 72,
+                      maxHeight: 120 
+                    }}
+                    onFocus={() => {
+                      setTimeout(scrollToNoteInput, 100);
+                    }}
+                    blurOnSubmit={false}
+                  />
                 </View>
-              </Animated.View>
+              </View>
 
               
             </Animated.View>
@@ -1248,8 +1406,8 @@ export default function BookingTableScreen() {
               </View>
               
               <ScrollView showsVerticalScrollIndicator={false}>
-                {availableTimeSlots.length > 0 ? (
-                  availableTimeSlots.map((time) => (
+                {availableSlots.length > 0 ? (
+                  availableSlots.map((time) => (
                     <TouchableOpacity
                       key={time}
                       onPress={() => handleTimeChange(time)}
@@ -1275,7 +1433,7 @@ export default function BookingTableScreen() {
         </Modal>
 
         {/* Footer hiển thị bàn đã chọn */}
-        {selectedTables.length > 0 && !isDatePickerVisible && (
+        {selectedTables.length > 0 && !keyboardVisible && (
           <Animated.View 
             entering={FadeIn}
             className="absolute bottom-0 left-0 right-0 border-t border-white/10 bg-neutral-900/95"
@@ -1563,7 +1721,7 @@ export default function BookingTableScreen() {
                     Không có bàn cho loại này
                   </Text>
                   <Text className="text-gray-400 text-center mb-6">
-                    Hiện tại không có bàn nào thuộc loại {currentTableType?.name} có sẵn
+                    Hiện tại khng có bàn nào thuộc loại {currentTableType?.name} có sẵn
                   </Text>
                   
                   {/* Nút tác vụ */}
@@ -1650,6 +1808,14 @@ export default function BookingTableScreen() {
         {/* Render modals */}
         {renderModals()}
       </SafeAreaView>
+
+      {/* Thêm LoadingPopup vào đây */}
+      <LoadingPopup 
+        visible={showProcessingModal}
+        status={bookingStatus}
+        errorMessage={bookingError}
+        onClose={() => setShowProcessingModal(false)}
+      />
     </View>
   );
 }

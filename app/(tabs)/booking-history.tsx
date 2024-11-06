@@ -1,12 +1,11 @@
-import { View, Text, TouchableOpacity, FlatList, RefreshControl, Image, ScrollView, ActivityIndicator, Modal, Alert, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, RefreshControl, Image, ScrollView, ActivityIndicator, Modal, Alert, TextInput, Keyboard, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState, useCallback, useEffect, useMemo, memo } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo, useRef } from 'react';
 import { BookingHistory, bookingService } from '@/services/booking';
 import { format, parseISO, differenceInDays } from 'date-fns';
-import { vi } from 'date-fns/locale';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FeedbackDetail, feedbackService } from '@/services/feedback';
 
@@ -314,6 +313,31 @@ const BookingItem = memo(({ booking, onRefreshList }: {
     setErrorMessage('');
   };
 
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  // Theo dõi keyboard
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
+
   return (
     <>
       <TouchableOpacity 
@@ -547,7 +571,11 @@ const BookingItem = memo(({ booking, onRefreshList }: {
                 </Text>
                 <View className="flex-row items-center mb-4">
                   <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-                  <Text className="text-gray-400 text-sm ml-1 flex-1">
+                  <Text 
+                    className="text-gray-400 text-sm ml-1 flex-1"
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                  >
                     {feedback?.barAddress}
                   </Text>
                 </View>
@@ -591,156 +619,162 @@ const BookingItem = memo(({ booking, onRefreshList }: {
         onRequestClose={resetRatingModal}
       >
         <TouchableOpacity 
-          className="flex-1 bg-black/50 justify-center items-center p-6"
           activeOpacity={1}
           onPress={resetRatingModal}
+          className="flex-1 bg-black/50 justify-center items-center"
         >
           <TouchableOpacity 
-            activeOpacity={1} 
+            activeOpacity={1}
             onPress={(e) => e.stopPropagation()}
-            className="w-full"
+            className={`w-[90%] max-h-[90%] ${keyboardHeight > 0 ? 'mb-5' : ''}`}
+            style={{ 
+              marginBottom: keyboardHeight > 0 ? keyboardHeight : 0
+            }}
           >
-            <View className="bg-neutral-800 rounded-2xl w-full overflow-hidden">
-              <Image 
-                source={{ uri: booking.image || 'https://placehold.co/60x60/333/FFF?text=Bar' }}
-                className="w-full h-32"
-                resizeMode="cover"
-              />
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.8)']}
-                className="absolute top-0 left-0 right-0 h-32"
-              />
+            <ScrollView
+              ref={scrollViewRef}
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View className="bg-neutral-800 rounded-2xl overflow-hidden">
+                {/* Header */}
+                <View className="p-6 pb-0">
+                  <Text className="text-white text-xl font-bold text-center">
+                    Đánh giá trải nghiệm
+                  </Text>
+                  <TouchableOpacity
+                    className="absolute right-4 top-4 p-2"
+                    onPress={resetRatingModal}
+                  >
+                    <Ionicons name="close" size={24} color="white" />
+                  </TouchableOpacity>
+                </View>
 
-              <TouchableOpacity
-                className="absolute top-3 right-3 bg-black/20 p-2 rounded-full"
-                onPress={resetRatingModal}
-              >
-                <Ionicons name="close" size={20} color="white" />
-              </TouchableOpacity>
-
-              <View className="p-6">
-                <Text className="text-yellow-500 text-xl font-bold mb-1">
-                  {booking.barName}
-                </Text>
-
-                {ratingStatus === 'loading' ? (
-                  <View className="items-center py-8">
-                    <ActivityIndicator size="large" color="#EAB308" />
-                    <Text className="text-white text-lg font-bold mt-4">
-                      Đang gửi đánh giá...
-                    </Text>
-                  </View>
-                ) : ratingStatus === 'success' ? (
-                  <View className="items-center py-8">
-                    <Ionicons name="checkmark-circle" size={48} color="#22C55E" />
-                    <Text className="text-white text-lg font-bold mt-4">
-                      Đã gửi đánh giá thành công
-                    </Text>
-                  </View>
-                ) : ratingStatus === 'error' ? (
-                  <>
+                {/* Content */}
+                <View className="p-6">
+                  {ratingStatus === 'loading' ? (
                     <View className="items-center py-4">
-                      <Ionicons name="alert-circle" size={48} color="#EF4444" />
+                      <ActivityIndicator size="large" color="#EAB308" />
                       <Text className="text-white text-lg font-bold mt-4">
-                        Không thể gửi đánh giá
-                      </Text>
-                      <Text className="text-white/60 text-center mt-2">
-                        {ratingError}
+                        Đang gửi đánh giá...
                       </Text>
                     </View>
-                    <View className="flex-row space-x-3 mt-4">
-                      <TouchableOpacity
-                        className="flex-1 bg-white/10 py-3 rounded-xl"
-                        onPress={resetRatingModal}
-                      >
-                        <Text className="text-white font-semibold text-center">Đóng</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        className="flex-1 bg-yellow-500 py-3 rounded-xl"
-                        onPress={() => setRatingStatus('idle')}
-                      >
-                        <Text className="text-black font-semibold text-center">Thử lại</Text>
-                      </TouchableOpacity>
+                  ) : ratingStatus === 'success' ? (
+                    <View className="items-center py-4">
+                      <Ionicons name="checkmark-circle" size={48} color="#22C55E" />
+                      <Text className="text-white text-lg font-bold mt-4">
+                        Gửi đánh giá thành công
+                      </Text>
                     </View>
-                  </>
-                ) : (
-                  <>
-                    <Text className="text-white/60 text-base mb-6">
-                      Hãy chia sẻ trải nghiệm của bạn về quán bar này
-                    </Text>
-
-                    {/* Rating stars */}
-                    <View className="flex-row justify-center space-x-2 mb-6">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <TouchableOpacity
-                          key={star}
-                          onPress={() => setRating(star)}
-                        >
-                          <Ionicons
-                            name={star <= rating ? "star" : "star-outline"}
-                            size={32}
-                            color="#EAB308"
-                          />
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    {/* Comment input với character counter */}
-                    <View className="mb-6">
-                      <TextInput
-                        className={`bg-white/5 rounded-xl p-4 text-white ${
-                          isCommentTooShort ? 'border border-red-500' : ''
-                        }`}
-                        placeholder="Nhập đánh giá của bạn (ít nhất 10 ký tự)..."
-                        placeholderTextColor="#9CA3AF"
-                        multiline
-                        numberOfLines={4}
-                        value={comment}
-                        onChangeText={setComment}
-                        style={{ textAlignVertical: 'top' }}
-                        maxLength={500}
-                      />
-                      <View className="flex-row justify-between mt-2">
-                        {isCommentTooShort && (
-                          <Text className="text-red-500 text-xs">
-                            Còn thiếu {10 - comment.trim().length} ký tự
-                          </Text>
-                        )}
-                        <Text className={`text-xs ${
-                          remainingChars <= 50 ? 'text-red-500' : 'text-gray-400'
-                        }`}>
-                          {remainingChars} ký tự còn lại
+                  ) : ratingStatus === 'error' ? (
+                    <>
+                      <View className="items-center py-4">
+                        <Ionicons name="alert-circle" size={48} color="#EF4444" />
+                        <Text className="text-white text-lg font-bold mt-4">
+                          Không thể gửi đánh giá
+                        </Text>
+                        <Text className="text-white/60 text-center mt-2">
+                          {ratingError}
                         </Text>
                       </View>
-                    </View>
-
-                    {/* Submit button */}
-                    <TouchableOpacity
-                      className={`py-3 rounded-xl ${
-                        isCommentTooShort ? 'bg-yellow-500/50' : 'bg-yellow-500'
-                      }`}
-                      onPress={handleSubmitRating}
-                      disabled={isSubmitting || isCommentTooShort}
-                    >
-                      <Text className="text-black font-semibold text-center text-lg">
-                        Gửi đánh giá
+                      <View className="flex-row space-x-3 mt-4">
+                        <TouchableOpacity
+                          className="flex-1 bg-white/10 py-3 rounded-xl"
+                          onPress={resetRatingModal}
+                        >
+                          <Text className="text-white font-semibold text-center">Đóng</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          className="flex-1 bg-yellow-500 py-3 rounded-xl"
+                          onPress={() => setRatingStatus('idle')}
+                        >
+                          <Text className="text-black font-semibold text-center">Thử lại</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  ) : (
+                    <>
+                      <Text className="text-white/60 text-base mb-6">
+                        Hãy chia sẻ trải nghiệm của bạn về quán bar này
                       </Text>
-                    </TouchableOpacity>
-                  </>
-                )}
+
+                      {/* Rating stars */}
+                      <View className="flex-row justify-center space-x-2 mb-6">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <TouchableOpacity
+                            key={star}
+                            onPress={() => setRating(star)}
+                          >
+                            <Ionicons
+                              name={star <= rating ? "star" : "star-outline"}
+                              size={32}
+                              color="#EAB308"
+                            />
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+
+                      {/* Comment input với character counter */}
+                      <View className="mb-6">
+                        <TextInput
+                          className={`bg-white/5 rounded-xl p-4 text-white ${
+                            isCommentTooShort ? 'border border-red-500' : ''
+                          }`}
+                          placeholder="Nhập đánh giá của bạn (ít nhất 10 ký tự)..."
+                          placeholderTextColor="#9CA3AF"
+                          multiline
+                          numberOfLines={4}
+                          value={comment}
+                          onChangeText={setComment}
+                          style={{ 
+                            textAlignVertical: 'top',
+                            minHeight: 120,
+                            maxHeight: 200
+                          }}
+                          maxLength={500}
+                          onFocus={() => {
+                            setTimeout(() => {
+                              scrollViewRef.current?.scrollToEnd({ animated: true });
+                            }, 100);
+                          }}
+                        />
+                        <View className="flex-row justify-between mt-2">
+                          <Text className={`${
+                            isCommentTooShort ? 'text-red-500' : 'text-white/60'
+                          }`}>
+                            {isCommentTooShort ? 'Tối thiểu 10 ký tự' : ''}
+                          </Text>
+                          <Text className="text-white/60">
+                            {remainingChars}/500
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Submit button */}
+                      <TouchableOpacity
+                        className={`py-3 rounded-xl ${
+                          isCommentTooShort ? 'bg-yellow-500/50' : 'bg-yellow-500'
+                        }`}
+                        onPress={handleSubmitRating}
+                        disabled={isSubmitting || isCommentTooShort}
+                      >
+                        <Text className="text-black font-semibold text-center text-lg">
+                          Gửi đánh giá
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               </View>
-            </View>
+            </ScrollView>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </>
   );
 }, (prevProps, nextProps) => {
-  return (
-    prevProps.booking.bookingId === nextProps.booking.bookingId &&
-    prevProps.booking.status === nextProps.booking.status &&
-    prevProps.booking.isRated === nextProps.booking.isRated
-  );
+  return prevProps.booking.bookingId === nextProps.booking.bookingId;
 });
 
 const BookingSkeleton = memo(() => (
@@ -805,7 +839,7 @@ export default function BookingHistoryScreen() {
       const response = await bookingService.getBookingHistory(
         user.accountId,
         page,
-        10
+        1000
       );
       
       if (refresh) {

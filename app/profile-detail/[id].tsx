@@ -10,7 +10,7 @@ import Animated, { FadeIn, withRepeat, withSequence, withTiming, useAnimatedStyl
 import Toast from 'react-native-toast-message';
 import { validateFullname, validatePhone, validateBirthDate } from '@/utils/validation';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Platform } from 'react-native';
+import { Platform, KeyboardAvoidingView, Keyboard } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -151,6 +151,33 @@ const Skeleton = ({ className }: { className: string }) => {
   );
 };
 
+// Thêm hook để theo dõi trạng thái keyboard
+const useKeyboardStatus = () => {
+  const [isKeyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+      }
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setKeyboardVisible(false);
+      }
+    );
+
+    return () => {
+      keyboardDidHideListener.remove();
+      keyboardDidShowListener.remove();
+    };
+  }, []);
+
+  return isKeyboardVisible;
+};
+
 export default function ProfileDetailScreen() {
   const { id } = useLocalSearchParams();
   const [account, setAccount] = useState<Account | null>(null);
@@ -175,6 +202,9 @@ export default function ProfileDetailScreen() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [popupStatus, setPopupStatus] = useState<ResultStatus>(null);
   const [imageLoading, setImageLoading] = useState(true);
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const [tempDate, setTempDate] = useState<Date | null>(null);
+  const isKeyboardVisible = useKeyboardStatus();
 
   useEffect(() => {
     fetchAccountDetail();
@@ -296,35 +326,18 @@ export default function ProfileDetailScreen() {
     }
   };
 
-  const renderDatePicker = () => {
-    if (Platform.OS === 'ios') {
-      return (
-        <View className="bg-neutral-900 rounded-xl overflow-hidden">
-          <DateTimePicker
-            value={selectedDate || new Date()}
-            mode="date"
-            display="spinner"
-            onChange={handleDateChange}
-            maximumDate={new Date()}
-            minimumDate={new Date(1900, 0, 1)}
-            textColor="white"
-            themeVariant="dark"
-            locale="vi-VN"
-          />
-        </View>
-      );
+  const handleTempDateChange = (event: any, date?: Date) => {
+    if (date) {
+      setTempDate(date);
     }
+  };
 
-    return showDatePicker && (
-      <DateTimePicker
-        value={selectedDate || new Date()}
-        mode="date"
-        display="default"
-        onChange={handleDateChange}
-        maximumDate={new Date()}
-        minimumDate={new Date(1900, 0, 1)}
-      />
-    );
+  const handleConfirmDate = () => {
+    if (tempDate) {
+      setSelectedDate(tempDate);
+      setErrors(prev => ({ ...prev, dob: '' }));
+    }
+    setShowDatePickerModal(false);
   };
 
   const handleChangeAvatar = async () => {
@@ -475,7 +488,7 @@ export default function ProfileDetailScreen() {
 
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1 mb-4" edges={['top']}>
         {/* Header */}
         <Animated.View 
           entering={FadeIn.duration(300)}
@@ -507,12 +520,17 @@ export default function ProfileDetailScreen() {
           </View>
         </Animated.View>
 
-        {/* Content */}
-        <Animated.View 
-          entering={FadeIn.duration(300)} 
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           className="flex-1"
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <ScrollView className="flex-1 px-6">
+          <ScrollView 
+            className="flex-1 px-6"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+          >
             {/* Avatar Section */}
             <Animated.View entering={FadeIn} className="items-center mb-8">
               <View className="relative w-32 h-32">
@@ -626,7 +644,14 @@ export default function ProfileDetailScreen() {
                 {isEditing ? (
                   <View>
                     <TouchableOpacity
-                      onPress={() => setShowDatePicker(true)}
+                      onPress={() => {
+                        if (Platform.OS === 'ios') {
+                          setTempDate(selectedDate || new Date());
+                          setShowDatePickerModal(true);
+                        } else {
+                          setShowDatePicker(true);
+                        }
+                      }}
                       className={`bg-neutral-900 p-4 rounded-xl flex-row items-center ${
                         errors.dob ? 'border border-red-500' : ''
                       }`}
@@ -651,10 +676,52 @@ export default function ProfileDetailScreen() {
                     {errors.dob ? (
                       <Text className="text-red-500 text-sm mt-1">{errors.dob}</Text>
                     ) : null}
+                    
                     {Platform.OS === 'ios' ? (
-                      showDatePicker && renderDatePicker()
+                      <Modal
+                        visible={showDatePickerModal}
+                        transparent
+                        animationType="slide"
+                      >
+                        <View className="flex-1 justify-end bg-black/50">
+                          <View className="bg-neutral-900 rounded-t-xl">
+                            <View className="flex-row justify-between items-center p-4 border-b border-white/10">
+                              <TouchableOpacity 
+                                onPress={() => setShowDatePickerModal(false)}
+                              >
+                                <Text className="text-white font-medium">Huỷ</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity 
+                                onPress={handleConfirmDate}
+                              >
+                                <Text className="text-yellow-500 font-medium">Xong</Text>
+                              </TouchableOpacity>
+                            </View>
+                            <DateTimePicker
+                              value={tempDate || selectedDate || new Date()}
+                              mode="date"
+                              display="spinner"
+                              onChange={handleTempDateChange}
+                              maximumDate={new Date()}
+                              minimumDate={new Date(1900, 0, 1)}
+                              textColor="white"
+                              themeVariant="dark"
+                              locale="vi-VN"
+                            />
+                          </View>
+                        </View>
+                      </Modal>
                     ) : (
-                      renderDatePicker()
+                      showDatePicker && (
+                        <DateTimePicker
+                          value={selectedDate || new Date()}
+                          mode="date"
+                          display="default"
+                          onChange={handleDateChange}
+                          maximumDate={new Date()}
+                          minimumDate={new Date(1900, 0, 1)}
+                        />
+                      )
                     )}
                   </View>
                 ) : (
@@ -675,34 +742,34 @@ export default function ProfileDetailScreen() {
               </View>
             </View>
           </ScrollView>
+        </KeyboardAvoidingView>
 
-          {/* Bottom Buttons */}
-          {isEditing && (
-            <Animated.View 
-              entering={FadeIn}
-              className="px-6 py-4 border-t border-white/10"
-            >
-              <View className="flex-row space-x-3">
-                <TouchableOpacity
-                  onPress={handleCancel}
-                  className="flex-1 bg-neutral-900 py-3 rounded-xl items-center"
-                >
-                  <Text className="text-white font-medium">
-                    Hủy
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSave}
-                  className="flex-1 bg-yellow-500 py-3 rounded-xl items-center"
-                >
-                  <Text className="text-black font-medium">
-                    Lưu
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          )}
-        </Animated.View>
+        {/* Footer buttons */}
+        {isEditing && !isKeyboardVisible && (
+          <Animated.View 
+            entering={FadeIn}
+            className="px-6 py-3 border-t border-white/10 bg-black"
+          >
+            <View className="flex-row space-x-3">
+              <TouchableOpacity
+                onPress={handleCancel}
+                className="flex-1 bg-neutral-900 py-3 rounded-xl items-center"
+              >
+                <Text className="text-white font-medium">
+                  Hủy
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSave}
+                className="flex-1 bg-yellow-500 py-3 rounded-xl items-center"
+              >
+                <Text className="text-black font-medium">
+                  Lưu
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        )}
       </SafeAreaView>
 
       <LoadingPopup 

@@ -23,8 +23,17 @@ interface MenuItem {
 const ProfileHeader = memo(({ account }: { account: Account | null }) => (
   <View className="items-center mb-8">
     <Image 
-      source={{ uri: account?.image }} 
-      className="w-24 h-24 rounded-full"
+      source={
+        account?.image 
+          ? { uri: account.image }
+          : require('@/assets/images/default-avatar.png')
+      }
+      className="w-24 h-24 rounded-full bg-neutral-800"
+      defaultSource={require('@/assets/images/default-avatar.png')}
+      onError={(e) => {
+        // Khi load ảnh bị lỗi sẽ tự động dùng defaultSource
+        console.log('Error loading avatar:', e.nativeEvent.error);
+      }}
     />
     <Text className="text-white text-xl font-bold mt-4">
       {account?.fullname}
@@ -88,7 +97,10 @@ const MenuItem = memo(({ item }: { item: MenuItem }) => {
 const ProfileSkeleton = memo(() => (
   <View className="animate-pulse p-6">
     <View className="items-center">
-      <View className="w-24 h-24 rounded-full bg-white/10" />
+      <Image
+        source={require('@/assets/images/default-avatar.png')}
+        className="w-24 h-24 rounded-full bg-neutral-800 opacity-30"
+      />
       <View className="h-6 w-40 bg-white/10 rounded-full mt-4" />
       <View className="h-4 w-32 bg-white/10 rounded-full mt-2" />
     </View>

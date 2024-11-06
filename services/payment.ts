@@ -32,6 +32,25 @@ export interface PaymentDetail {
   };
 }
 
+export interface PaymentHistory {
+  bookingId: string;
+  customerName: string;
+  phoneNumber: string;
+  barName: string;
+  transactionCode: string;
+  paymentDate: string;
+  totalPrice: number;
+  note: string | null;
+  status: number;
+  providerName: string;
+  paymentFee: number;
+}
+
+interface PaymentHistoryResponse {
+  totalPage: number;
+  response: PaymentHistory[];
+}
+
 export const paymentService = {
   getPaymentDetail: async (paymentId: string): Promise<PaymentDetail> => {
     try {
@@ -48,6 +67,24 @@ export const paymentService = {
           status: error.response?.status,
           data: error.response?.data,
           config: error.config
+        });
+      }
+      throw error;
+    }
+  },
+
+  getPaymentHistory: async (accountId: string, pageIndex: number = 1): Promise<PaymentHistoryResponse> => {
+    try {
+      const response = await axios.get(
+        `${API_CONFIG.BASE_URL}/api/PaymentHistory/${accountId}?PageIndex=${pageIndex}&PageSize=1000`
+      );
+      return response.data;
+    } catch (error) {
+      console.error('=== Payment History Service Error ===');
+      if (axios.isAxiosError(error)) {
+        console.error('Error Response:', {
+          status: error.response?.status,
+          data: error.response?.data
         });
       }
       throw error;

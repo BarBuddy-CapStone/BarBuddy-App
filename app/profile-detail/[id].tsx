@@ -174,6 +174,7 @@ export default function ProfileDetailScreen() {
   const [showLoadingPopup, setShowLoadingPopup] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [popupStatus, setPopupStatus] = useState<ResultStatus>(null);
+  const [imageLoading, setImageLoading] = useState(true);
 
   useEffect(() => {
     fetchAccountDetail();
@@ -425,8 +426,8 @@ export default function ProfileDetailScreen() {
     return (
       <View className="flex-1 bg-black">
         <SafeAreaView className="flex-1">
-          {/* Header Skeleton */}
-          <View className="flex-row items-center justify-between px-6 py-4 border-b border-white/10">
+          {/* Header Skeleton - Bỏ border */}
+          <View className="flex-row items-center justify-between px-6 py-4">
             <View className="flex-row items-center">
               <Skeleton className="w-6 h-6 rounded-full mr-4" />
               <Skeleton className="w-40 h-6 rounded-lg" />
@@ -476,208 +477,234 @@ export default function ProfileDetailScreen() {
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
         {/* Header */}
-        <View className="flex-row items-center justify-between px-6 py-4 border-b border-white/10">
-          <View className="flex-row items-center">
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="mr-4"
-            >
-              <Ionicons name="arrow-back" size={24} color="white" />
-            </TouchableOpacity>
-            <Text className="text-white text-xl font-bold">
-              Thông tin cá nhân
-            </Text>
-          </View>
-          {isEditing ? (
-            <View className="flex-row space-x-4">
+        <Animated.View 
+          entering={FadeIn.duration(300)}
+          className="px-4 pt-1 mb-4"
+        >
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center space-x-3">
               <TouchableOpacity
-                onPress={handleCancel}
-                disabled={saving}
+                onPress={() => router.back()}
+                className="w-9 h-9 items-center justify-center"
               >
-                <Text className="text-white font-medium">
-                  Hủy
+                <Ionicons name="arrow-back" size={24} color="white" />
+              </TouchableOpacity>
+              <Text className="text-white text-xl font-bold">
+                Thông tin cá nhân
+              </Text>
+            </View>
+            
+            {!isEditing && (
+              <TouchableOpacity
+                onPress={() => setIsEditing(true)}
+                className="bg-yellow-500/10 px-4 py-2 rounded-full"
+              >
+                <Text className="text-yellow-500 font-medium">
+                  Chỉnh sửa
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleSave}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color="#EAB308" />
-                ) : (
-                  <Text className="text-yellow-500 font-medium">
-                    Lưu
-                  </Text>
+            )}
+          </View>
+        </Animated.View>
+
+        {/* Content */}
+        <Animated.View 
+          entering={FadeIn.duration(300)} 
+          className="flex-1"
+        >
+          <ScrollView className="flex-1 px-6">
+            {/* Avatar Section */}
+            <Animated.View entering={FadeIn} className="items-center mb-8">
+              <View className="relative w-32 h-32">
+                <Image
+                  source={
+                    account?.image 
+                      ? { uri: account.image }
+                      : require('@/assets/images/default-avatar.png')
+                  }
+                  className="w-32 h-32 rounded-full bg-neutral-800"
+                  onLoadStart={() => {
+                    setImageLoading(true);
+                    setImageError(false);
+                  }}
+                  onLoadEnd={() => setImageLoading(false)}
+                  onError={() => {
+                    setImageError(true);
+                    setImageLoading(false);
+                  }}
+                  defaultSource={require('@/assets/images/default-avatar.png')}
+                />
+                {(imageLoading || uploadingAvatar) && (
+                  <View className="absolute inset-0 bg-black/50 rounded-full items-center justify-center">
+                    <ActivityIndicator color="#EAB308" />
+                  </View>
                 )}
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              onPress={() => setIsEditing(true)}
-            >
-              <Text className="text-yellow-500 font-medium">
-                Chỉnh sửa
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <ScrollView className="flex-1 p-6">
-          <Animated.View entering={FadeIn} className="items-center mb-8">
-            <View className="relative w-32 h-32">
-              <Image
-                source={
-                  account?.image && !imageError
-                    ? { uri: account.image }
-                    : require('@/assets/images/default-avatar.png')
-                }
-                className="w-32 h-32 rounded-full bg-neutral-800"
-                onError={() => setImageError(true)}
-                defaultSource={require('@/assets/images/default-avatar.png')}
-              />
-              {uploadingAvatar && (
-                <View className="absolute inset-0 bg-black/50 rounded-full items-center justify-center">
-                  <ActivityIndicator color="#EAB308" />
-                </View>
-              )}
-            </View>
-            <TouchableOpacity 
-              className={`bg-yellow-500/10 px-4 py-2 rounded-full mt-4 ${
-                isEditing ? 'opacity-50' : ''
-              }`}
-              onPress={handleChangeAvatar}
-              disabled={uploadingAvatar || isEditing}
-            >
-              <Text className={`text-yellow-500 font-medium ${
-                isEditing ? 'opacity-50' : ''
-              }`}>
-                Đổi ảnh đại diện
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
-
-          <View className="space-y-6">
-            {/* Email */}
-            <View>
-              <Text className="text-white/60 mb-2">Email</Text>
-              <View className="bg-neutral-900 p-4 rounded-xl">
-                <Text className="text-white">{account?.email}</Text>
               </View>
-            </View>
+              <TouchableOpacity 
+                className={`bg-yellow-500/10 px-4 py-2 rounded-full mt-4 ${
+                  isEditing || uploadingAvatar ? 'opacity-50' : ''
+                }`}
+                onPress={handleChangeAvatar}
+                disabled={uploadingAvatar || isEditing}
+              >
+                <Text className={`text-yellow-500 font-medium ${
+                  isEditing || uploadingAvatar ? 'opacity-50' : ''
+                }`}>
+                  Đổi ảnh đại diện
+                </Text>
+              </TouchableOpacity>
+            </Animated.View>
 
-            {/* Họ tên */}
-            <View>
-              <Text className="text-white/60 mb-2">Họ tên</Text>
-              {isEditing ? (
-                <View>
-                  <TextInput
-                    value={editedData.fullname}
-                    onChangeText={(text) => {
-                      setEditedData(prev => ({ ...prev, fullname: text }));
-                      setErrors(prev => ({ ...prev, fullname: '' }));
-                    }}
-                    className={`bg-neutral-900 p-4 rounded-xl text-white ${
-                      errors.fullname ? 'border border-red-500' : ''
-                    }`}
-                    placeholderTextColor="#9CA3AF"
-                  />
-                  {errors.fullname ? (
-                    <Text className="text-red-500 text-sm mt-1">{errors.fullname}</Text>
-                  ) : null}
-                </View>
-              ) : (
+            {/* Form Fields */}
+            <View className="space-y-6">
+              {/* Email */}
+              <View>
+                <Text className="text-white/60 mb-2">Email</Text>
                 <View className="bg-neutral-900 p-4 rounded-xl">
-                  <Text className="text-white">{account?.fullname}</Text>
+                  <Text className="text-white">{account?.email}</Text>
                 </View>
-              )}
-            </View>
+              </View>
 
-            {/* Số điện thoại */}
-            <View>
-              <Text className="text-white/60 mb-2">Số điện thoại</Text>
-              {isEditing ? (
-                <View>
-                  <TextInput
-                    value={editedData.phone}
-                    onChangeText={(text) => {
-                      setEditedData(prev => ({ ...prev, phone: text }));
-                      setErrors(prev => ({ ...prev, phone: '' }));
-                    }}
-                    className={`bg-neutral-900 p-4 rounded-xl text-white ${
-                      errors.phone ? 'border border-red-500' : ''
-                    }`}
-                    keyboardType="phone-pad"
-                    placeholderTextColor="#9CA3AF"
-                  />
-                  {errors.phone ? (
-                    <Text className="text-red-500 text-sm mt-1">{errors.phone}</Text>
-                  ) : null}
-                </View>
-              ) : (
-                <View className="bg-neutral-900 p-4 rounded-xl">
-                  <Text className="text-white">{account?.phone}</Text>
-                </View>
-              )}
-            </View>
+              {/* Họ tên */}
+              <View>
+                <Text className="text-white/60 mb-2">Họ tên</Text>
+                {isEditing ? (
+                  <View>
+                    <TextInput
+                      value={editedData.fullname}
+                      onChangeText={(text) => {
+                        setEditedData(prev => ({ ...prev, fullname: text }));
+                        setErrors(prev => ({ ...prev, fullname: '' }));
+                      }}
+                      className={`bg-neutral-900 p-4 rounded-xl text-white ${
+                        errors.fullname ? 'border border-red-500' : ''
+                      }`}
+                      placeholderTextColor="#9CA3AF"
+                    />
+                    {errors.fullname ? (
+                      <Text className="text-red-500 text-sm mt-1">{errors.fullname}</Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View className="bg-neutral-900 p-4 rounded-xl">
+                    <Text className="text-white">{account?.fullname}</Text>
+                  </View>
+                )}
+              </View>
 
-            {/* Ngày sinh */}
-            <View>
-              <Text className="text-white/60 mb-2">Ngày sinh</Text>
-              {isEditing ? (
-                <View>
-                  <TouchableOpacity
-                    onPress={() => setShowDatePicker(true)}
-                    className={`bg-neutral-900 p-4 rounded-xl flex-row items-center ${
-                      errors.dob ? 'border border-red-500' : ''
-                    }`}
-                  >
+              {/* Số điện thoại */}
+              <View>
+                <Text className="text-white/60 mb-2">Số điện thoại</Text>
+                {isEditing ? (
+                  <View>
+                    <TextInput
+                      value={editedData.phone}
+                      onChangeText={(text) => {
+                        setEditedData(prev => ({ ...prev, phone: text }));
+                        setErrors(prev => ({ ...prev, phone: '' }));
+                      }}
+                      className={`bg-neutral-900 p-4 rounded-xl text-white ${
+                        errors.phone ? 'border border-red-500' : ''
+                      }`}
+                      keyboardType="phone-pad"
+                      placeholderTextColor="#9CA3AF"
+                    />
+                    {errors.phone ? (
+                      <Text className="text-red-500 text-sm mt-1">{errors.phone}</Text>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View className="bg-neutral-900 p-4 rounded-xl">
+                    <Text className="text-white">{account?.phone}</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Ngày sinh */}
+              <View>
+                <Text className="text-white/60 mb-2">Ngày sinh</Text>
+                {isEditing ? (
+                  <View>
+                    <TouchableOpacity
+                      onPress={() => setShowDatePicker(true)}
+                      className={`bg-neutral-900 p-4 rounded-xl flex-row items-center ${
+                        errors.dob ? 'border border-red-500' : ''
+                      }`}
+                    >
+                      <Ionicons 
+                        name="calendar-outline" 
+                        size={20} 
+                        color="#9CA3AF"
+                        style={{ marginRight: 12 }}
+                      />
+                      <Text className="text-white flex-1">
+                        {selectedDate 
+                          ? format(selectedDate, 'dd/MM/yyyy', { locale: vi })
+                          : 'Chọn ngày sinh'}
+                      </Text>
+                      <Ionicons 
+                        name="chevron-down-outline" 
+                        size={20} 
+                        color="#9CA3AF" 
+                      />
+                    </TouchableOpacity>
+                    {errors.dob ? (
+                      <Text className="text-red-500 text-sm mt-1">{errors.dob}</Text>
+                    ) : null}
+                    {Platform.OS === 'ios' ? (
+                      showDatePicker && renderDatePicker()
+                    ) : (
+                      renderDatePicker()
+                    )}
+                  </View>
+                ) : (
+                  <View className="bg-neutral-900 p-4 rounded-xl flex-row items-center">
                     <Ionicons 
                       name="calendar-outline" 
                       size={20} 
                       color="#9CA3AF"
                       style={{ marginRight: 12 }}
                     />
-                    <Text className="text-white flex-1">
-                      {selectedDate 
-                        ? format(selectedDate, 'dd/MM/yyyy', { locale: vi })
-                        : 'Chọn ngày sinh'}
+                    <Text className="text-white">
+                      {account?.dob 
+                        ? format(new Date(account.dob), 'dd/MM/yyyy', { locale: vi })
+                        : 'Chưa có ngày sinh'}
                     </Text>
-                    <Ionicons 
-                      name="chevron-down-outline" 
-                      size={20} 
-                      color="#9CA3AF" 
-                    />
-                  </TouchableOpacity>
-                  {errors.dob ? (
-                    <Text className="text-red-500 text-sm mt-1">{errors.dob}</Text>
-                  ) : null}
-                  {Platform.OS === 'ios' ? (
-                    showDatePicker && renderDatePicker()
-                  ) : (
-                    renderDatePicker()
-                  )}
-                </View>
-              ) : (
-                <View className="bg-neutral-900 p-4 rounded-xl flex-row items-center">
-                  <Ionicons 
-                    name="calendar-outline" 
-                    size={20} 
-                    color="#9CA3AF"
-                    style={{ marginRight: 12 }}
-                  />
-                  <Text className="text-white">
-                    {account?.dob 
-                      ? format(new Date(account.dob), 'dd/MM/yyyy', { locale: vi })
-                      : 'Chưa có ngày sinh'}
-                  </Text>
-                </View>
-              )}
+                  </View>
+                )}
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+
+          {/* Bottom Buttons */}
+          {isEditing && (
+            <Animated.View 
+              entering={FadeIn}
+              className="px-6 py-4 border-t border-white/10"
+            >
+              <View className="flex-row space-x-3">
+                <TouchableOpacity
+                  onPress={handleCancel}
+                  className="flex-1 bg-neutral-900 py-3 rounded-xl items-center"
+                >
+                  <Text className="text-white font-medium">
+                    Hủy
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleSave}
+                  className="flex-1 bg-yellow-500 py-3 rounded-xl items-center"
+                >
+                  <Text className="text-black font-medium">
+                    Lưu
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+          )}
+        </Animated.View>
       </SafeAreaView>
-      
-      {/* Thêm LoadingPopup vào cuối component */}
+
       <LoadingPopup 
         visible={showLoadingPopup} 
         message={loadingMessage}

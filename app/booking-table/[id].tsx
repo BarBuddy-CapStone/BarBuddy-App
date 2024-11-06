@@ -136,6 +136,15 @@ const LoadingPopup = ({
   </Modal>
 );
 
+// Thêm enum để quản lý trạng thái modal
+enum ModalState {
+  NONE = 'NONE',
+  UPDATE_PROFILE = 'UPDATE_PROFILE',
+  CLOSED_DAY = 'CLOSED_DAY',
+  MAX_TABLES = 'MAX_TABLES',
+  PROCESSING = 'PROCESSING'
+}
+
 export default function BookingTableScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
@@ -172,6 +181,11 @@ export default function BookingTableScreen() {
   const [bookingError, setBookingError] = useState<string>('');
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(selectedDate);
+  const [showUpdateProfileModal, setShowUpdateProfileModal] = useState(false);
+  const [isUserValidated, setIsUserValidated] = useState(false);
+
+  // Thay thế các state quản lý modal riêng lẻ bằng một state duy nhất
+  const [currentModal, setCurrentModal] = useState<ModalState>(ModalState.NONE);
 
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
     if (!barDetail?.barTimeResponses) {
@@ -263,15 +277,15 @@ export default function BookingTableScreen() {
   // Load bar detail và table types khi component mount
   useEffect(() => {
     const fetchInitialData = async () => {
-      if (!id) return;
+    if (!id) return;
+    
+    try {
+      const detail = await barService.getBarDetail(id as string);
+      setBarDetail(detail);
       
-      try {
-        const detail = await barService.getBarDetail(id as string);
-        setBarDetail(detail);
+      if (detail) {
+        await loadTableTypes();
         
-        if (detail) {
-          await loadTableTypes();
-          
           // Kiểm tra giờ mở cửa ngay khi có dữ liệu
           const today = new Date();
           const dayOfWeek = today.getDay();
@@ -295,19 +309,19 @@ export default function BookingTableScreen() {
           } else {
             setAvailableTimeSlots(slots);
             setSelectedTime(slots[0]);
-          }
         }
-      } catch (error) {
-        console.error('Error fetching initial data:', error);
       }
-    };
+    } catch (error) {
+        console.error('Error fetching initial data:', error);
+    }
+  };
     
     fetchInitialData();
   }, [id]); // Chỉ phụ thuộc vào id
 
   // Kiểm tra giờ mở cửa khi thay đổi ngày
   useEffect(() => {
-    if (!barDetail) {
+    if (!barDetail || !isUserValidated || currentModal === ModalState.UPDATE_PROFILE) {
       return;
     }
 
@@ -328,7 +342,7 @@ export default function BookingTableScreen() {
     if (!barTimeForSelectedDay) {
       const dayName = dayOfWeek === 0 ? 'Chủ nhật' : `Thứ ${dayOfWeek + 1}`;
       setClosedMessage(`Quán không mở cửa vào ${dayName}`);
-      setShowClosedModal(true);
+      setCurrentModal(ModalState.CLOSED_DAY);
       return;
     }
 
@@ -336,13 +350,13 @@ export default function BookingTableScreen() {
     
     if (slots.length === 0) {
       setClosedMessage("Không có khung giờ nào khả dụng cho ngày này");
-      setShowClosedModal(true);
+      setCurrentModal(ModalState.CLOSED_DAY);
     } else {
-      setShowClosedModal(false);
+      setCurrentModal(ModalState.NONE);
       setAvailableTimeSlots(slots);
-      setSelectedTime(slots[0]); // Chọn khung giờ đầu tiên khả dụng
+      setSelectedTime(slots[0]);
     }
-  }, [selectedDate, barDetail]); // Chỉ phụ thuộc vào selectedDate và barDetail
+  }, [selectedDate, barDetail, isUserValidated]);
 
   // Thêm cleanup function cho modal
   useEffect(() => {
@@ -468,22 +482,62 @@ export default function BookingTableScreen() {
     setShowTypeDescription(true); // Hiển thị description khi chọn loại bàn
   };
 
+  const isOver18 = (birthDate: string) => {
+    const today = new Date();
+    const birth = new Date(birthDate);
+    let age = today.getFullYear() - birth.getFullYear();
+    const monthDiff = today.getMonth() - birth.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+      age--;
+    }
+    
+    return age >= 18;
+  };
+
+  const validateUserInfo = (account: Account) => {
+    if (!account.phone || account.phone.trim() === '') {
+      return false;
+    }
+    
+    if (!account.dob) {
+      return false;
+    }
+    
+    return isOver18(account.dob);
+  };
+
   useEffect(() => {
     const fetchAccountInfo = async () => {
       if (!user?.accountId) return;
+      
       setIsLoadingAccount(true);
       try {
         const data = await accountService.getAccountInfo(user.accountId);
         setAccountInfo(data);
+        
+        // Sửa lại phần kiểm tra isValid
+        if (data) {
+          const isValid = validateUserInfo(data);
+          setIsUserValidated(isValid); // Giờ isValid là boolean
+          
+          if (!isValid) {
+            setCurrentModal(ModalState.UPDATE_PROFILE);
+          }
+        } else {
+          setIsUserValidated(false);
+        }
       } catch (error) {
         console.error('Error fetching account info:', error);
+        setAccountInfo(null);
+        setIsUserValidated(false);
       } finally {
         setIsLoadingAccount(false);
       }
     };
-    
+
     fetchAccountInfo();
-  }, [user?.accountId]); // Thêm dependency user?.accountId
+  }, [user?.accountId]);
 
   const handleBookingNow = async () => {
     setShowConfirmModal(true);
@@ -566,6 +620,119 @@ export default function BookingTableScreen() {
     }
   };
 
+  const handleUpdateProfile = () => {
+    setCurrentModal(ModalState.NONE);
+    router.push(`/profile-detail/${user?.accountId}`);
+  };
+
+  const handleBackToBar = () => {
+    setCurrentModal(ModalState.NONE);
+    router.back();
+  };
+
+  const handleMaxTables = () => {
+    setCurrentModal(ModalState.MAX_TABLES);
+  };
+
+  // Render modals
+  const renderModals = () => {
+    switch (currentModal) {
+      case ModalState.UPDATE_PROFILE:
+        return (
+          <Modal
+            visible={true}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setCurrentModal(ModalState.NONE)}
+          >
+            <View className="flex-1 bg-black/50 justify-center items-center px-4">
+              <View className="bg-neutral-800 w-full rounded-2xl p-6">
+                {/* Modal content */}
+                <View className="items-center mb-4">
+                  <View className="w-12 h-12 bg-yellow-500/10 rounded-full items-center justify-center mb-2">
+                    <Ionicons name="alert-circle" size={28} color="#EAB308" />
+                  </View>
+                  <Text className="text-white text-lg font-bold text-center">
+                    Cập nhật thông tin
+                  </Text>
+                </View>
+                
+                <Text className="text-white/60 text-center mb-6">
+                  Vui lòng cập nhật đầy đủ thông tin cá nhân (ngày sinh và số điện thoại) để tiếp tục đặt bàn
+                </Text>
+                
+                <View className="flex-row space-x-3">
+                  <TouchableOpacity
+                    onPress={handleBackToBar}
+                    className="flex-1 bg-neutral-700 py-3 rounded-xl"
+                  >
+                    <Text className="text-white text-center font-medium">
+                      Quay lại
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    onPress={handleUpdateProfile}
+                    className="flex-1 bg-yellow-500 py-3 rounded-xl"
+                  >
+                    <Text className="text-black text-center font-medium">
+                      Cập nhật ngay
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        );
+
+      case ModalState.CLOSED_DAY:
+        return (
+          <Modal
+            visible={true}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setCurrentModal(ModalState.NONE)}
+          >
+            <View className="flex-1 bg-black/50 justify-center items-center px-4">
+              <View className="bg-neutral-800 w-full rounded-2xl p-6">
+                <View className="items-center">
+                  <View className="bg-white/10 p-4 rounded-full mb-4">
+                    <Ionicons name="time" size={40} color="#9CA3AF" />
+                  </View>
+                  <Text className="text-white text-lg font-medium text-center mb-2">
+                    Quán đóng cửa
+                  </Text>
+                  <Text className="text-gray-400 text-center mb-6">
+                    {closedMessage}
+                  </Text>
+                  <TouchableOpacity 
+                    onPress={() => setCurrentModal(ModalState.NONE)}
+                    className="w-full bg-yellow-500 py-3 rounded-xl"
+                  >
+                    <Text className="text-black text-center font-medium">
+                      Chọn ngày khác
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        );
+
+      case ModalState.PROCESSING:
+        return (
+          <LoadingPopup 
+            visible={true}
+            status={bookingStatus}
+            errorMessage={bookingError}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
@@ -573,7 +740,7 @@ export default function BookingTableScreen() {
         <View className="border-b border-white/10">
           {/* Phần navigation */}
           <View className="px-4 pt-1.5 pb-2 flex-row items-center">
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => router.back()}
               className="h-9 w-9 bg-neutral-800 rounded-full items-center justify-center mr-3"
             >
@@ -581,7 +748,7 @@ export default function BookingTableScreen() {
             </TouchableOpacity>
             <Text className="text-yellow-500 text-lg font-bold">
               Đặt bàn
-            </Text>
+              </Text>
           </View>
 
           {/* Thông tin quán */}
@@ -687,7 +854,7 @@ export default function BookingTableScreen() {
                     ))}
                   </View>
                 </Animated.View>
-              ) : (
+              ) : accountInfo ? (
                 <View className="flex-row">
                   {/* Avatar */}
                   <Image 
@@ -749,6 +916,10 @@ export default function BookingTableScreen() {
                       </Text>
                     </View>
                   </View>
+                </View>
+              ) : (
+                <View className="items-center py-4">
+                  <Text className="text-white/60">Không thể tải thông tin người dùng</Text>
                 </View>
               )}
             </View>
@@ -816,8 +987,8 @@ export default function BookingTableScreen() {
                             {format(selectedDate, 'dd/MM/yyyy', { locale: vi })}
                           </Text>
                           <Ionicons name="calendar-outline" size={20} color="#9CA3AF" />
-                        </TouchableOpacity>
-                      </View>
+            </TouchableOpacity>
+          </View>
 
                       {/* Chọn giờ */}
                       <View className="flex-1">
@@ -974,8 +1145,8 @@ export default function BookingTableScreen() {
                         </View>
                       </Animated.View>
                     )}
-                  </>
-                )}
+          </>
+        )}
               </View>
 
               {/* Khối ghi chú */}
@@ -1416,71 +1587,6 @@ export default function BookingTableScreen() {
           </Modal>
         )}
 
-        {/* Modal thông báo quán đóng cửa */}
-        {showClosedModal && (
-          <Modal
-            visible={showClosedModal}
-            transparent={true}
-            animationType="slide"
-            onRequestClose={() => setShowClosedModal(false)}
-          >
-            <TouchableOpacity 
-              activeOpacity={1} 
-              onPress={() => setShowClosedModal(false)}
-              className="flex-1 justify-center items-center bg-black/50"
-            >
-              <TouchableOpacity 
-                activeOpacity={1}
-                onPress={e => e.stopPropagation()} 
-                className="bg-neutral-800 w-[85%] rounded-xl p-6"
-              >
-                <View className="items-center">
-                  {/* Header với nút đóng */}
-                  <View className="w-full flex-row justify-end mb-4">
-                    <TouchableOpacity 
-                      onPress={() => setShowClosedModal(false)}
-                      className="p-1"
-                    >
-                      <Ionicons name="close" size={24} color="white" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Icon và nội dung */}
-                  <View className="bg-white/10 p-4 rounded-full mb-4">
-                    <Ionicons
-                      name="time-outline"
-                      size={40}
-                      color="#9CA3AF"
-                    />
-                  </View>
-                  <Text className="text-white text-lg font-medium text-center mb-2">
-                    Quán đóng cửa
-                  </Text>
-                  <Text className="text-gray-400 text-center mb-6">
-                    {closedMessage}
-                  </Text>
-                  
-                  {/* Nút tác vụ */}
-                  <View className="w-full">
-                    <TouchableOpacity 
-                      onPress={() => {
-                        setShowClosedModal(false); // Đóng modal trước
-                        setTimeout(() => {
-                          setShowDatePicker(true); // Mở date picker sau một khoảng thời gian ngắn
-                        }, 100);
-                      }}
-                      className="flex-row items-center justify-center bg-white/10 p-4 rounded-xl"
-                    >
-                      <Ionicons name="calendar-outline" size={20} color="#EAB308" className="mr-2" />
-                      <Text className="text-white ml-2">Chọn ngày khác</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </Modal>
-        )}
-
         {/* Modal thông báo ã chn tối đa bàn */}
         {showMaxTablesModal && (
           <Modal
@@ -1541,12 +1647,8 @@ export default function BookingTableScreen() {
           </Modal>
         )}
 
-        {/* Thay thế modal processing cũ bằng LoadingPopup */}
-        <LoadingPopup 
-          visible={showProcessingModal} 
-          status={bookingStatus}
-          errorMessage={bookingError}
-        />
+        {/* Render modals */}
+        {renderModals()}
       </SafeAreaView>
     </View>
   );

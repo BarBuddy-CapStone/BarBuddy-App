@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { BarDetail, barService } from '@/services/bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoadingPopup = ({ visible }: { visible: boolean }) => (
   <Modal transparent visible={visible}>
@@ -35,7 +36,10 @@ export default function PaymentDetailScreen() {
   const [barDetail, setBarDetail] = useState<BarDetail | null>(null);
   const [showLoadingPopup, setShowLoadingPopup] = useState(false);
 
-  const bookingRequest: BookingDrinkRequest = JSON.parse(params.bookingRequest as string);
+  const bookingRequest: BookingDrinkRequest = typeof params.bookingRequest === 'string' 
+    ? JSON.parse(params.bookingRequest)
+    : params.bookingRequest;
+
   const discount = Number(params.discount) || 0;
   const originalPrice = Number(params.originalPrice) || 0;
   const totalPrice = Number(params.totalPrice) || 0;
@@ -78,23 +82,39 @@ export default function PaymentDetailScreen() {
       setShowLoadingPopup(true);
       setShowConfirmModal(false);
       
+      // Lưu booking data vào storage
+      const bookingData = {
+        bookingRequest,
+        selectedTables: bookingRequest.selectedTables,
+        drinks: bookingRequest.drinks,
+        discount,
+        originalPrice,
+        totalPrice
+      };
+
+      await AsyncStorage.setItem('temp_booking_data', JSON.stringify(bookingData));
+      
       const response = await bookingTableService.bookTableWithDrinks(bookingRequest);
       
       if (response.data?.paymentUrl) {
+        await router.replace({
+          pathname: '/(tabs)/booking-history',
+          params: { fromPayment: 'true' }
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 300));
         await Linking.openURL(response.data.paymentUrl);
+        
       } else {
-        Alert.alert('Lỗi', 'Không nhận được đường dẫn thanh toán');
+        throw new Error('Không nhận được đường dẫn thanh toán');
       }
 
     } catch (error: any) {
       console.error('Booking Error:', error);
-      if (error.response) {
-        console.error('Error Response:', {
-          status: error.response.status,
-          data: error.response.data
-        });
-      }
-      Alert.alert('Lỗi', error.message || 'Có lỗi xảy ra khi đặt bàn và nước uống');
+      router.replace({
+        pathname: '/payment/error/0' as any,
+        params: { fromPayment: 'true' }
+      });
     } finally {
       setIsProcessing(false);
       setShowLoadingPopup(false);
@@ -466,7 +486,7 @@ export default function PaymentDetailScreen() {
                   <View className="flex-row items-center">
                     <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
                     <Text className="text-white ml-2">
-                      {bookingRequest.tableIds.length} bàn đã chọn
+                      {bookingRequest.tableIds.length} bàn đ�� chọn
                     </Text>
                   </View>
                 </View>

@@ -1,4 +1,4 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, BackHandler, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +28,19 @@ export default function PaymentSuccessScreen() {
 
     fetchPaymentDetail();
   }, [paymentId]);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        router.replace({
+          pathname: '/(tabs)/booking-history',
+          params: { reload: 'true' }
+        });
+        return true;
+      });
+      return () => backHandler.remove();
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -65,7 +78,7 @@ export default function PaymentSuccessScreen() {
               </View>
             </View>
 
-            {/* Thông tin đặt chỗ */}
+            {/* Thông tin đặt ch */}
             <View className="bg-neutral-900 rounded-2xl p-4 mb-4">
               <Text className="text-yellow-500 font-bold text-lg mb-4">
                 {payment.booking.barName}
@@ -134,7 +147,14 @@ export default function PaymentSuccessScreen() {
       {/* Bottom Button */}
       <View className="p-4 border-t border-white/10">
         <TouchableOpacity
-          onPress={() => router.replace('/booking-history')}
+          onPress={() => {
+            router.replace({
+              pathname: '/(tabs)/booking-history',
+              params: {
+                reload: 'true'
+              }
+            });
+          }}
           className="bg-yellow-500 py-3 rounded-xl"
         >
           <Text className="text-black font-bold text-center">

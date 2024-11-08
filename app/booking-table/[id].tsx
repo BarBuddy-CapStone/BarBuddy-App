@@ -632,11 +632,19 @@ export default function BookingTableScreen() {
       await bookingTableService.bookTable(bookingRequest);
       setBookingStatus('success');
       
-      // Delay trước khi chuyển trang để người dùng thấy trạng thái thành công
+      // Thay đổi cách navigation
       setTimeout(() => {
         setShowProcessingModal(false);
-        router.push('/booking-history');
+        // Replace thay vì push để không thể back lại
+        router.replace({
+          pathname: '/(tabs)/booking-history',
+          params: { 
+            reload: 'true',
+            fromBooking: 'true' // Thêm param để biết là từ booking
+          }
+        });
       }, 1500);
+
     } catch (error) {
       setBookingStatus('error');
       if (error instanceof Error) {
@@ -644,7 +652,6 @@ export default function BookingTableScreen() {
       } else {
         setBookingError('Có lỗi xảy ra khi đặt bàn. Vui lòng thử lại.');
       }
-      // Tự động đóng thông báo lỗi sau 2s
       setTimeout(() => {
         setShowProcessingModal(false);
       }, 2000);

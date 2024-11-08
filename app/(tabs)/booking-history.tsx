@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, FlatList, RefreshControl, Image, ScrollView, ActivityIndicator, Modal, Alert, TextInput, Keyboard, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, RefreshControl, Image, ScrollView, ActivityIndicator, Modal, Alert, TextInput, Keyboard, Platform, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -336,6 +336,21 @@ const BookingItem = memo(({ booking, onRefreshList }: {
       keyboardWillShow.remove();
       keyboardWillHide.remove();
     };
+  }, []);
+
+  // Thêm xử lý keyboard cho iOS
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      const keyboardWillShow = Keyboard.addListener('keyboardWillShow', () => {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 150); // Tăng delay cho iOS
+      });
+
+      return () => {
+        keyboardWillShow.remove();
+      };
+    }
   }, []);
 
   return (
@@ -812,7 +827,8 @@ const BookingSkeleton = memo(() => (
 export default function BookingHistoryScreen() {
   const { isGuest, user } = useAuth();
   const params = useLocalSearchParams();
-  
+  const fromBooking = params.fromBooking === 'true';
+
   // Nhóm tất cả useState hooks
   const [bookings, setBookings] = useState<BookingHistory[]>([]);
   const [loading, setLoading] = useState(false);
@@ -857,10 +873,10 @@ export default function BookingHistoryScreen() {
     }
   }, [user?.accountId]);
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setPageIndex(1);
-    fetchBookings(1, true);
+    await fetchBookings(1, true);
+    setRefreshing(false);
   }, [fetchBookings]);
 
   const loadMore = useCallback(() => {
@@ -873,8 +889,8 @@ export default function BookingHistoryScreen() {
 
   const renderBookingItem = useCallback(({ item }: { item: BookingHistory }) => (
     <BookingItem 
-      booking={item} 
-      onRefreshList={onRefresh}
+      booking={item}
+      onRefreshList={onRefresh} 
     />
   ), [onRefresh]);
 
@@ -1005,9 +1021,14 @@ export default function BookingHistoryScreen() {
   }, [user?.accountId, fetchBookings]);
 
   useEffect(() => {
-    if (params.reload === 'true') {
+    if (params.reset === 'true') {
       onRefresh();
-      router.setParams({ reload: 'false' });
+      router.setParams({
+        reset: undefined,
+        status: undefined,
+        screen: undefined,
+        initial: undefined
+      });
     }
     
     const statusParam = params.status;
@@ -1018,7 +1039,43 @@ export default function BookingHistoryScreen() {
       }
       router.setParams({ status: undefined });
     }
-  }, [params.reload, params.status, onRefresh]);
+  }, [params.reset, params.status, onRefresh, router]);
+
+  useEffect(() => {
+    if (params.reload === 'true') {
+      // Clear param
+      router.setParams({});
+      // Refresh list
+      onRefresh();
+    }
+  }, [params.reload]);
+
+  useEffect(() => {
+    if (params.fromPayment === 'true') {
+      // Clear param
+      router.setParams({});
+      
+      // Disable back gesture và hardware back button
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        return true; // Prevents default back action
+      });
+
+      return () => backHandler.remove();
+    }
+  }, [params.fromPayment]);
+
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        // Nếu từ booking hoặc payment thì không cho back
+        if (fromBooking || params.fromPayment === 'true') {
+          return true;
+        }
+        return false;
+      });
+      return () => backHandler.remove();
+    }
+  }, [fromBooking, params.fromPayment]);
 
   if (isGuest || !user?.accountId) {
     return <GuestView />;

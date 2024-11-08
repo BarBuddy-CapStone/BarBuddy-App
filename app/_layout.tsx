@@ -9,18 +9,6 @@ import { View, Linking } from 'react-native';
 // Giữ splash screen hiển thị
 SplashScreen.preventAutoHideAsync();
 
-// Thêm khai báo type ở đầu file
-declare global {
-  namespace ReactNavigation {
-    interface RootParamList {
-      '/payment/[status]/[paymentId]': {
-        status: 'success' | 'failure' | 'error';
-        paymentId: string;
-      };
-    }
-  }
-}
-
 function RootLayoutNav() {
   const { isAuthenticated, isGuest, isLoading, allowNavigation } = useAuth();
   const segments = useSegments();
@@ -46,13 +34,44 @@ function RootLayoutNav() {
         headerShown: false,
         contentStyle: { backgroundColor: 'black' },
         animation: 'fade',
+        gestureEnabled: true
       }}>
-        <Stack.Screen name="onboarding" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="(auth)" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-        <Stack.Screen name="payment/success/[paymentId]" />
-        <Stack.Screen name="payment/failure/[paymentId]" />
-        <Stack.Screen name="payment/error/[paymentId]" />
+        <Stack.Screen name="onboarding" options={{ 
+          animation: 'slide_from_right',
+          gestureEnabled: true
+        }} />
+        <Stack.Screen name="(auth)" options={{ 
+          animation: 'slide_from_right',
+          gestureEnabled: true
+        }} />
+        <Stack.Screen name="(tabs)" options={{ 
+          animation: 'fade',
+          gestureEnabled: true
+        }} />
+        <Stack.Screen 
+          name="payment/success/[paymentId]" 
+          options={{ 
+            animation: 'none',
+            headerBackVisible: false,
+            gestureEnabled: false
+          }} 
+        />
+        <Stack.Screen 
+          name="payment/failure/[paymentId]" 
+          options={{ 
+            animation: 'none',
+            headerBackVisible: false,
+            gestureEnabled: false
+          }} 
+        />
+        <Stack.Screen 
+          name="payment/error/[paymentId]" 
+          options={{ 
+            animation: 'none',
+            headerBackVisible: false,
+            gestureEnabled: false
+          }} 
+        />
       </Stack>
     </ThemeProvider>
   );
@@ -81,7 +100,7 @@ export default function RootLayout() {
     };
   }, []);
 
-  const handleDeepLink = (url: string) => {
+  const handleDeepLink = async (url: string) => {
     if (!url) return;
 
     try {
@@ -92,17 +111,24 @@ export default function RootLayout() {
         const [_, status, paymentId] = pathSegments;
         
         if (['success', 'failure', 'error'].includes(status)) {
-          router.replace({
-            pathname: '/payment/[status]/[paymentId]' as any,
-            params: { 
-              status: status as 'success' | 'failure' | 'error', 
-              paymentId 
-            }
-          });
+          // Đảm bảo navigation stack được reset hoàn toàn
+          await router.replace('/(tabs)/booking-history');
+          
+          // Delay ngắn để đảm bảo navigation stack đã được reset
+          setTimeout(() => {
+            router.push({
+              pathname: `/payment/${status}/${paymentId}` as any,
+              params: { 
+                fromPayment: 'true',
+                clearHistory: 'true'
+              }
+            });
+          }, 100);
         }
       }
     } catch (error) {
-      console.error('Error parsing deep link URL:', error);
+      console.error('Error handling deep link:', error);
+      router.replace('/payment/error/0');
     }
   };
 

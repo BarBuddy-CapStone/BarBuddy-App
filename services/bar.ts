@@ -68,6 +68,20 @@ export interface IBarService {
   getBarDetail(barId: string): Promise<BarDetail | null>;
 }
 
+// Thêm interface mới cho response của API getBar
+export interface CustomerBar {
+  barId: string;
+  barName: string;
+  address: string;
+  images: string;
+}
+
+interface CustomerBarResponse {
+  statusCode: number;
+  message: string;
+  data: CustomerBar[];
+}
+
 class BarService implements IBarService {
   async getBars(pageIndex: number = 1, pageSize: number = 1000, search?: string): Promise<Bar[]> {
     try {
@@ -100,6 +114,17 @@ class BarService implements IBarService {
     } catch (error) {
       console.error('Error fetching bar detail:', error);
       return null;
+    }
+  }
+
+  async getCustomerBars(): Promise<CustomerBar[]> {
+    try {
+      const url = `${API_CONFIG.BASE_URL}/api/v1/Bar/customer/getBar?PageIndex=1&PageSize=100`;
+      const response = await axios.get<CustomerBarResponse>(url);
+      return response.data.data || [];
+    } catch (error) {
+      console.error('Error fetching customer bars:', error);
+      return [];
     }
   }
 }

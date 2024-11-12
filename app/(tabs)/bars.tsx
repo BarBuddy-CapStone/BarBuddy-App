@@ -96,7 +96,7 @@ const BarItem = memo(({ bar, onPress }: { bar: Bar; onPress: () => void }) => {
         <View className="relative">
           <Image
             source={{ uri: bar.images.split(',')[0].trim() }}
-            className="w-full h-[380px]"
+            className="w-full h-[250px]"
             resizeMode="cover"
           />
           
@@ -254,15 +254,20 @@ export default function BarsScreen() {
           {/* Filter button */}
           <TouchableOpacity
             onPress={() => setShowOpenOnly(!showOpenOnly)}
-            className={`h-9 w-9 rounded-full items-center justify-center ml-3 ${
+            className={`h-9 w-auto rounded-full items-center justify-center ml-3 px-3 ${
               showOpenOnly ? 'bg-yellow-500' : 'bg-neutral-900'
             }`}
           >
-            <Ionicons 
-              name={showOpenOnly ? "time" : "time-outline"} 
-              size={18} 
-              color={showOpenOnly ? "black" : "white"} 
-            />
+            <View className="flex-row items-center">
+              <Ionicons 
+                name={showOpenOnly ? "time" : "time-outline"} 
+                size={18} 
+                color={showOpenOnly ? "black" : "white"} 
+              />
+              <Text className={`ml-2 text-xs font-medium ${showOpenOnly ? 'text-black' : 'text-white'}`}>
+                {showOpenOnly ? 'Hôm nay' : 'Tất cả'}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -284,7 +289,7 @@ export default function BarsScreen() {
             data={getFilteredBars()}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
-            contentContainerStyle={{ padding: 16 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

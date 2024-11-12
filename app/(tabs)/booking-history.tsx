@@ -13,12 +13,6 @@ const GuestView = () => {
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
-        <View className="px-6 py-4 border-b border-white/10">
-          <Text className="text-yellow-500 text-2xl font-bold">
-            Lịch sử đặt bàn
-          </Text>
-        </View>
-
         <View className="flex-1 items-center justify-center p-6">
           <Ionicons name="lock-closed-outline" size={64} color="#EAB308" />
           <Text className="text-white text-xl font-bold mt-6 text-center">
@@ -1208,7 +1202,7 @@ export default function BookingHistoryScreen() {
             data={filteredBookings}
             renderItem={renderBookingItem}
             keyExtractor={keyExtractor}
-            contentContainerStyle={{ padding: 16 }}
+            contentContainerStyle={{ padding: 16, paddingBottom: 72 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl 

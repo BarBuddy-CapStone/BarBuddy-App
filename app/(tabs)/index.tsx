@@ -9,6 +9,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Dimensions } from 'react-native';
 import { formatRating } from '@/utils/rating';
+import { eventService, type Event } from '@/services/event';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -162,6 +165,82 @@ const BarItem = memo(({
   </TouchableOpacity>
 ));
 
+// Thêm interface EventItemProps
+interface EventItemProps {
+  event: Event;
+}
+
+// Thêm component EventItem
+const EventItem = memo(({ event }: EventItemProps) => {
+  const formatEventTime = (times: Event['eventTimeResponses']) => {
+    if (!times.length) return 'Chưa có lịch';
+    
+    const time = times[0];
+    if (time.date) {
+      return `${format(new Date(time.date), 'dd/MM/yyyy', { locale: vi })} ${time.startTime.slice(0,5)} - ${time.endTime.slice(0,5)}`;
+    } else if (time.dayOfWeek !== null) {
+      const days = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+      return `${days[time.dayOfWeek]} hàng tuần, ${time.startTime.slice(0,5)} - ${time.endTime.slice(0,5)}`;
+    }
+    return 'Chưa có lịch';
+  };
+
+  return (
+    <TouchableOpacity 
+      className="w-72 overflow-hidden"
+      activeOpacity={0.7}
+      onPress={() => router.push(`/event-detail/${event.eventId}` as any)}
+    >
+      <View className="relative">
+        <Image
+          source={{ uri: event.images.split(',')[0].trim() }}
+          className="w-full h-[200px] rounded-3xl"
+          resizeMode="cover"
+        />
+        
+        {event.eventVoucherResponse && (
+          <View className="absolute top-4 right-4">
+            <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full">
+              <Text className="text-black font-bold text-xs">
+                -{event.eventVoucherResponse.discount}%
+              </Text>
+            </View>
+          </View>
+        )}
+        
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+          className="absolute bottom-0 left-0 right-0 h-36 rounded-b-3xl"
+        >
+          <View className="absolute bottom-0 p-4 w-full">
+            <Text 
+              numberOfLines={1} 
+              className="text-yellow-500 text-lg font-bold mb-2"
+            >
+              {event.eventName}
+            </Text>
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="business-outline" size={14} color="#9CA3AF" />
+              <Text 
+                numberOfLines={1}
+                className="text-gray-400 text-xs ml-1 flex-1"
+              >
+                {event.barName}
+              </Text>
+            </View>
+            <View className="flex-row items-center">
+              <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+              <Text className="text-gray-400 text-xs ml-1">
+                {formatEventTime(event.eventTimeResponses)}
+              </Text>
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function HomeScreen() {
   const { user } = useAuth();
   const [bars, setBars] = useState<Bar[]>([]);
@@ -169,6 +248,9 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const bannerRef = useRef<FlatList>(null);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [eventSectionTitle, setEventSectionTitle] = useState('Sự kiện đang diễn ra');
 
   const fetchBars = async () => {
     setLoading(true);
@@ -182,14 +264,41 @@ export default function HomeScreen() {
     }
   };
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    fetchBars().finally(() => setRefreshing(false));
+  const fetchEvents = useCallback(async () => {
+    try {
+      setLoadingEvents(true);
+      const response = await eventService.getEvents({
+        pageIndex: 1,
+        pageSize: 5,
+        isStill: 0
+      });
+
+      if (response.events.length > 0) {
+        setEvents(response.events);
+        setEventSectionTitle('Sự kiện đang diễn ra');
+      } else {
+        const allEventsResponse = await eventService.getEvents({
+          pageIndex: 1,
+          pageSize: 5,
+          isStill: null
+        });
+        setEvents(allEventsResponse.events);
+        setEventSectionTitle('Sự kiện');
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setLoadingEvents(false);
+    }
   }, []);
 
   useEffect(() => {
     fetchBars();
   }, []);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
 
   const getAverageRating = (feedBacks: Array<{rating: number}>) => {
     if (!feedBacks.length) return null;
@@ -320,6 +429,35 @@ export default function HomeScreen() {
     return item.barId;
   }, []);
 
+  const EventSkeleton = () => (
+    <View className="w-72 h-[200px] bg-white/5 rounded-3xl overflow-hidden mx-3 animate-pulse">
+      <View className="flex-1">
+        <View className="absolute bottom-0 p-4 w-full">
+          <View className="h-6 bg-white/10 rounded-full w-3/4 mb-3" />
+          <View className="h-4 bg-white/10 rounded-full w-full mb-2" />
+          <View className="flex-row justify-between">
+            <View className="h-4 bg-white/10 rounded-full w-1/3" />
+            <View className="h-4 bg-white/10 rounded-full w-1/4" />
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        fetchBars(),
+        fetchEvents()
+      ]);
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchBars, fetchEvents]);
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
@@ -387,6 +525,43 @@ export default function HomeScreen() {
               </Animated.View>
             )}
           </View>
+
+          {/* Events Section */}
+          <View className="mt-4 pb-4">
+            <View className="flex-row justify-between items-center px-6 mb-4">
+              <Text className="text-white text-xl font-bold">
+                {eventSectionTitle}
+              </Text>
+              <TouchableOpacity onPress={() => router.push('/event/event' as any)}>
+                <Text className="text-yellow-500">Tất cả</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingEvents ? (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24 }}
+              >
+                {[1,2,3].map(i => <EventSkeleton key={i} />)}
+              </ScrollView>
+            ) : events.length > 0 ? (
+              <Animated.View entering={FadeIn}>
+                <FlatList
+                  horizontal
+                  data={events}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 24 }}
+                  ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+                  renderItem={({ item }) => <EventItem event={item} />}
+                  keyExtractor={(item) => item.eventId}
+                />
+              </Animated.View>
+            ) : null}
+          </View>
+
+          {/* Thêm view trống ở cuối */}
+          <View style={{ height: 80 }} />
         </ScrollView>
       </SafeAreaView>
     </View>

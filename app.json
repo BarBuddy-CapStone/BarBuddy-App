@@ -18,7 +18,10 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Ứng dụng cần quyền truy cập vào thư viện ảnh để thay đổi ảnh đại diện của bạn.",
-        "NSCameraUsageDescription": "Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới."
+        "NSCameraUsageDescription": "Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới.",
+        "NSLocationWhenInUseUsageDescription": "Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.",
+        "NSLocationAlwaysUsageDescription": "Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn."
       }
     },
     "android": {

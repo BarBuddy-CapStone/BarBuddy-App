@@ -1,12 +1,14 @@
 import { View, Text, TextInput, TouchableOpacity, FlatList, ScrollView, Image, RefreshControl, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useCallback, useEffect, memo } from 'react';
+import { useState, useCallback, useEffect, memo, useRef } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { barService, type Bar } from '@/services/bar';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { formatRating } from '@/utils/rating';
+import * as Location from 'expo-location';
+import { GoongLocation } from '@/services/goong';
 
 // Thêm component BarSkeleton
 const BarSkeleton = () => (
@@ -78,8 +80,35 @@ const isBarOpen = (barTimes: Bar['barTimeResponses']) => {
   return true; // Tạm thời return true vì logic check giờ phức tạp hơn cần xử lý riêng
 };
 
+// Thêm DistanceBadge component
+const DistanceBadge = memo(({ distance, loading }: { distance?: number, loading: boolean }) => {
+  if (loading) {
+    return (
+      <View className="bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-sm">
+        <ActivityIndicator size="small" color="#ffffff" />
+      </View>
+    );
+  }
+  
+  if (distance !== undefined) {
+    return (
+      <View className="bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-sm">
+        <Text className="text-white font-medium text-xs">
+          {distance.toFixed(1)}km
+        </Text>
+      </View>
+    );
+  }
+  
+  return null;
+});
+
 // Tách BarItem thành một component riêng và sử dụng React.memo
-const BarItem = memo(({ bar, onPress }: { bar: Bar; onPress: () => void }) => {
+const BarItem = memo(({ bar, onPress, loadingDistances }: { 
+  bar: Bar; 
+  onPress: () => void;
+  loadingDistances: boolean;
+}) => {
   const getAverageRating = useCallback((feedBacks: Array<{ rating: number }>) => {
     if (!feedBacks || feedBacks.length === 0) return null;
     const sum = feedBacks.reduce((acc, curr) => acc + curr.rating, 0);
@@ -102,21 +131,21 @@ const BarItem = memo(({ bar, onPress }: { bar: Bar; onPress: () => void }) => {
           
           {/* Status badges container */}
           <View className="absolute top-4 w-full flex-row justify-between px-4">
-            {/* Left side - Table availability badge */}
             <View>
               {isBarOpen(bar.barTimeResponses) && (
-                <View 
-                  className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
-                    bar.isAnyTableAvailable 
-                      ? 'bg-green-500/90' 
-                      : 'bg-red-500/90'
-                  }`}
-                >
-                  <Text className="text-white font-medium text-xs">
-                    {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
-                  </Text>
+                <View className="mb-2">
+                  <View className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
+                    bar.isAnyTableAvailable ? 'bg-green-500/90' : 'bg-red-500/90'
+                  }`}>
+                    <Text className="text-white font-medium text-xs">
+                      {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
+                    </Text>
+                  </View>
                 </View>
               )}
+              <View className="self-start">
+                <DistanceBadge distance={bar.location?.distance} loading={loadingDistances} />
+              </View>
             </View>
             
             {/* Right side - Discount badge */}
@@ -168,28 +197,104 @@ const BarItem = memo(({ bar, onPress }: { bar: Bar; onPress: () => void }) => {
 export default function BarsScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [bars, setBars] = useState<Bar[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [barsWithLocation, setBarsWithLocation] = useState<Bar[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showOpenOnly, setShowOpenOnly] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [calculatingDistances, setCalculatingDistances] = useState(false);
+  const [userLocation, setUserLocation] = useState<GoongLocation | null>(null);
+  const calculationInProgress = useRef(false);
 
   // Đơn giản hóa fetchBars
   const fetchBars = async () => {
-    setLoading(true);
     try {
       const data = await barService.getBars();
       setBars(data);
+      return data;
     } catch (error) {
       console.error('Error fetching bars:', error);
-      setBars([]);
-    } finally {
-      setLoading(false);
+      return null;
     }
   };
 
+  const getUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return null;
+
+      const location = await Location.getCurrentPositionAsync({});
+      const userLoc = {
+        lat: location.coords.latitude,
+        lng: location.coords.longitude
+      };
+      setUserLocation(userLoc);
+      return userLoc;
+    } catch (error) {
+      console.error('Error getting location:', error);
+      return null;
+    }
+  };
+
+  const calculateDistances = useCallback(async (barsData: Bar[], userLoc: GoongLocation) => {
+    if (calculationInProgress.current) return null;
+    
+    calculationInProgress.current = true;
+    setCalculatingDistances(true);
+    
+    try {
+      const updatedBars = await barService.calculateBarDistances(barsData, userLoc);
+      const sortedBars = [...updatedBars].sort((a, b) => {
+        const distanceA = a.location?.distance ?? Infinity;
+        const distanceB = b.location?.distance ?? Infinity;
+        return distanceA - distanceB;
+      });
+      return sortedBars;
+    } catch (error) {
+      console.error('Error calculating distances:', error);
+      return null;
+    } finally {
+      setCalculatingDistances(false);
+      calculationInProgress.current = false;
+    }
+  }, []);
+
+  // Đơn giản hóa initialization
+  useEffect(() => {
+    const init = async () => {
+      setIsLoading(true);
+      
+      try {
+        const [barsData, userLoc] = await Promise.all([
+          fetchBars(),
+          getUserLocation()
+        ]);
+
+        if (barsData) {
+          if (userLoc) {
+            const barsWithDist = await calculateDistances(barsData, userLoc);
+            if (barsWithDist) {
+              setBarsWithLocation(barsWithDist);
+            } else {
+              setBarsWithLocation(barsData);
+            }
+          } else {
+            setBarsWithLocation(barsData);
+          }
+        }
+      } catch (error) {
+        console.error('Error in initialization:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    init();
+  }, [calculateDistances]);
+
   // Tối ưu lại getFilteredBars
   const getFilteredBars = useCallback(() => {
-    return bars.filter(bar => {
-      // Nếu có search query, kiểm tra match
+    if (!barsWithLocation.length) return [];
+    
+    return barsWithLocation.filter(bar => {
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         const nameMatch = bar.barName.toLowerCase().includes(query);
@@ -197,34 +302,43 @@ export default function BarsScreen() {
         if (!nameMatch && !addressMatch) return false;
       }
 
-      // Nếu filter "Đang mở cửa" được bật
       if (showOpenOnly && !isBarOpen(bar.barTimeResponses)) {
         return false;
       }
 
       return true;
     });
-  }, [bars, searchQuery, showOpenOnly]);
+  }, [barsWithLocation, searchQuery, showOpenOnly]);
 
   // Đơn giản hóa onRefresh
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    fetchBars().finally(() => setRefreshing(false));
-  }, []);
-
-  // Load data lần đầu
-  useEffect(() => {
-    fetchBars();
+    try {
+      const barsSuccess = await fetchBars();
+      if (barsSuccess) {
+        const locationGranted = await getUserLocation();
+        if (locationGranted) {
+          await calculateDistances(barsSuccess, locationGranted);
+        } else {
+          setBarsWithLocation(barsSuccess);
+        }
+      }
+    } catch (error) {
+      console.error('Error refreshing:', error);
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
   const renderItem = useCallback(({ item: bar }: { item: Bar }) => {
     return (
       <BarItem 
-        bar={bar} 
+        bar={bar}
         onPress={() => router.push(`/bar-detail/${bar.barId}`)}
+        loadingDistances={calculatingDistances}
       />
     );
-  }, []);
+  }, [calculatingDistances]);
 
   const keyExtractor = useCallback((item: Bar) => item.barId, []);
 
@@ -274,7 +388,7 @@ export default function BarsScreen() {
         <View className="h-[1px] bg-neutral-900" />
 
         {/* Content */}
-        {loading ? (
+        {isLoading ? (
           <ScrollView 
             className="flex-1" 
             contentContainerStyle={{ padding: 16 }}
@@ -292,7 +406,10 @@ export default function BarsScreen() {
             contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl 
+                refreshing={refreshing} 
+                onRefresh={onRefresh}
+              />
             }
             ItemSeparatorComponent={() => <View className="h-4" />}
             maxToRenderPerBatch={5}

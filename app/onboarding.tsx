@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, Text, View, Alert, Platform } from 'react-native';
 import Animated, { 
   useSharedValue, 
   useAnimatedStyle,
@@ -10,6 +10,7 @@ import Animated, {
   cancelAnimation
 } from 'react-native-reanimated';
 import { useAuth } from '@/contexts/AuthContext';
+import * as Location from 'expo-location';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -19,6 +20,31 @@ export default function OnboardingScreen() {
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.3);
   const hasNavigated = useRef(false);
+
+  const requestPermissions = async () => {
+    try {
+      // Xin quyền truy cập vị trí khi sử dụng
+      const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+      
+      if (foregroundPermission.status !== 'granted') {
+        Alert.alert(
+          'Cần quyền truy cập vị trí',
+          'Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.',
+          [{ text: 'OK' }]
+        );
+      }
+
+      // Nếu là Android, xin thêm quyền truy cập vị trí trong nền
+      if (Platform.OS === 'android') {
+        const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
+        if (backgroundPermission.status !== 'granted') {
+          console.log('Quyền truy cập vị trí trong nền bị từ chối');
+        }
+      }
+    } catch (error) {
+      console.error('Lỗi khi xin quyền truy cập vị trí:', error);
+    }
+  };
 
   const navigateNext = () => {
     if (isLoading || hasNavigated.current) return;
@@ -34,8 +60,11 @@ export default function OnboardingScreen() {
   useEffect(() => {
     let isMounted = true;
 
-    const startAnimation = () => {
+    const startAnimation = async () => {
       if (!isMounted) return;
+
+      // Xin quyền trước khi bắt đầu animation
+      await runOnJS(requestPermissions)();
 
       opacity.value = withSequence(
         withTiming(1, { duration: 150 }),

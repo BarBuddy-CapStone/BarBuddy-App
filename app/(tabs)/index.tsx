@@ -1,7 +1,7 @@
-import { View, Text, TouchableOpacity, Image, ScrollView, RefreshControl, FlatList } from 'react-native';
+import { View, Text, TouchableOpacity, Image, ScrollView, RefreshControl, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useState, useRef, memo } from 'react';
+import { useCallback, useEffect, useState, useRef, memo, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { barService, type Bar } from '@/services/bar';
 import { Link, router } from 'expo-router';
@@ -12,6 +12,8 @@ import { formatRating } from '@/utils/rating';
 import { eventService, type Event } from '@/services/event';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
+import * as Location from 'expo-location';
+import { GoongLocation } from '@/services/goong';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -35,6 +37,7 @@ interface BarItemProps {
   getCurrentDayTime: (barTimes: Bar['barTimeResponses']) => string;
   isBarOpen: (barTimes: Bar['barTimeResponses']) => boolean;
   getAverageRating: (feedBacks: Array<{ rating: number }>) => number | null;
+  loadingDistances: boolean;
 }
 
 // Thêm mảng banners cứng
@@ -86,84 +89,142 @@ const BannerItem = memo(({ banner, width }: BannerItemProps) => (
   </View>
 ));
 
-// Tách BarItem thành component riêng
+// Tách Badge components
+const StatusBadge = memo(({ isAvailable }: { isAvailable: boolean }) => (
+  <View className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
+    isAvailable ? 'bg-green-500/90' : 'bg-red-500/90'
+  }`}>
+    <Text className="text-white font-medium text-xs">
+      {isAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
+    </Text>
+  </View>
+));
+
+const DistanceBadge = memo(({ distance, loading }: { distance?: number, loading: boolean }) => {
+  if (loading) {
+    return (
+      <View className="bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-sm">
+        <ActivityIndicator size="small" color="#ffffff" />
+      </View>
+    );
+  }
+  
+  if (distance !== undefined) {
+    return (
+      <View className="bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-sm">
+        <Text className="text-white font-medium text-xs">
+          {distance.toFixed(1)}km
+        </Text>
+      </View>
+    );
+  }
+  
+  return null;
+});
+
+const DiscountBadge = memo(({ discount }: { discount: number }) => {
+  if (discount <= 0) return null;
+  
+  return (
+    <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full h-7 items-center justify-center">
+      <Text className="text-black font-bold text-xs">-{discount}%</Text>
+    </View>
+  );
+});
+
+// Tối ưu BarItem với useMemo và memo chặt chẽ hơn
 const BarItem = memo(({ 
   bar, 
   onPress,
   getCurrentDayTime,
   isBarOpen,
-  getAverageRating
-}: BarItemProps) => (
-  <TouchableOpacity 
-    className="w-72 overflow-hidden"
-    activeOpacity={0.7}
-    onPress={onPress}
-  >
-    <View className="relative">
-      <Image
-        source={{ uri: bar.images.split(',')[0].trim() }}
-        className="w-full h-[380px] rounded-3xl"
-        resizeMode="cover"
-      />
-      
-      {/* Status badges container */}
-      <View className="absolute top-4 w-full flex-row justify-between px-4">
-        <View>
-          {isBarOpen(bar.barTimeResponses) && (
-            <View className={`px-2.5 py-1 rounded-full h-7 items-center justify-center ${
-              bar.isAnyTableAvailable ? 'bg-green-500/90' : 'bg-red-500/90'
-            }`}>
-              <Text className="text-white font-medium text-xs">
-                {bar.isAnyTableAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
-              </Text>
-            </View>
-          )}
-        </View>
-        
-        <View>
-          {bar.discount > 0 && (
-            <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full h-7 items-center justify-center">
-              <Text className="text-black font-bold text-xs">-{bar.discount}%</Text>
-            </View>
-          )}
-        </View>
-      </View>
-      
-      <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
-        className="absolute bottom-0 left-0 right-0 h-40 rounded-b-3xl"
-      >
-        <View className="absolute bottom-0 p-5 w-full">
-          <Text className="text-yellow-500 text-xl font-bold mb-2">
-            {bar.barName}
-          </Text>
-          
-          <View className="flex-row items-center mb-2">
-            <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-            <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
-              {bar.address}
-            </Text>
-          </View>
+  getAverageRating,
+  loadingDistances 
+}: BarItemProps) => {
+  // Tính toán các giá trị phức tạp một lần
+  const memoizedValues = useMemo(() => ({
+    isOpen: isBarOpen(bar.barTimeResponses),
+    dayTime: getCurrentDayTime(bar.barTimeResponses),
+    rating: getAverageRating(bar.feedBacks),
+    mainImage: bar.images.split(',')[0].trim()
+  }), [bar.barTimeResponses, bar.feedBacks, bar.images, getCurrentDayTime, isBarOpen, getAverageRating]);
 
-          <View className="flex-row items-center space-x-4">
-            <View className="flex-row items-center">
-              <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-              <Text className="text-gray-400 text-xs ml-1">
-                {getCurrentDayTime(bar.barTimeResponses)}
-              </Text>
-            </View>
-            <View className="flex-row items-center">
-              <Ionicons name="star" size={14} color="#EAB308" />
-              <Text className="text-white ml-1 text-xs font-medium">
-                {formatRating(getAverageRating(bar.feedBacks))}
-              </Text>
+  return (
+    <TouchableOpacity 
+      className="w-72 overflow-hidden"
+      activeOpacity={0.7}
+      onPress={onPress}
+    >
+      <View className="relative">
+        <Image
+          source={{ uri: memoizedValues.mainImage }}
+          className="w-full h-[380px] rounded-3xl"
+          resizeMode="cover"
+        />
+        
+        {/* Badges Container */}
+        <View className="absolute top-4 w-full flex-row justify-between px-4">
+          <View className="flex flex-col items-start space-y-2">
+            {memoizedValues.isOpen && (
+              <StatusBadge isAvailable={bar.isAnyTableAvailable} />
+            )}
+            <View className="self-start">
+              <DistanceBadge 
+                distance={bar.location?.distance} 
+                loading={loadingDistances} 
+              />
             </View>
           </View>
+          
+          <DiscountBadge discount={bar.discount} />
         </View>
-      </LinearGradient>
-    </View>
-  </TouchableOpacity>
-));
+
+        <LinearGradient
+          colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+          className="absolute bottom-0 left-0 right-0 h-40 rounded-b-3xl"
+        >
+          <View className="absolute bottom-0 p-5 w-full">
+            <Text className="text-white text-xl font-bold mb-2" numberOfLines={1}>
+              {bar.barName}
+            </Text>
+            <View className="flex-row items-center mb-2">
+              <Ionicons name="location-outline" size={14} color="#9CA3AF" />
+              <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
+                {bar.address}
+              </Text>
+            </View>
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center">
+                <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+                <Text className="text-gray-400 text-xs ml-1">
+                  {memoizedValues.dayTime}
+                </Text>
+              </View>
+              {memoizedValues.rating !== null && (
+                <View className="flex-row items-center">
+                  <Ionicons name="star" size={14} color="#EAB308" />
+                  <Text className="text-yellow-500 text-xs ml-1">
+                    {memoizedValues.rating.toFixed(1)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </LinearGradient>
+      </View>
+    </TouchableOpacity>
+  );
+}, (prevProps, nextProps) => {
+  // Kiểm tra sâu hơn để tránh re-render không cần thiết
+  return (
+    prevProps.bar.barId === nextProps.bar.barId &&
+    prevProps.loadingDistances === nextProps.loadingDistances &&
+    prevProps.bar.location?.distance === nextProps.bar.location?.distance &&
+    prevProps.bar.isAnyTableAvailable === nextProps.bar.isAnyTableAvailable &&
+    prevProps.bar.discount === nextProps.bar.discount &&
+    JSON.stringify(prevProps.bar.barTimeResponses) === JSON.stringify(nextProps.bar.barTimeResponses)
+  );
+});
 
 // Thêm interface EventItemProps
 interface EventItemProps {
@@ -244,6 +305,10 @@ const EventItem = memo(({ event }: EventItemProps) => {
 export default function HomeScreen() {
   const { user } = useAuth();
   const [bars, setBars] = useState<Bar[]>([]);
+  const [barsWithLocation, setBarsWithLocation] = useState<Bar[]>([]);
+  const [fetchingBars, setFetchingBars] = useState(true);
+  const [calculatingDistances, setCalculatingDistances] = useState(false);
+  const calculationInProgress = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
@@ -251,18 +316,53 @@ export default function HomeScreen() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventSectionTitle, setEventSectionTitle] = useState('Sự kiện đang diễn ra');
+  const [userLocation, setUserLocation] = useState<GoongLocation | null>(null);
+  const [loadingDistances, setLoadingDistances] = useState(false);
 
-  const fetchBars = async () => {
-    setLoading(true);
+  const fetchBars = useCallback(async () => {
+    setFetchingBars(true);
     try {
-      const data = await barService.getBars();
+      const data = await barService.getBars(1, 1000);
       setBars(data);
+      setBarsWithLocation(data.map(bar => ({ ...bar })));
     } catch (error) {
       console.error('Error fetching bars:', error);
     } finally {
-      setLoading(false);
+      setFetchingBars(false);
     }
-  };
+  }, []);
+
+  const calculateDistances = useCallback(async () => {
+    if (calculationInProgress.current || !userLocation) return;
+    
+    calculationInProgress.current = true;
+    setCalculatingDistances(true);
+    
+    try {
+      const updatedBars = await barService.calculateBarDistances(bars, userLocation);
+      setBarsWithLocation(prev => 
+        prev.map(bar => {
+          const updatedBar = updatedBars.find(b => b.barId === bar.barId);
+          return updatedBar || bar;
+        })
+      );
+    } catch (error) {
+      console.error('Error calculating distances:', error);
+    } finally {
+      setCalculatingDistances(false);
+      calculationInProgress.current = false;
+    }
+  }, [bars, userLocation]);
+
+  useEffect(() => {
+    fetchBars();
+  }, []);
+
+  useEffect(() => {
+    if (bars.length > 0 && userLocation && !fetchingBars) {
+      calculateDistances();
+    }
+  }, [bars, userLocation, fetchingBars]);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -292,8 +392,26 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const getUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Permission denied');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        lat: location.coords.latitude,
+        lng: location.coords.longitude
+      });
+    } catch (error) {
+      console.error('Error getting location:', error);
+    }
+  };
+
   useEffect(() => {
-    fetchBars();
+    getUserLocation();
   }, []);
 
   useEffect(() => {
@@ -414,15 +532,19 @@ export default function HomeScreen() {
     <BannerItem banner={banner} width={screenWidth} />
   ), [screenWidth]);
 
-  const renderBarItem = useCallback(({ item: bar }: { item: Bar }) => (
-    <BarItem 
-      bar={bar}
-      onPress={() => router.push(`./bar-detail/${bar.barId}`)}
-      getCurrentDayTime={getCurrentDayTime}
-      isBarOpen={isBarOpen}
-      getAverageRating={getAverageRating}
-    />
-  ), []);
+  const renderBarItem = useCallback(({ item: bar }: { item: Bar }) => {
+    const barWithLocation = barsWithLocation.find(b => b.barId === bar.barId);
+    return (
+      <BarItem 
+        bar={barWithLocation || bar}
+        onPress={() => router.push(`./bar-detail/${bar.barId}`)}
+        getCurrentDayTime={getCurrentDayTime}
+        isBarOpen={isBarOpen}
+        getAverageRating={getAverageRating}
+        loadingDistances={calculatingDistances}
+      />
+    );
+  }, [barsWithLocation, calculatingDistances]);
 
   const keyExtractor = useCallback((item: Banner | Bar) => {
     if ('id' in item) return item.id.toString();
@@ -499,7 +621,7 @@ export default function HomeScreen() {
               </Link>
             </View>
 
-            {loading ? (
+            {fetchingBars ? (
               <ScrollView 
                 horizontal 
                 showsHorizontalScrollIndicator={false}
@@ -517,10 +639,16 @@ export default function HomeScreen() {
                   ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
                   renderItem={renderBarItem}
                   keyExtractor={keyExtractor}
-                  maxToRenderPerBatch={5}
-                  windowSize={5}
+                  maxToRenderPerBatch={3}
+                  windowSize={3}
                   removeClippedSubviews={true}
-                  initialNumToRender={3}
+                  initialNumToRender={2}
+                  updateCellsBatchingPeriod={50}
+                  getItemLayout={(data, index) => ({
+                    length: 288,
+                    offset: 288 * index,
+                    index,
+                  })}
                 />
               </Animated.View>
             )}

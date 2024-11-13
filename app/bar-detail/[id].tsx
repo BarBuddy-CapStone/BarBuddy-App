@@ -30,6 +30,8 @@ import ImageView from "react-native-image-viewing";
 import Modal from "react-native-modal";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatRating } from '@/utils/rating';
+import * as Location from 'expo-location';
+import { GoongLocation } from '@/services/goong';
 
 // Thêm hàm xử lý images
 const getImageArray = (imagesString: string): string[] => {
@@ -806,6 +808,146 @@ const AuthModal = ({
 // Đặt ASPECT_RATIO là constant ở đầu file, ngoài component
 const ASPECT_RATIO = 1.5; // Giữ tỷ lệ 1.5 cho tất cả ảnh
 
+// Cập nhật DistanceBadge với style mới cho header
+const DistanceBadge = memo(({ 
+  distance,
+  variant = 'default'
+}: { 
+  distance?: number,
+  variant?: 'default' | 'compact' 
+}) => {
+  const [isLoading, setIsLoading] = useState(true);
+  const translateX = useSharedValue(-100);
+
+  useEffect(() => {
+    if (distance !== undefined) {
+      setIsLoading(false);
+    }
+    
+    translateX.value = withRepeat(
+      withTiming(100, { duration: 1000 }),
+      -1,
+      false
+    );
+  }, [distance]);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  // Style khác nhau cho header và content
+  const containerStyle = variant === 'compact' 
+    ? "bg-neutral-900 px-3 py-1 rounded-full overflow-hidden" 
+    : "bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-sm overflow-hidden";
+
+  return (
+    <View className={containerStyle}>
+      {isLoading ? (
+        <View className="w-10 flex-row items-center">
+          <Animated.View
+            style={[{
+              width: "100%",
+              height: "100%",
+              position: "absolute",
+              backgroundColor: "transparent",
+            }, animatedStyle]}
+          >
+            <LinearGradient
+              colors={["transparent", "rgba(255,255,255,0.3)", "transparent"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ flex: 1 }}
+            />
+          </Animated.View>
+          <Text className={`text-white/30 font-medium ${variant === 'compact' ? 'text-[10px]' : 'text-xs'}`}>
+            0.0km
+          </Text>
+        </View>
+      ) : (
+        <Text className={`text-white font-medium ${variant === 'compact' ? 'text-[10px]' : 'text-xs'}`}>
+          {distance?.toFixed(1)}km
+        </Text>
+      )}
+    </View>
+  );
+});
+
+// Cập nhật HeaderBadgeContainer để hiển thị đầy đủ các badge
+const HeaderBadgeContainer = memo(({ 
+  distance,
+  discount,
+  isAvailable,
+  isOpen
+}: { 
+  distance?: number,
+  discount: number,
+  isAvailable: boolean,
+  isOpen: boolean
+}) => (
+  <View className="flex-row items-center ml-1">
+    <DistanceBadge distance={distance} variant="compact" />
+    
+    <View className="flex-row items-center space-x-1 ml-1">
+      {/* Discount Badge */}
+      {discount > 0 && (
+        <View className="bg-yellow-500/90 px-2 py-0.5 rounded-full">
+          <Text className="text-black font-bold text-[10px]">
+            -{discount}%
+          </Text>
+        </View>
+      )}
+
+      {/* Availability Badge */}
+      {isOpen && (
+        <View className={`px-2 py-0.5 rounded-full ${isAvailable ? 'bg-green-500/90' : 'bg-red-500/90'}`}>
+          <Text className="text-white font-bold text-[10px]">
+            {isAvailable ? 'Còn bàn' : 'Hết bàn'}
+          </Text>
+        </View>
+      )}
+    </View>
+  </View>
+));
+
+// Cập nhật ContentBadgeContainer cho content
+const ContentBadgeContainer = memo(({ 
+  distance,
+  discount,
+  isAvailable,
+  isOpen
+}: { 
+  distance?: number,
+  discount: number,
+  isAvailable: boolean,
+  isOpen: boolean
+}) => (
+  <View className="flex-row items-center ml-4">
+    <DistanceBadge distance={distance} />
+    
+    <View className="flex-row items-center space-x-2 ml-2">
+      {/* Discount Badge */}
+      {discount > 0 && (
+        <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full">
+          <Text className="text-black font-bold text-xs">
+            -{discount}%
+          </Text>
+        </View>
+      )}
+
+      {/* Availability Badge */}
+      {isOpen && (
+        <View className={`px-2.5 py-1 rounded-full ${isAvailable ? 'bg-green-500/90' : 'bg-red-500/90'}`}>
+          <Text className="text-white font-bold text-xs">
+            {isAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
+          </Text>
+        </View>
+      )}
+    </View>
+  </View>
+));
+
 // 2. Component chính
 export default function BarDetailScreen() {
   const router = useRouter();
@@ -1053,6 +1195,39 @@ export default function BarDetailScreen() {
     };
   });
 
+  // Thêm state quản lý vị trí người dùng
+  const [userLocation, setUserLocation] = useState<GoongLocation | null>(null);
+  
+  // Thêm useEffect để lấy vị trí người dùng
+  useEffect(() => {
+    const getUserLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({});
+          setUserLocation({
+            lat: location.coords.latitude,
+            lng: location.coords.longitude
+          });
+        }
+      } catch (error) {
+        console.error('Error getting location:', error);
+      }
+    };
+    getUserLocation();
+  }, []);
+
+  // Cập nhật useEffect lấy thông tin bar detail
+  useEffect(() => {
+    const fetchBarDetail = async () => {
+      if (id && userLocation) {
+        const detail = await barService.getBarDetailWithDistance(id, userLocation);
+        setBarDetail(detail);
+      }
+    };
+    fetchBarDetail();
+  }, [id, userLocation]);
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1" edges={['top']}>
@@ -1095,31 +1270,12 @@ export default function BarDetailScreen() {
                       {barDetail?.address}
                     </Text>
 
-                    {/* Discount badge */}
-                    {(barDetail?.discount ?? 0) > 0 && (
-                      <View className="bg-yellow-500/90 px-1.5 py-0.5 rounded-full">
-                        <Text className="text-black font-bold text-xs">
-                          -{barDetail?.discount}%
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Table availability badge */}
-                    {barDetail && isOpenToday(barDetail.barTimeResponses) && (
-                      <View
-                        className={`px-1.5 py-0.5 rounded-full ${
-                          barDetail.isAnyTableAvailable
-                            ? "bg-green-500/90"
-                            : "bg-red-500/90"
-                        }`}
-                      >
-                        <Text className="text-white font-bold text-xs">
-                          {barDetail.isAnyTableAvailable
-                            ? "Còn bàn"
-                            : "Hết bàn"}
-                        </Text>
-                      </View>
-                    )}
+                    <HeaderBadgeContainer
+                      distance={barDetail?.location?.distance}
+                      discount={barDetail?.discount || 0}
+                      isAvailable={barDetail?.isAnyTableAvailable || false}
+                      isOpen={barDetail ? isOpenToday(barDetail.barTimeResponses) : false}
+                    />
                   </View>
                 </Animated.View>
               </View>
@@ -1212,31 +1368,12 @@ export default function BarDetailScreen() {
                           </Text>
                         </View>
 
-                        {/* Discount badge */}
-                        {(barDetail?.discount ?? 0) > 0 && (
-                          <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full">
-                            <Text className="text-black font-bold text-xs">
-                              Giảm {barDetail?.discount}%
-                            </Text>
-                          </View>
-                        )}
-
-                        {/* Table availability badge */}
-                        {barDetail && isOpenToday(barDetail.barTimeResponses) && (
-                          <View
-                            className={`px-2.5 py-1 rounded-full ${
-                              barDetail.isAnyTableAvailable
-                                ? "bg-green-500/90"
-                                : "bg-red-500/90"
-                            }`}
-                          >
-                            <Text className="text-white font-bold text-xs">
-                              {barDetail.isAnyTableAvailable
-                                ? "Còn bàn hôm nay"
-                                : "Hết bàn hôm nay"}
-                            </Text>
-                          </View>
-                        )}
+                        <ContentBadgeContainer
+                          distance={barDetail?.location?.distance}
+                          discount={barDetail?.discount || 0}
+                          isAvailable={barDetail?.isAnyTableAvailable || false}
+                          isOpen={barDetail ? isOpenToday(barDetail.barTimeResponses) : false}
+                        />
                       </View>
                     </View>
                   </Animated.View>
@@ -1412,7 +1549,7 @@ export default function BarDetailScreen() {
                         </Text>
                         <Text className="text-gray-500 text-sm text-center mt-2 max-w-[250px]">
                           Menu đang được cập nhật. Vui lòng quay lại sau hoặc
-                          liên hệ trực tiếp với quán để biết thêm chi tiết.
+                          liên hệ trực tiếp với quán để biết thm chi tiết.
                         </Text>
 
                         {/* Nút liên hệ */}

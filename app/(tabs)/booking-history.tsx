@@ -1075,7 +1075,109 @@ export default function BookingHistoryScreen() {
     return <GuestView />;
   }
 
-  return (
+  return Platform.OS === 'ios' ? (
+    // iOS Layout
+    <SafeAreaView className="flex-1 bg-black" edges={['top']}>
+      {/* Header và Search */}
+      <View className="px-4 pt-1 mb-4">
+        {/* Search và Filter */}
+        <View className="flex-row items-center space-x-3 mb-4">
+          <View className="flex-1 bg-neutral-900 rounded-full flex-row items-center h-9 px-3">
+            <Ionicons name="search" size={16} color="#9CA3AF" />
+            <TextInput
+              placeholder="Tìm theo ngày, giờ, mã đặt bàn..."
+              placeholderTextColor="#9CA3AF"
+              className="flex-1 ml-2 text-white text-sm"
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            {searchText !== '' && (
+              <TouchableOpacity onPress={() => setSearchText('')}>
+                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Filter button */}
+          <TouchableOpacity 
+            onPress={() => setShowFilterModal(true)}
+            className="h-9 w-9 rounded-full items-center justify-center bg-neutral-900"
+          >
+            <Ionicons name="filter" size={18} color="white" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Status Tabs */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          className="space-x-3"
+        >
+          <FilterTab
+            active={selectedStatus === 0}
+            label="Đang chờ"
+            count={statusCounts.pending}
+            onPress={() => setSelectedStatus(0)}
+          />
+          <FilterTab
+            active={selectedStatus === 2}
+            label="Đang phục vụ"
+            count={statusCounts.serving}
+            onPress={() => setSelectedStatus(2)}
+          />
+          <FilterTab
+            active={selectedStatus === 3}
+            label="Hoàn thành"
+            count={statusCounts.completed}
+            onPress={() => setSelectedStatus(3)}
+          />
+          <FilterTab
+            active={selectedStatus === 1}
+            label="Đã hủy"
+            count={statusCounts.cancelled}
+            onPress={() => setSelectedStatus(1)}
+          />
+        </ScrollView>
+      </View>
+
+      {/* Content */}
+      {loading && bookings.length === 0 ? (
+        <ScrollView className="flex-1 px-4">
+          <BookingSkeleton />
+          <BookingSkeleton />
+          <BookingSkeleton />
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={filteredBookings}
+          renderItem={renderBookingItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={{ 
+            padding: 16, 
+            paddingBottom: 100 // Tăng padding bottom cho iOS
+          }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              tintColor="#EAB308"
+            />
+          }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={5}
+          updateCellsBatchingPeriod={50}
+          windowSize={5}
+          initialNumToRender={5}
+          ListFooterComponent={ListFooterComponent}
+          ListEmptyComponent={ListEmptyComponent}
+        />
+      )}
+    </SafeAreaView>
+  ) : (
+    // Android Layout
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
         {/* Header và Search */}
@@ -1108,7 +1210,11 @@ export default function BookingHistoryScreen() {
           </View>
 
           {/* Status Tabs */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            className="space-x-3"
+          >
             <FilterTab
               active={selectedStatus === 0}
               label="Đang chờ"
@@ -1136,61 +1242,7 @@ export default function BookingHistoryScreen() {
           </ScrollView>
         </View>
 
-        <View className="h-[1px] bg-neutral-900" />
-
-        {/* Modal Filter */}
-        <Modal
-          visible={showFilterModal}
-          transparent
-          animationType="fade"
-          statusBarTranslucent
-          onRequestClose={() => setShowFilterModal(false)}
-        >
-          <TouchableOpacity 
-            activeOpacity={1}
-            onPress={() => setShowFilterModal(false)} 
-            className="flex-1 bg-black/50 justify-center items-center p-6"
-          >
-            <TouchableOpacity 
-              activeOpacity={1}
-              onPress={e => e.stopPropagation()}
-              className="bg-neutral-800 w-full rounded-2xl overflow-hidden"
-            >
-              <View className="p-4 border-b border-white/10">
-                <Text className="text-white text-lg font-bold text-center">
-                  Sắp xếp theo
-                </Text>
-              </View>
-
-              <TouchableOpacity 
-                onPress={() => handleFilterChange('createAt')}
-                className="flex-row items-center p-4 border-b border-white/10"
-              >
-                <View className="flex-1">
-                  <Text className="text-white font-medium">Ngày đặt bàn</Text>
-                  <Text className="text-white/60 text-sm">Sắp xếp theo thời gian tạo đơn</Text>
-                </View>
-                {filterBy === 'createAt' && (
-                  <Ionicons name="checkmark-circle" size={24} color="#EAB308" />
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                onPress={() => handleFilterChange('bookingTime')}
-                className="flex-row items-center p-4"
-              >
-                <View className="flex-1">
-                  <Text className="text-white font-medium">Ngày sử dụng</Text>
-                  <Text className="text-white/60 text-sm">Sắp xếp theo thời gian phục vụ</Text>
-                </View>
-                {filterBy === 'bookingTime' && (
-                  <Ionicons name="checkmark-circle" size={24} color="#EAB308" />
-                )}
-              </TouchableOpacity>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Modal>
-
+        {/* Content */}
         {loading && bookings.length === 0 ? (
           <ScrollView className="flex-1 px-4">
             <BookingSkeleton />
@@ -1202,7 +1254,10 @@ export default function BookingHistoryScreen() {
             data={filteredBookings}
             renderItem={renderBookingItem}
             keyExtractor={keyExtractor}
-            contentContainerStyle={{ padding: 16, paddingBottom: 72 }}
+            contentContainerStyle={{ 
+              padding: 16, 
+              paddingBottom: 72 // Giữ nguyên padding cho Android
+            }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl 
@@ -1213,7 +1268,6 @@ export default function BookingHistoryScreen() {
             }
             onEndReached={loadMore}
             onEndReachedThreshold={0.5}
-            // Thêm các prop để tối ưu hiệu suất
             removeClippedSubviews={true}
             maxToRenderPerBatch={5}
             updateCellsBatchingPeriod={50}

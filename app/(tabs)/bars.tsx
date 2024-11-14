@@ -9,6 +9,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { formatRating } from '@/utils/rating';
 import * as Location from 'expo-location';
 import { GoongLocation } from '@/services/goong';
+import { Platform } from 'react-native';
 
 // Thêm component BarSkeleton
 const BarSkeleton = () => (
@@ -342,7 +343,103 @@ export default function BarsScreen() {
 
   const keyExtractor = useCallback((item: Bar) => item.barId, []);
 
-  return (
+  return Platform.OS === 'ios' ? (
+    // iOS Layout
+    <SafeAreaView className="flex-1 bg-black" edges={['top']}>
+      {/* Header và Search */}
+      <View className="px-4 pt-1 flex-row items-center justify-between mb-4">
+        <View className="flex-row items-center flex-1">
+          <View className="flex-1 bg-neutral-900 rounded-full flex-row items-center h-9 px-3">
+            <Ionicons name="search" size={16} color="#9CA3AF" />
+            <TextInput
+              placeholder="Tìm kiếm quán Bar, địa chỉ quán Bar..."
+              placeholderTextColor="#9CA3AF"
+              className="flex-1 ml-2 text-white text-sm"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery !== '' && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Filter button */}
+        <TouchableOpacity
+          onPress={() => setShowOpenOnly(!showOpenOnly)}
+          className={`h-9 w-auto rounded-full items-center justify-center ml-3 px-3 ${
+            showOpenOnly ? 'bg-yellow-500' : 'bg-neutral-900'
+          }`}
+        >
+          <View className="flex-row items-center">
+            <Ionicons 
+              name={showOpenOnly ? "time" : "time-outline"} 
+              size={18} 
+              color={showOpenOnly ? "black" : "white"} 
+            />
+            <Text className={`ml-2 text-xs font-medium ${showOpenOnly ? 'text-black' : 'text-white'}`}>
+              {showOpenOnly ? 'Hôm nay' : 'Tất cả'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      <View className="h-[1px] bg-neutral-900" />
+
+      {/* Content */}
+      {isLoading ? (
+        <ScrollView 
+          className="flex-1" 
+          contentContainerStyle={{ padding: 16 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {[1, 2, 3].map((item) => (
+            <BarSkeleton key={item} />
+          ))}
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={getFilteredBars()}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          contentContainerStyle={{ 
+            padding: 16, 
+            paddingBottom: 100 // Tăng padding bottom cho iOS
+          }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+            />
+          }
+          ItemSeparatorComponent={() => <View className="h-4" />}
+          maxToRenderPerBatch={5}
+          windowSize={5}
+          removeClippedSubviews={true}
+          initialNumToRender={3}
+          ListEmptyComponent={() => (
+            <View className="flex-1 items-center justify-center py-20">
+              <Ionicons 
+                name={searchQuery ? "search" : "time-outline"} 
+                size={48} 
+                color="#EAB308" 
+              />
+              <Text className="text-white text-lg font-bold mt-4">
+                {searchQuery ? 'Không tìm thấy kết quả' : 'Không có quán bar nào đang mở cửa'}
+              </Text>
+              <Text className="text-white/60 text-center mt-2">
+                {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hãy thử lại vào thời điểm khác'}
+              </Text>
+            </View>
+          )}
+        />
+      )}
+    </SafeAreaView>
+  ) : (
+    // Android Layout
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1">
         {/* Header và Search */}
@@ -403,7 +500,10 @@ export default function BarsScreen() {
             data={getFilteredBars()}
             renderItem={renderItem}
             keyExtractor={keyExtractor}
-            contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
+            contentContainerStyle={{ 
+              padding: 16, 
+              paddingBottom: 16 // Giữ nguyên padding cho Android
+            }}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl 

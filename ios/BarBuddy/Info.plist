@@ -29,6 +29,7 @@
         <array>
           <string>com.fptu.barbuddy</string>
           <string>com.fptu.barbuddy</string>
+          <string>com.googleusercontent.apps.294668771815-0oslkkj1gg5sov5o7npbbf6beo7aknni</string>
         </array>
       </dict>
     </array>
@@ -45,6 +46,12 @@
     </dict>
     <key>NSCameraUsageDescription</key>
     <string>Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.</string>
+    <key>NSLocationAlwaysUsageDescription</key>
+    <string>Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
     <key>NSPhotoLibraryUsageDescription</key>
@@ -79,10 +86,5 @@
     <string>Dark</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
-    <key>RCTDevMenu</key>
-    <dict>
-      <key>enabled</key>
-      <true/>
-    </dict>
   </dict>
 </plist>

@@ -7,7 +7,8 @@ import {
   Image,
   ActivityIndicator,
   Modal,
-  FlatList 
+  FlatList,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useCallback, useEffect, useRef, createContext, memo, useContext } from 'react';
@@ -454,8 +455,9 @@ export default function EventScreen() {
       isEveryWeekEvent,
       setIsEveryWeekEvent
     }}>
-      <View className="flex-1 bg-black">
-        <SafeAreaView className="flex-1">
+      {Platform.OS === 'ios' ? (
+        // iOS Layout
+        <SafeAreaView className="flex-1 bg-black" edges={['top']}>
           {/* Header và Search */}
           <View className="px-4 pt-1 flex-row items-center justify-between mb-4">
             <TouchableOpacity 
@@ -549,7 +551,10 @@ export default function EventScreen() {
           <ScrollView 
             ref={scrollViewRef}
             className="flex-1"
-            contentContainerStyle={{ padding: 16 }}
+            contentContainerStyle={{ 
+              padding: 16,
+              paddingBottom: 32 // Thêm padding bottom cho iOS
+            }}
             showsVerticalScrollIndicator={false}
             onScroll={({ nativeEvent }) => {
               const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
@@ -603,7 +608,159 @@ export default function EventScreen() {
           <BarFilterModal />
           <EventTypeModal />
         </SafeAreaView>
-      </View>
+      ) : (
+        // Android Layout
+        <View className="flex-1 bg-black">
+          <SafeAreaView className="flex-1">
+            {/* Header và Search */}
+            <View className="px-4 pt-1 flex-row items-center justify-between mb-4">
+              <TouchableOpacity 
+                onPress={() => router.back()}
+                className="h-9 w-9 bg-neutral-900 rounded-full items-center justify-center mr-3"
+              >
+                <Ionicons name="arrow-back" size={18} color="white" />
+              </TouchableOpacity>
+
+              <View className="flex-row items-center flex-1">
+                <View className="flex-1 bg-neutral-900 rounded-full flex-row items-center h-9 px-3">
+                  <Ionicons name="search" size={16} color="#9CA3AF" />
+                  <TextInput
+                    placeholder="Tìm kiếm sự kiện..."
+                    placeholderTextColor="#9CA3AF"
+                    className="flex-1 ml-2 text-white text-sm"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                  />
+                  {searchQuery !== '' && (
+                    <TouchableOpacity onPress={() => setSearchQuery('')}>
+                      <Ionicons name="close-circle" size={16} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setIsStillFilter(prev => prev === 0 ? null : 0)}
+                className={`h-9 px-3 rounded-full items-center justify-center ml-3 flex-row ${
+                  isStillFilter === 0 ? 'bg-yellow-500' : 'bg-neutral-900'
+                }`}
+              >
+                <Ionicons 
+                  name={isStillFilter === 0 ? "time" : "time-outline"} 
+                  size={16} 
+                  color={isStillFilter === 0 ? "black" : "white"} 
+                />
+                <Text className={`ml-1 text-xs ${
+                  isStillFilter === 0 ? 'text-black' : 'text-white'
+                }`}>
+                  Đang diễn ra
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Thêm filter buttons */}
+            <View className="px-4 flex-row space-x-4 mb-4">
+              <TouchableOpacity
+                onPress={() => setShowBarModal(true)}
+                className={`flex-1 h-9 rounded-full items-center justify-center flex-row ${
+                  selectedBarId ? 'bg-yellow-500' : 'bg-neutral-900'
+                }`}
+              >
+                <Ionicons 
+                  name="business-outline" 
+                  size={16} 
+                  color={selectedBarId ? "black" : "white"} 
+                />
+                <Text className={`ml-2 text-xs ${
+                  selectedBarId ? 'text-black' : 'text-white'
+                }`}>
+                  {selectedBar?.barName || 'Chọn quán bar'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setShowEventTypeModal(true)}
+                className={`flex-1 h-9 rounded-full items-center justify-center flex-row ${
+                  isEveryWeekEvent !== null ? 'bg-yellow-500' : 'bg-neutral-900'
+                }`}
+              >
+                <Ionicons 
+                  name="calendar-outline" 
+                  size={16} 
+                  color={isEveryWeekEvent !== null ? "black" : "white"} 
+                />
+                <Text className={`ml-2 text-xs ${
+                  isEveryWeekEvent !== null ? 'text-black' : 'text-white'
+                }`}>
+                  {isEveryWeekEvent === 1 ? 'Hàng tuần' : 
+                   isEveryWeekEvent === 0 ? 'Theo ngày' : 
+                   'Loại sự kiện'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <View className="h-[1.5px] bg-neutral-900" />
+
+            {/* Content */}
+            <ScrollView 
+              ref={scrollViewRef}
+              className="flex-1"
+              contentContainerStyle={{ padding: 16 }}
+              showsVerticalScrollIndicator={false}
+              onScroll={({ nativeEvent }) => {
+                const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+                const paddingToBottom = 20;
+                const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= 
+                  contentSize.height - paddingToBottom;
+                  
+                if (isCloseToBottom && !loadingMore && !loading && currentPage < totalPages) {
+                  handleLoadMore();
+                }
+              }}
+              scrollEventThrottle={16}
+            >
+              {loading && !loadingMore ? (
+                // Loading skeleton
+                [...Array(4)].map((_, index) => (
+                  <View key={`skeleton-${index}`} className="mb-4">
+                    <View className="w-full h-[200px] bg-white/10 rounded-3xl" />
+                  </View>
+                ))
+              ) : events.length > 0 ? (
+                <>
+                  {events.map(renderEventItem)}
+                  
+                  {loadingMore && (
+                    <View className="py-4">
+                      <ActivityIndicator size="small" color="#EAB308" />
+                    </View>
+                  )}
+                  
+                  {currentPage >= totalPages && events.length > 0 && (
+                    <Text className="text-white/60 text-center py-4">
+                      Đã hiển thị tất cả sự kiện
+                    </Text>
+                  )}
+                </>
+              ) : (
+                <View className="flex-1 items-center justify-center py-20">
+                  <Ionicons name="calendar-outline" size={48} color="#EAB308" />
+                  <Text className="text-white text-lg font-bold mt-4">
+                    Không tìm thấy sự kiện nào
+                  </Text>
+                  <Text className="text-white/60 text-center mt-2">
+                    {searchQuery ? 'Thử tìm kiếm với từ khóa khác' : 'Hiện tại chưa có sự kiện nào'}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+
+            {/* Render modals */}
+            <BarFilterModal />
+            <EventTypeModal />
+          </SafeAreaView>
+        </View>
+      )}
     </EventContext.Provider>
   );
 }

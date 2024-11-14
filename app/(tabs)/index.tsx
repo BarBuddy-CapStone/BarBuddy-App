@@ -7,7 +7,7 @@ import { barService, type Bar } from '@/services/bar';
 import { Link, router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { Dimensions } from 'react-native';
+import { Dimensions, Platform } from 'react-native';
 import { formatRating } from '@/utils/rating';
 import { eventService, type Event } from '@/services/event';
 import { format } from 'date-fns';
@@ -132,7 +132,7 @@ const DiscountBadge = memo(({ discount }: { discount: number }) => {
   );
 });
 
-// Tối ưu BarItem với useMemo và memo chặt chẽ hơn
+// Tối ưu BarItem với memo và useMemo
 const BarItem = memo(({ 
   bar, 
   onPress,
@@ -141,13 +141,44 @@ const BarItem = memo(({
   getAverageRating,
   loadingDistances 
 }: BarItemProps) => {
-  // Tính toán các giá trị phức tạp một lần
+  // Tách các tính toán phức tạp ra khỏi render cycle
   const memoizedValues = useMemo(() => ({
     isOpen: isBarOpen(bar.barTimeResponses),
     dayTime: getCurrentDayTime(bar.barTimeResponses),
     rating: getAverageRating(bar.feedBacks),
-    mainImage: bar.images.split(',')[0].trim()
-  }), [bar.barTimeResponses, bar.feedBacks, bar.images, getCurrentDayTime, isBarOpen, getAverageRating]);
+    mainImage: bar.images.split(',')[0].trim(),
+    distance: bar.location?.distance,
+    isAvailable: bar.isAnyTableAvailable,
+    discount: bar.discount
+  }), [
+    bar.barTimeResponses,
+    bar.feedBacks,
+    bar.images,
+    bar.location?.distance,
+    bar.isAnyTableAvailable,
+    bar.discount,
+    getCurrentDayTime,
+    isBarOpen,
+    getAverageRating
+  ]);
+
+  // Tách các component con để tránh re-render không cần thiết
+  const renderBadges = useMemo(() => (
+    <View className="absolute top-4 w-full flex-row justify-between px-4">
+      <View className="flex flex-col items-start space-y-2">
+        {memoizedValues.isOpen && (
+          <StatusBadge isAvailable={memoizedValues.isAvailable} />
+        )}
+        <View className="self-start">
+          <DistanceBadge 
+            distance={memoizedValues.distance} 
+            loading={loadingDistances} 
+          />
+        </View>
+      </View>
+      <DiscountBadge discount={memoizedValues.discount} />
+    </View>
+  ), [memoizedValues, loadingDistances]);
 
   return (
     <TouchableOpacity 
@@ -162,22 +193,7 @@ const BarItem = memo(({
           resizeMode="cover"
         />
         
-        {/* Badges Container */}
-        <View className="absolute top-4 w-full flex-row justify-between px-4">
-          <View className="flex flex-col items-start space-y-2">
-            {memoizedValues.isOpen && (
-              <StatusBadge isAvailable={bar.isAnyTableAvailable} />
-            )}
-            <View className="self-start">
-              <DistanceBadge 
-                distance={bar.location?.distance} 
-                loading={loadingDistances} 
-              />
-            </View>
-          </View>
-          
-          <DiscountBadge discount={bar.discount} />
-        </View>
+        {renderBadges}
 
         <LinearGradient
           colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
@@ -215,14 +231,16 @@ const BarItem = memo(({
     </TouchableOpacity>
   );
 }, (prevProps, nextProps) => {
-  // Kiểm tra sâu hơn để tránh re-render không cần thiết
+  // Tối ưu điều kiện re-render
   return (
     prevProps.bar.barId === nextProps.bar.barId &&
     prevProps.loadingDistances === nextProps.loadingDistances &&
     prevProps.bar.location?.distance === nextProps.bar.location?.distance &&
     prevProps.bar.isAnyTableAvailable === nextProps.bar.isAnyTableAvailable &&
     prevProps.bar.discount === nextProps.bar.discount &&
-    JSON.stringify(prevProps.bar.barTimeResponses) === JSON.stringify(nextProps.bar.barTimeResponses)
+    prevProps.bar.barTimeResponses === nextProps.bar.barTimeResponses && // So sánh reference thay vì stringify
+    prevProps.bar.images === nextProps.bar.images &&
+    prevProps.bar.feedBacks === nextProps.bar.feedBacks
   );
 });
 
@@ -580,9 +598,10 @@ export default function HomeScreen() {
     }
   }, [fetchBars, fetchEvents]);
 
-  return (
+  return Platform.OS === 'ios' ? (
+    // iOS Layout
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1">
+      <SafeAreaView className="flex-1" edges={['top']}>
         {/* Header */}
         <View className="px-6 py-4 border-b border-white/10">
           <View className="flex-row items-center justify-between">
@@ -601,6 +620,9 @@ export default function HomeScreen() {
         {/* Content */}
         <ScrollView 
           className="flex-1"
+          contentContainerStyle={{
+            paddingBottom: 100 // Tăng padding bottom cho iOS
+          }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
@@ -687,9 +709,120 @@ export default function HomeScreen() {
               </Animated.View>
             ) : null}
           </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  ) : (
+    // Android Layout
+    <View className="flex-1 bg-black">
+      <SafeAreaView className="flex-1">
+        {/* Header */}
+        <View className="px-6 py-4 border-b border-white/10">
+          <View className="flex-row items-center justify-between">
+            <View>
+              <Text className="text-white/60">Xin chào 👋</Text>
+              <Text className="text-yellow-500 text-xl font-bold">
+                {user?.fullname || 'Khách'}
+              </Text>
+            </View>
+            <TouchableOpacity className="w-10 h-10 items-center justify-center rounded-full bg-white/10">
+              <Ionicons name="notifications-outline" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-          {/* Thêm view trống ở cuối */}
-          <View style={{ height: 80 }} />
+        {/* Content */}
+        <ScrollView 
+          className="flex-1"
+          contentContainerStyle={{
+            paddingBottom: 80 // Giữ nguyên padding cho Android
+          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {/* Banner Section */}
+          <BannerSlider />
+
+          {/* Bars Section */}
+          <View className="mt-4 pb-4">
+            <View className="flex-row justify-between items-center px-6 mb-4">
+              <Text className="text-white text-xl font-bold">
+                Hệ Thống Quán Bar
+              </Text>
+              <Link href="/(tabs)/bars" asChild>
+                <TouchableOpacity>
+                  <Text className="text-yellow-500">Tất cả</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+
+            {fetchingBars ? (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24 }}
+              >
+                {[1,2,3].map(i => <BarSkeleton key={i} />)}
+              </ScrollView>
+            ) : (
+              <Animated.View entering={FadeIn}>
+                <FlatList
+                  horizontal
+                  data={bars}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 24 }}
+                  ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+                  renderItem={renderBarItem}
+                  keyExtractor={keyExtractor}
+                  maxToRenderPerBatch={3}
+                  windowSize={3}
+                  removeClippedSubviews={true}
+                  initialNumToRender={2}
+                  updateCellsBatchingPeriod={50}
+                  getItemLayout={(data, index) => ({
+                    length: 288,
+                    offset: 288 * index,
+                    index,
+                  })}
+                />
+              </Animated.View>
+            )}
+          </View>
+
+          {/* Events Section */}
+          <View className="mt-4 pb-4">
+            <View className="flex-row justify-between items-center px-6 mb-4">
+              <Text className="text-white text-xl font-bold">
+                {eventSectionTitle}
+              </Text>
+              <TouchableOpacity onPress={() => router.push('/event/event' as any)}>
+                <Text className="text-yellow-500">Tất cả</Text>
+              </TouchableOpacity>
+            </View>
+
+            {loadingEvents ? (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ paddingHorizontal: 24 }}
+              >
+                {[1,2,3].map(i => <EventSkeleton key={i} />)}
+              </ScrollView>
+            ) : events.length > 0 ? (
+              <Animated.View entering={FadeIn}>
+                <FlatList
+                  horizontal
+                  data={events}
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 24 }}
+                  ItemSeparatorComponent={() => <View style={{ width: 16 }} />}
+                  renderItem={({ item }) => <EventItem event={item} />}
+                  keyExtractor={(item) => item.eventId}
+                />
+              </Animated.View>
+            ) : null}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </View>

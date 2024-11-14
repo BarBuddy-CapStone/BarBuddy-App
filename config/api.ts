@@ -1,10 +1,12 @@
-import { API_URL, API_TIMEOUT } from '@env';
+import Constants from 'expo-constants';
+
+const { apiUrl, apiTimeout } = Constants.expoConfig?.extra || {};
 
 export const API_CONFIG = {
-  BASE_URL: API_URL,
-  TIMEOUT: parseInt(API_TIMEOUT, 10),
+  BASE_URL: apiUrl,
+  TIMEOUT: parseInt(apiTimeout || '10000', 10),
 };
 
-if (!API_URL) {
+if (!apiUrl) {
   console.warn('API_URL không được định nghĩa trong file .env');
 }

@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuth } from '@/contexts/AuthContext';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -23,7 +24,11 @@ export default function OnboardingScreen() {
 
   const requestPermissions = async () => {
     try {
-      // Xin quyền truy cập vị trí khi sử dụng
+      // Kiểm tra xem người dùng đã từ chối quyền chưa
+      const hasDeclinedPermission = await AsyncStorage.getItem('hasDeclinedLocationPermission');
+      if (hasDeclinedPermission) return;
+
+      // Xin quyền truy cập vị trí
       const foregroundPermission = await Location.requestForegroundPermissionsAsync();
       
       if (foregroundPermission.status !== 'granted') {
@@ -32,14 +37,8 @@ export default function OnboardingScreen() {
           'Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.',
           [{ text: 'OK' }]
         );
-      }
-
-      // Nếu là Android, xin thêm quyền truy cập vị trí trong nền
-      if (Platform.OS === 'android') {
-        const backgroundPermission = await Location.requestBackgroundPermissionsAsync();
-        if (backgroundPermission.status !== 'granted') {
-          console.log('Quyền truy cập vị trí trong nền bị từ chối');
-        }
+        // Chỉ lưu trạng thái khi người dùng từ chối
+        await AsyncStorage.setItem('hasDeclinedLocationPermission', 'true');
       }
     } catch (error) {
       console.error('Lỗi khi xin quyền truy cập vị trí:', error);

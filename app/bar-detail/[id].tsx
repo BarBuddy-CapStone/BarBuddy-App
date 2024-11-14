@@ -32,6 +32,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { formatRating } from '@/utils/rating';
 import * as Location from 'expo-location';
 import { GoongLocation } from '@/services/goong';
+import { eventService, type Event } from "@/services/event";
+import { format } from "date-fns";
 
 // Thêm hàm xử lý images
 const getImageArray = (imagesString: string): string[] => {
@@ -808,28 +810,66 @@ const AuthModal = ({
 // Đặt ASPECT_RATIO là constant ở đầu file, ngoài component
 const ASPECT_RATIO = 1.5; // Giữ tỷ lệ 1.5 cho tất cả ảnh
 
-// Cập nhật DistanceBadge với style mới cho header
+// Cập nhật DistanceBadge với style mi cho header
 const DistanceBadge = memo(({ 
   distance,
-  variant = 'default'
+  variant = 'default',
+  locationPermission
 }: { 
   distance?: number,
-  variant?: 'default' | 'compact' 
+  variant?: 'default' | 'compact',
+  locationPermission?: 'granted' | 'denied'
 }) => {
+  // Nếu không có quyền truy cập vị trí, không hiển thị badge
+  if (locationPermission !== 'granted') return null;
+
   const [isLoading, setIsLoading] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
   const translateX = useSharedValue(-100);
+  const timeoutRef = useRef<NodeJS.Timeout>();
 
   useEffect(() => {
+    // Reset loading state và start timeout khi distance thay đổi
+    setIsLoading(true);
+    
+    // Clear timeout cũ nếu có
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    // Set timeout mới
+    timeoutRef.current = setTimeout(() => {
+      if (isLoading && retryCount < 3) { // Cho phép retry tối đa 3 lần
+        setRetryCount(prev => prev + 1);
+        setIsLoading(true);
+      } else if (retryCount >= 3) {
+        setIsLoading(false); // Ngừng loading sau 3 lần retry
+      }
+    }, 5000);
+
+    // Nếu có distance, dừng loading
     if (distance !== undefined) {
       setIsLoading(false);
+      setRetryCount(0);
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
     }
-    
+
+    // Animation loading
     translateX.value = withRepeat(
       withTiming(100, { duration: 1000 }),
       -1,
       false
     );
-  }, [distance]);
+
+    // Cleanup
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [distance, retryCount]);
 
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -879,15 +919,21 @@ const HeaderBadgeContainer = memo(({
   distance,
   discount,
   isAvailable,
-  isOpen
+  isOpen,
+  locationPermission
 }: { 
   distance?: number,
   discount: number,
   isAvailable: boolean,
-  isOpen: boolean
+  isOpen: boolean,
+  locationPermission?: 'granted' | 'denied'
 }) => (
   <View className="flex-row items-center ml-1">
-    <DistanceBadge distance={distance} variant="compact" />
+    <DistanceBadge 
+      distance={distance} 
+      variant="compact" 
+      locationPermission={locationPermission}
+    />
     
     <View className="flex-row items-center space-x-1 ml-1">
       {/* Discount Badge */}
@@ -916,15 +962,20 @@ const ContentBadgeContainer = memo(({
   distance,
   discount,
   isAvailable,
-  isOpen
+  isOpen,
+  locationPermission
 }: { 
   distance?: number,
   discount: number,
   isAvailable: boolean,
-  isOpen: boolean
+  isOpen: boolean,
+  locationPermission?: 'granted' | 'denied'
 }) => (
   <View className="flex-row items-center ml-4">
-    <DistanceBadge distance={distance} />
+    <DistanceBadge 
+      distance={distance} 
+      locationPermission={locationPermission}
+    />
     
     <View className="flex-row items-center space-x-2 ml-2">
       {/* Discount Badge */}
@@ -947,6 +998,27 @@ const ContentBadgeContainer = memo(({
     </View>
   </View>
 ));
+
+const formatTime = (time: string) => {
+  // Đảm bảo giờ luôn có 2 chữ số
+  const [hours, minutes] = time.split(':');
+  return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+};
+
+const formatEventTime = (eventTimes: Event['eventTimeResponses']) => {
+  if (!eventTimes || eventTimes.length === 0) return '';
+  
+  const time = eventTimes[0];
+  const formattedStartTime = formatTime(time.startTime);
+  const formattedEndTime = formatTime(time.endTime);
+
+  if (time.dayOfWeek !== null) {
+    return `T${time.dayOfWeek === 0 ? 'CN' : time.dayOfWeek + 1} hàng tuần, ${formattedStartTime} - ${formattedEndTime}`;
+  } else if (time.date) {
+    return `${format(new Date(time.date), 'dd/MM/yyyy')}, ${formattedStartTime} - ${formattedEndTime}`;
+  }
+  return `${formattedStartTime} - ${formattedEndTime}`;
+};
 
 // 2. Component chính
 export default function BarDetailScreen() {
@@ -1198,11 +1270,16 @@ export default function BarDetailScreen() {
   // Thêm state quản lý vị trí người dùng
   const [userLocation, setUserLocation] = useState<GoongLocation | null>(null);
   
-  // Thêm useEffect để lấy vị trí người dùng
+  // Thêm state cho quyền truy cập vị trí
+  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied'>('denied');
+  
+  // Sửa lại useEffect để kiểm tra quyền
   useEffect(() => {
     const getUserLocation = async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        const { status } = await Location.getForegroundPermissionsAsync();
+        setLocationPermission(status as 'granted' | 'denied');
+        
         if (status === 'granted') {
           const location = await Location.getCurrentPositionAsync({});
           setUserLocation({
@@ -1227,6 +1304,50 @@ export default function BarDetailScreen() {
     };
     fetchBarDetail();
   }, [id, userLocation]);
+
+  // Thêm states cho events
+  const [events, setEvents] = useState<Event[]>([]);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+
+  // Thêm state cho title
+  const [eventSectionTitle, setEventSectionTitle] = useState('Sự kiện');
+
+  // Sửa lại useEffect fetch events
+  useEffect(() => {
+    const fetchEvents = async () => {
+      if (!id) return;
+      setLoadingEvents(true);
+      try {
+        // Đầu tiên thử lấy các sự kiện đang diễn ra (isStill = 0)
+        const currentEvents = await eventService.getEvents({
+          barId: id,
+          isStill: 0,
+          pageIndex: 1,
+          pageSize: 10
+        });
+
+        if (currentEvents.events.length > 0) {
+          setEvents(currentEvents.events);
+          setEventSectionTitle('Sự kiện đang diễn ra');
+        } else {
+          // Nếu không có sự kiện đang diễn ra, lấy tất cả sự kiện
+          const allEvents = await eventService.getEvents({
+            barId: id,
+            pageIndex: 1,
+            pageSize: 10
+          });
+          setEvents(allEvents.events);
+          setEventSectionTitle('Sự kiện');
+        }
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      } finally {
+        setLoadingEvents(false);
+      }
+    };
+
+    fetchEvents();
+  }, [id]);
 
   return (
     <View className="flex-1 bg-black">
@@ -1275,6 +1396,7 @@ export default function BarDetailScreen() {
                       discount={barDetail?.discount || 0}
                       isAvailable={barDetail?.isAnyTableAvailable || false}
                       isOpen={barDetail ? isOpenToday(barDetail.barTimeResponses) : false}
+                      locationPermission={locationPermission}
                     />
                   </View>
                 </Animated.View>
@@ -1373,6 +1495,7 @@ export default function BarDetailScreen() {
                           discount={barDetail?.discount || 0}
                           isAvailable={barDetail?.isAnyTableAvailable || false}
                           isOpen={barDetail ? isOpenToday(barDetail.barTimeResponses) : false}
+                          locationPermission={locationPermission}
                         />
                       </View>
                     </View>
@@ -1518,6 +1641,80 @@ export default function BarDetailScreen() {
                       </SafeAreaView>
                     )}
                   />
+
+                  {/* Events Section */}
+    <View>
+      <Text className="text-white text-lg font-bold mb-4">
+        {eventSectionTitle}
+      </Text>
+      
+      {loadingEvents ? (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+        >
+          {[1,2,3].map(i => (
+            <View key={i} className="w-72 h-[180px] bg-neutral-900 rounded-xl mr-4 animate-pulse" />
+          ))}
+        </ScrollView>
+      ) : events.length > 0 ? (
+        <FlatList
+          horizontal
+          data={events}
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item: event }) => (
+            <TouchableOpacity 
+              className="w-72 mr-4"
+              activeOpacity={0.7}
+              onPress={() => router.push(`/event-detail/${event.eventId}` as any)}
+            >
+              <Image
+                source={{ uri: event.images.split(',')[0] }}
+                className="w-full h-[180px] rounded-xl"
+                resizeMode="cover"
+              />
+              <LinearGradient
+                colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
+                className="absolute bottom-0 left-0 right-0 h-32 rounded-b-xl"
+              >
+                <View className="absolute bottom-0 p-4 w-full">
+                  <Text 
+                    numberOfLines={1}
+                    style={{ lineHeight: 24 }}
+                    className="text-yellow-500 text-lg font-bold mb-2"
+                  >
+                    {event.eventName}
+                  </Text>
+                  <View className="flex-row items-center mb-2">
+                    <Ionicons name="time-outline" size={14} color="#9CA3AF" />
+                    <Text 
+                      numberOfLines={1}
+                      style={{ lineHeight: 16 }}
+                      className="text-gray-400 text-xs ml-1 flex-1"
+                    >
+                      {formatEventTime(event.eventTimeResponses)}
+                    </Text>
+                  </View>
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+          keyExtractor={(item) => item.eventId}
+        />
+      ) : (
+        <View className="bg-neutral-900 rounded-xl p-6 items-center">
+          <View className="bg-neutral-800 p-4 rounded-full mb-4">
+            <Ionicons name="calendar-outline" size={40} color="#9CA3AF" />
+          </View>
+          <Text className="text-gray-300 text-lg font-medium text-center">
+            Chưa có sự kiện nào
+          </Text>
+          <Text className="text-gray-500 text-sm text-center mt-2">
+            Quán chưa có sự kiện nào được tổ chức
+          </Text>
+        </View>
+      )}
+    </View>
 
                   {/* Drinks */}
                   <View className="mt-8">

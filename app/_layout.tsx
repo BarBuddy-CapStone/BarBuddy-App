@@ -4,6 +4,7 @@ import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuth, AuthProvider } from '@/contexts/AuthContext';
+import { LocationProvider } from '@/contexts/LocationContext';
 import { View, Linking } from 'react-native';
 
 // Giữ splash screen hiển thị
@@ -135,7 +136,9 @@ export default function RootLayout() {
   return (
     <View style={{ flex: 1, backgroundColor: 'black' }}>
       <AuthProvider>
-        <LoadingLayout loaded={loaded} />
+        <LocationProvider>
+          <LoadingLayout loaded={loaded} />
+        </LocationProvider>
       </AuthProvider>
     </View>
   );

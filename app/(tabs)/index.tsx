@@ -12,8 +12,8 @@ import { formatRating } from '@/utils/rating';
 import { eventService, type Event } from '@/services/event';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import * as Location from 'expo-location';
-import { GoongLocation } from '@/services/goong';
+import { useFocusEffect } from '@react-navigation/native';
+import { useLocation } from '@/contexts/LocationContext';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -145,7 +145,7 @@ const BarItem = memo(({
   const memoizedValues = useMemo(() => ({
     isOpen: isBarOpen(bar.barTimeResponses),
     dayTime: getCurrentDayTime(bar.barTimeResponses),
-    rating: getAverageRating(bar.feedBacks),
+    rating: formatRating(getAverageRating(bar.feedBacks)),
     mainImage: bar.images.split(',')[0].trim(),
     distance: bar.location?.distance,
     isAvailable: bar.isAnyTableAvailable,
@@ -200,12 +200,20 @@ const BarItem = memo(({
           className="absolute bottom-0 left-0 right-0 h-40 rounded-b-3xl"
         >
           <View className="absolute bottom-0 p-5 w-full">
-            <Text className="text-white text-xl font-bold mb-2" numberOfLines={1}>
+            <Text 
+              className="text-yellow-500 text-xl font-bold mb-2" 
+              numberOfLines={1}
+              style={{ lineHeight: 24 }}
+            >
               {bar.barName}
             </Text>
             <View className="flex-row items-center mb-2">
               <Ionicons name="location-outline" size={14} color="#9CA3AF" />
-              <Text className="text-gray-400 text-xs ml-1 flex-1" numberOfLines={1}>
+              <Text 
+                className="text-gray-400 text-xs ml-1 flex-1" 
+                numberOfLines={1}
+                style={{ lineHeight: 16 }}
+              >
                 {bar.address}
               </Text>
             </View>
@@ -217,10 +225,10 @@ const BarItem = memo(({
                 </Text>
               </View>
               {memoizedValues.rating !== null && (
-                <View className="flex-row items-center">
+                <View className="flex-row items-center space-x-2">
                   <Ionicons name="star" size={14} color="#EAB308" />
-                  <Text className="text-yellow-500 text-xs ml-1">
-                    {memoizedValues.rating.toFixed(1)}
+                  <Text className="text-white text-xs">
+                    {memoizedValues.rating}
                   </Text>
                 </View>
               )}
@@ -293,16 +301,18 @@ const EventItem = memo(({ event }: EventItemProps) => {
         >
           <View className="absolute bottom-0 p-4 w-full">
             <Text 
-              numberOfLines={1} 
               className="text-yellow-500 text-lg font-bold mb-2"
+              numberOfLines={1}
+              style={{ lineHeight: 24 }}
             >
               {event.eventName}
             </Text>
             <View className="flex-row items-center mb-2">
               <Ionicons name="business-outline" size={14} color="#9CA3AF" />
               <Text 
-                numberOfLines={1}
                 className="text-gray-400 text-xs ml-1 flex-1"
+                numberOfLines={1}
+                style={{ lineHeight: 16 }}
               >
                 {event.barName}
               </Text>
@@ -322,6 +332,7 @@ const EventItem = memo(({ event }: EventItemProps) => {
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { userLocation, locationPermission, checkAndGetLocation, setUserLocation } = useLocation();
   const [bars, setBars] = useState<Bar[]>([]);
   const [barsWithLocation, setBarsWithLocation] = useState<Bar[]>([]);
   const [fetchingBars, setFetchingBars] = useState(true);
@@ -334,7 +345,6 @@ export default function HomeScreen() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
   const [eventSectionTitle, setEventSectionTitle] = useState('Sự kiện đang diễn ra');
-  const [userLocation, setUserLocation] = useState<GoongLocation | null>(null);
   const [loadingDistances, setLoadingDistances] = useState(false);
 
   const fetchBars = useCallback(async () => {
@@ -372,9 +382,31 @@ export default function HomeScreen() {
     }
   }, [bars, userLocation]);
 
+  // Thêm useEffect riêng cho fetchEvents
+  useEffect(() => {
+    fetchEvents();
+  }, []); // Chỉ chạy 1 lần khi mount
+
   useEffect(() => {
     fetchBars();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const autoCheckLocation = async () => {
+        try {
+          const location = await checkAndGetLocation();
+          if (location && bars.length > 0) {
+            calculateDistances();
+          }
+        } catch (error) {
+          console.error('Error checking location:', error);
+        }
+      };
+      
+      autoCheckLocation();
+    }, [bars])
+  );
 
   useEffect(() => {
     if (bars.length > 0 && userLocation && !fetchingBars) {
@@ -409,32 +441,6 @@ export default function HomeScreen() {
       setLoadingEvents(false);
     }
   }, []);
-
-  const getUserLocation = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.log('Permission denied');
-        return;
-      }
-
-      const location = await Location.getCurrentPositionAsync({});
-      setUserLocation({
-        lat: location.coords.latitude,
-        lng: location.coords.longitude
-      });
-    } catch (error) {
-      console.error('Error getting location:', error);
-    }
-  };
-
-  useEffect(() => {
-    getUserLocation();
-  }, []);
-
-  useEffect(() => {
-    fetchEvents();
-  }, [fetchEvents]);
 
   const getAverageRating = (feedBacks: Array<{rating: number}>) => {
     if (!feedBacks.length) return null;

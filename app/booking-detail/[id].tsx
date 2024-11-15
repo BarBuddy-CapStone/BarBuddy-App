@@ -343,16 +343,21 @@ export default function BookingDetailScreen() {
     },
   });
 
+  const HEADER_SCROLL_DISTANCE = 200;
+
+  // Thêm animated style cho border
   const headerAnimatedStyle = useAnimatedStyle(() => {
-    const backgroundColor = interpolate(
+    const opacity = interpolate(
       scrollY.value,
-      [0, 100],
-      [0, 1],
-      { extrapolateRight: Extrapolation.CLAMP }
+      [0, HEADER_SCROLL_DISTANCE - 100, HEADER_SCROLL_DISTANCE],
+      [0, 0, 1],
+      Extrapolation.CLAMP
     );
 
     return {
-      backgroundColor: `rgba(0, 0, 0, ${backgroundColor})`,
+      backgroundColor: `rgba(0, 0, 0, ${opacity})`,
+      borderBottomWidth: opacity === 1 ? 1.5 : 0, // Chỉ hiện border khi opacity = 1
+      borderBottomColor: '#171717', // neutral-900
     };
   });
 

@@ -1,7 +1,7 @@
-import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator} from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, FlatList } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { eventService, type EventDetail } from '@/services/event';
@@ -10,7 +10,44 @@ import { vi } from 'date-fns/locale';
 import Toast from 'react-native-toast-message';
 import * as Clipboard from 'expo-clipboard';
 import { toastConfig, showToast } from '@/components/CustomToast';
+import ImageView from 'react-native-image-viewing';
+import React from 'react';
 
+// Tách GalleryItem component
+const GalleryItem = React.memo(({ 
+  item, 
+  index, 
+  screenWidth, 
+  onPress 
+}: { 
+  item: string;
+  index: number;
+  screenWidth: number;
+  onPress: (index: number) => void;
+}) => (
+  <TouchableOpacity
+    activeOpacity={0.9}
+    onPress={() => onPress(index)}
+    style={{
+      width: screenWidth - 88,
+      height: ((screenWidth - 88) * 9) / 16,
+    }}
+  >
+    <Image
+      source={{ uri: item }}
+      style={{
+        width: '100%',
+        height: '100%'
+      }}
+      resizeMode="cover"
+    />
+    <View className="absolute inset-0 bg-black/10 rounded-xl items-center justify-center">
+      <View className="bg-black/30 rounded-full p-2">
+        <Ionicons name="expand-outline" size={20} color="white" />
+      </View>
+    </View>
+  </TouchableOpacity>
+));
 
 // Thêm EventSkeleton component
 const EventSkeleton = () => (
@@ -66,6 +103,10 @@ export default function EventDetailScreen() {
   const { id } = useLocalSearchParams();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const screenWidth = Dimensions.get('window').width;
+  const [isImageViewVisible, setIsImageViewVisible] = useState(false);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   useEffect(() => {
     const fetchEventDetail = async () => {
@@ -113,6 +154,37 @@ export default function EventDetailScreen() {
       );
     }
   };
+
+  // Cache danh sách ảnh
+  const images = useMemo(() => {
+    if (!event?.images) return [];
+    return event.images.split(',').map(img => img.trim());
+  }, [event?.images]);
+
+  // Cache imageViewImages
+  const imageViewImages = useMemo(() => {
+    return images.map(img => ({
+      uri: img
+    }));
+  }, [images]);
+
+  // Tối ưu các callbacks
+  const handleImagePress = useCallback((index: number) => {
+    setSelectedImageIndex(index);
+    setIsImageViewVisible(true);
+  }, []);
+
+  const handleScroll = useCallback((e: any) => {
+    const newIndex = Math.round(
+      e.nativeEvent.contentOffset.x / (screenWidth - 88)
+    );
+    if (newIndex !== currentImageIndex) {
+      setCurrentImageIndex(newIndex);
+    }
+  }, [currentImageIndex, screenWidth]);
+
+  const keyExtractor = useCallback((item: string, index: number) => 
+    `gallery-${index}`, []);
 
   if (loading) {
     return <EventSkeleton />;
@@ -216,6 +288,60 @@ export default function EventDetailScreen() {
             </Text>
           </View>
 
+          {/* Gallery */}
+          <View className="bg-neutral-900 rounded-3xl p-5 mb-6">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="flex-row items-center">
+                <View className="h-10 w-10 bg-yellow-500 rounded-full items-center justify-center">
+                  <Ionicons name="images" size={20} color="black" />
+                </View>
+                <Text className="text-white text-lg font-bold ml-3">
+                  Hình ảnh sự kiện
+                </Text>
+              </View>
+            </View>
+
+            <View className="bg-neutral-800 rounded-2xl overflow-hidden">
+              <FlatList
+                data={images}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={screenWidth - 88}
+                decelerationRate="fast"
+                maxToRenderPerBatch={3}
+                windowSize={3}
+                initialNumToRender={2}
+                removeClippedSubviews={true}
+                onScroll={handleScroll}
+                scrollEventThrottle={16}
+                renderItem={({ item, index }) => (
+                  <GalleryItem
+                    item={item}
+                    index={index}
+                    screenWidth={screenWidth}
+                    onPress={handleImagePress}
+                  />
+                )}
+                keyExtractor={keyExtractor}
+              />
+
+              {/* Pagination dots */}
+              <View className="absolute bottom-4 w-full flex-row justify-center space-x-2">
+                {images.map((_, index) => (
+                  <View
+                    key={index}
+                    className={`w-2 h-2 rounded-full ${
+                      index === currentImageIndex
+                        ? "bg-yellow-500"
+                        : "bg-white/50"
+                    }`}
+                  />
+                ))}
+              </View>
+            </View>
+          </View>
+
           {/* Voucher Section */}
           {event.eventVoucherResponse && (
             <View className="bg-neutral-900 rounded-3xl p-5">
@@ -254,6 +380,34 @@ export default function EventDetailScreen() {
 
       {/* Cập nhật Toast Container với config */}
       <Toast config={toastConfig} />
+
+      {/* Image Viewer Modal */}
+      <ImageView
+        images={imageViewImages}
+        imageIndex={selectedImageIndex}
+        visible={isImageViewVisible}
+        onRequestClose={() => setIsImageViewVisible(false)}
+        swipeToCloseEnabled={true}
+        doubleTapToZoomEnabled={true}
+        presentationStyle="overFullScreen"
+        animationType="fade"
+        keyExtractor={(_, index) => `image-${index}`}
+        HeaderComponent={({ imageIndex }) => (
+          <SafeAreaView edges={["top"]}>
+            <View className="w-full flex-row justify-between items-center px-4 py-2 mt-16">
+              <TouchableOpacity
+                onPress={() => setIsImageViewVisible(false)}
+                className="bg-black/50 rounded-full p-2"
+              >
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
+              <Text className="text-white font-bold">
+                {imageIndex + 1} / {imageViewImages.length}
+              </Text>
+            </View>
+          </SafeAreaView>
+        )}
+      />
     </View>
   );
 }

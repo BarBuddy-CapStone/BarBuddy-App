@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { barService, type CustomerBar } from '@/services/bar';
+import { useLocalSearchParams } from 'expo-router';
 
 const LoadingSpinner = () => (
   <View className="py-4 items-center">
@@ -290,6 +291,18 @@ const EventTypeModal = memo(() => {
 });
 
 export default function EventScreen() {
+  const params = useLocalSearchParams();
+  
+  useEffect(() => {
+    if (params.preSelectedBarId && params.preSelectedBarName) {
+      setSelectedBarId(params.preSelectedBarId as string);
+      setSelectedBar({
+        barId: params.preSelectedBarId as string,
+        barName: params.preSelectedBarName as string
+      } as CustomerBar);
+    }
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);

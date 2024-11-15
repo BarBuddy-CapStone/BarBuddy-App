@@ -29,9 +29,9 @@ import { drinkService, type Drink, DrinkCategory } from "@/services/drink";
 import ImageView from "react-native-image-viewing";
 import Modal from "react-native-modal";
 import { useAuth } from "@/contexts/AuthContext";
-import { formatRating } from '@/utils/rating';
-import * as Location from 'expo-location';
-import { GoongLocation } from '@/services/goong';
+import { formatRating } from "@/utils/rating";
+import * as Location from "expo-location";
+import { GoongLocation } from "@/services/goong";
 import { eventService, type Event } from "@/services/event";
 import { format } from "date-fns";
 
@@ -261,16 +261,16 @@ const isOpenToday = (barTimes: BarDetail["barTimeResponses"]) => {
 const FeedbackItem = memo(
   ({ feedback }: { feedback: BarDetail["feedBacks"][0] }) => {
     const [imageError, setImageError] = useState(false);
-    
+
     // Cập nhật formattedDate để hiển thị cả giờ và phút
     const formattedDate = useMemo(() => {
       const date = new Date(feedback.createdTime);
-      const hours = date.getHours().toString().padStart(2, '0');
-      const minutes = date.getMinutes().toString().padStart(2, '0');
+      const hours = date.getHours().toString().padStart(2, "0");
+      const minutes = date.getMinutes().toString().padStart(2, "0");
       const day = date.getDate();
       const month = date.getMonth() + 1;
       const year = date.getFullYear();
-      
+
       return `lúc ${hours}:${minutes} - ${day} tháng ${month}, ${year}`;
     }, [feedback.createdTime]);
 
@@ -330,7 +330,7 @@ const FilterButton = ({
   rating,
   isSelected,
   onPress,
-  count
+  count,
 }: {
   rating: number;
   isSelected: boolean;
@@ -345,13 +345,16 @@ const FilterButton = ({
   >
     <View className="flex-row items-center">
       <Text className={`${isSelected ? "text-black font-bold" : "text-white"}`}>
-        {rating} <Ionicons name="star" size={14} color={isSelected ? "#000" : "#9CA3AF"} />
+        {rating}{" "}
+        <Ionicons
+          name="star"
+          size={14}
+          color={isSelected ? "#000" : "#9CA3AF"}
+        />
       </Text>
       {isSelected && (
         <View className="bg-black/20 px-2 py-0.5 rounded-full ml-2">
-          <Text className="text-black text-xs font-medium">
-            {count}
-          </Text>
+          <Text className="text-black text-xs font-medium">{count}</Text>
         </View>
       )}
     </View>
@@ -359,86 +362,85 @@ const FilterButton = ({
 );
 
 // 1. Tối ưu DrinkItem component
-const DrinkItem = memo(({ 
-  drink, 
-  onPress 
-}: { 
-  drink: Drink; 
-  onPress: () => void;
-}) => {
-  // Sử dụng useMemo cho images array
-  const images = useMemo(() => getImageArray(drink.images), [drink.images]);
+const DrinkItem = memo(
+  ({ drink, onPress }: { drink: Drink; onPress: () => void }) => {
+    // Sử dụng useMemo cho images array
+    const images = useMemo(() => getImageArray(drink.images), [drink.images]);
 
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      className="flex-row items-center p-3 mb-3 bg-neutral-900 rounded-xl active:opacity-70"
-    >
-      <Image
-        source={{ uri: images[0] }}
-        className="w-20 h-20 rounded-lg"
-        resizeMode="cover"
-      />
-      
-      <View className="flex-1 ml-3">
-        <Text 
-          numberOfLines={1} 
-          ellipsizeMode="tail"
-          className="text-white font-medium mb-1"
-        >
-          {drink.drinkName}
-        </Text>
-        
-        <Text 
-          numberOfLines={2}
-          ellipsizeMode="tail"
-          className="text-gray-400 text-sm min-h-[40px]"
-        >
-          {drink.description || "Chưa có mô tả"}
-        </Text>
-        
-        <Text className="text-yellow-500 font-bold mt-1">
-          {drink.price.toLocaleString("vi-VN")}đ
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}, (prevProps, nextProps) => {
-  // Custom comparison function
-  return prevProps.drink.drinkId === nextProps.drink.drinkId;
-});
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        className="flex-row items-center p-3 mb-3 bg-neutral-900 rounded-xl active:opacity-70"
+      >
+        <Image
+          source={{ uri: images[0] }}
+          className="w-20 h-20 rounded-lg"
+          resizeMode="cover"
+        />
+
+        <View className="flex-1 ml-3">
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            className="text-white font-medium mb-1"
+          >
+            {drink.drinkName}
+          </Text>
+
+          <Text
+            numberOfLines={2}
+            ellipsizeMode="tail"
+            className="text-gray-400 text-sm min-h-[40px]"
+          >
+            {drink.description || "Chưa có mô tả"}
+          </Text>
+
+          <Text className="text-yellow-500 font-bold mt-1">
+            {drink.price.toLocaleString("vi-VN")}đ
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison function
+    return prevProps.drink.drinkId === nextProps.drink.drinkId;
+  }
+);
 
 // 2. Tối ưu danh sách drinks trong modal
-const DrinksList = memo(({
-  drinks,
-  onDrinkPress
-}: {
-  drinks: Drink[];
-  onDrinkPress: (drink: Drink) => void;
-}) => {
-  if (drinks.length === 0) {
+const DrinksList = memo(
+  ({
+    drinks,
+    onDrinkPress,
+  }: {
+    drinks: Drink[];
+    onDrinkPress: (drink: Drink) => void;
+  }) => {
+    if (drinks.length === 0) {
+      return (
+        <View className="py-8 items-center">
+          <Ionicons name="wine-outline" size={40} color="#9CA3AF" />
+          <Text className="text-gray-400 mt-2 text-center">
+            Không có thức uống nào
+          </Text>
+        </View>
+      );
+    }
+
     return (
-      <View className="py-8 items-center">
-        <Ionicons name="wine-outline" size={40} color="#9CA3AF" />
-        <Text className="text-gray-400 mt-2 text-center">
-          Không có thức uống nào
-        </Text>
-      </View>
+      <>
+        {drinks.map((drink) => (
+          <DrinkItem
+            key={drink.drinkId}
+            drink={drink}
+            onPress={() => onDrinkPress(drink)}
+          />
+        ))}
+      </>
     );
   }
-
-  return (
-    <>
-      {drinks.map((drink) => (
-        <DrinkItem
-          key={drink.drinkId}
-          drink={drink}
-          onPress={() => onDrinkPress(drink)}
-        />
-      ))}
-    </>
-  );
-});
+);
 
 // Components con
 const DrinkDetailSkeleton = () => (
@@ -695,7 +697,11 @@ const ReviewModal = memo(
                   }`}
                 >
                   <View className="flex-row items-center">
-                    <Text className={`${!selectedRating ? "text-black font-bold" : "text-white"}`}>
+                    <Text
+                      className={`${
+                        !selectedRating ? "text-black font-bold" : "text-white"
+                      }`}
+                    >
                       Tất cả
                     </Text>
                     {!selectedRating && (
@@ -811,211 +817,241 @@ const AuthModal = ({
 const ASPECT_RATIO = 1.5; // Giữ tỷ lệ 1.5 cho tất cả ảnh
 
 // Cập nhật DistanceBadge với style mi cho header
-const DistanceBadge = memo(({ 
-  distance,
-  variant = 'default',
-  locationPermission
-}: { 
-  distance?: number,
-  variant?: 'default' | 'compact',
-  locationPermission?: 'granted' | 'denied'
-}) => {
-  // Nếu không có quyền truy cập vị trí, không hiển thị badge
-  if (locationPermission !== 'granted') return null;
+const DistanceBadge = memo(
+  ({
+    distance,
+    variant = "default",
+    locationPermission,
+  }: {
+    distance?: number;
+    variant?: "default" | "compact";
+    locationPermission?: "granted" | "denied";
+  }) => {
+    // Nếu không có quyền truy cập vị trí, không hiển thị badge
+    if (locationPermission !== "granted") return null;
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [retryCount, setRetryCount] = useState(0);
-  const translateX = useSharedValue(-100);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+    const [isLoading, setIsLoading] = useState(true);
+    const [retryCount, setRetryCount] = useState(0);
+    const translateX = useSharedValue(-100);
+    const timeoutRef = useRef<NodeJS.Timeout>();
 
-  useEffect(() => {
-    // Reset loading state và start timeout khi distance thay đổi
-    setIsLoading(true);
-    
-    // Clear timeout cũ nếu có
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
+    useEffect(() => {
+      // Reset loading state và start timeout khi distance thay đổi
+      setIsLoading(true);
 
-    // Set timeout mới
-    timeoutRef.current = setTimeout(() => {
-      if (isLoading && retryCount < 3) { // Cho phép retry tối đa 3 lần
-        setRetryCount(prev => prev + 1);
-        setIsLoading(true);
-      } else if (retryCount >= 3) {
-        setIsLoading(false); // Ngừng loading sau 3 lần retry
-      }
-    }, 5000);
-
-    // Nếu có distance, dừng loading
-    if (distance !== undefined) {
-      setIsLoading(false);
-      setRetryCount(0);
+      // Clear timeout cũ nếu có
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
-    }
 
-    // Animation loading
-    translateX.value = withRepeat(
-      withTiming(100, { duration: 1000 }),
-      -1,
-      false
-    );
+      // Set timeout mới
+      timeoutRef.current = setTimeout(() => {
+        if (isLoading && retryCount < 3) {
+          // Cho phép retry tối đa 3 lần
+          setRetryCount((prev) => prev + 1);
+          setIsLoading(true);
+        } else if (retryCount >= 3) {
+          setIsLoading(false); // Ngừng loading sau 3 lần retry
+        }
+      }, 5000);
 
-    // Cleanup
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      // Nếu có distance, dừng loading
+      if (distance !== undefined) {
+        setIsLoading(false);
+        setRetryCount(0);
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
       }
-    };
-  }, [distance, retryCount]);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
-    };
-  });
+      // Animation loading
+      translateX.value = withRepeat(
+        withTiming(100, { duration: 1000 }),
+        -1,
+        false
+      );
 
-  // Style khác nhau cho header và content
-  const containerStyle = variant === 'compact' 
-    ? "bg-neutral-900 px-3 py-1 rounded-full overflow-hidden" 
-    : "bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-sm overflow-hidden";
+      // Cleanup
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
+    }, [distance, retryCount]);
 
-  return (
-    <View className={containerStyle}>
-      {isLoading ? (
-        <View className="w-10 flex-row items-center">
-          <Animated.View
-            style={[{
-              width: "100%",
-              height: "100%",
-              position: "absolute",
-              backgroundColor: "transparent",
-            }, animatedStyle]}
+    const animatedStyle = useAnimatedStyle(() => {
+      return {
+        transform: [{ translateX: translateX.value }],
+      };
+    });
+
+    // Style khác nhau cho header và content
+    const containerStyle =
+      variant === "compact"
+        ? "bg-neutral-900 px-3 py-1 rounded-full overflow-hidden"
+        : "bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-sm overflow-hidden";
+
+    return (
+      <View className={containerStyle}>
+        {isLoading ? (
+          <View className="w-10 flex-row items-center">
+            <Animated.View
+              style={[
+                {
+                  width: "100%",
+                  height: "100%",
+                  position: "absolute",
+                  backgroundColor: "transparent",
+                },
+                animatedStyle,
+              ]}
+            >
+              <LinearGradient
+                colors={["transparent", "rgba(255,255,255,0.3)", "transparent"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{ flex: 1 }}
+              />
+            </Animated.View>
+            <Text
+              className={`text-white/30 font-medium ${
+                variant === "compact" ? "text-[10px]" : "text-xs"
+              }`}
+            >
+              0.0km
+            </Text>
+          </View>
+        ) : (
+          <Text
+            className={`text-white font-medium ${
+              variant === "compact" ? "text-[10px]" : "text-xs"
+            }`}
           >
-            <LinearGradient
-              colors={["transparent", "rgba(255,255,255,0.3)", "transparent"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={{ flex: 1 }}
-            />
-          </Animated.View>
-          <Text className={`text-white/30 font-medium ${variant === 'compact' ? 'text-[10px]' : 'text-xs'}`}>
-            0.0km
+            {distance?.toFixed(1)}km
           </Text>
-        </View>
-      ) : (
-        <Text className={`text-white font-medium ${variant === 'compact' ? 'text-[10px]' : 'text-xs'}`}>
-          {distance?.toFixed(1)}km
-        </Text>
-      )}
-    </View>
-  );
-});
+        )}
+      </View>
+    );
+  }
+);
 
 // Cập nhật HeaderBadgeContainer để hiển thị đầy đủ các badge
-const HeaderBadgeContainer = memo(({ 
-  distance,
-  discount,
-  isAvailable,
-  isOpen,
-  locationPermission
-}: { 
-  distance?: number,
-  discount: number,
-  isAvailable: boolean,
-  isOpen: boolean,
-  locationPermission?: 'granted' | 'denied'
-}) => (
-  <View className="flex-row items-center ml-1">
-    <DistanceBadge 
-      distance={distance} 
-      variant="compact" 
-      locationPermission={locationPermission}
-    />
-    
-    <View className="flex-row items-center space-x-1 ml-1">
-      {/* Discount Badge */}
-      {discount > 0 && (
-        <View className="bg-yellow-500/90 px-2 py-0.5 rounded-full">
-          <Text className="text-black font-bold text-[10px]">
-            -{discount}%
-          </Text>
-        </View>
-      )}
+const HeaderBadgeContainer = memo(
+  ({
+    distance,
+    discount,
+    isAvailable,
+    isOpen,
+    locationPermission,
+  }: {
+    distance?: number;
+    discount: number;
+    isAvailable: boolean;
+    isOpen: boolean;
+    locationPermission?: "granted" | "denied";
+  }) => (
+    <View className="flex-row items-center ml-1">
+      <DistanceBadge
+        distance={distance}
+        variant="compact"
+        locationPermission={locationPermission}
+      />
 
-      {/* Availability Badge */}
-      {isOpen && (
-        <View className={`px-2 py-0.5 rounded-full ${isAvailable ? 'bg-green-500/90' : 'bg-red-500/90'}`}>
-          <Text className="text-white font-bold text-[10px]">
-            {isAvailable ? 'Còn bàn' : 'Hết bàn'}
-          </Text>
-        </View>
-      )}
+      <View className="flex-row items-center space-x-1 ml-1">
+        {/* Discount Badge */}
+        {discount > 0 && (
+          <View className="bg-yellow-500/90 px-2 py-0.5 rounded-full">
+            <Text className="text-black font-bold text-[10px]">
+              -{discount}%
+            </Text>
+          </View>
+        )}
+
+        {/* Availability Badge */}
+        {isOpen && (
+          <View
+            className={`px-2 py-0.5 rounded-full ${
+              isAvailable ? "bg-green-500/90" : "bg-red-500/90"
+            }`}
+          >
+            <Text className="text-white font-bold text-[10px]">
+              {isAvailable ? "Còn bàn" : "Hết bàn"}
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
-  </View>
-));
+  )
+);
 
 // Cập nhật ContentBadgeContainer cho content
-const ContentBadgeContainer = memo(({ 
-  distance,
-  discount,
-  isAvailable,
-  isOpen,
-  locationPermission
-}: { 
-  distance?: number,
-  discount: number,
-  isAvailable: boolean,
-  isOpen: boolean,
-  locationPermission?: 'granted' | 'denied'
-}) => (
-  <View className="flex-row items-center ml-4">
-    <DistanceBadge 
-      distance={distance} 
-      locationPermission={locationPermission}
-    />
-    
-    <View className="flex-row items-center space-x-2 ml-2">
-      {/* Discount Badge */}
-      {discount > 0 && (
-        <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full">
-          <Text className="text-black font-bold text-xs">
-            -{discount}%
-          </Text>
-        </View>
-      )}
+const ContentBadgeContainer = memo(
+  ({
+    distance,
+    discount,
+    isAvailable,
+    isOpen,
+    locationPermission,
+  }: {
+    distance?: number;
+    discount: number;
+    isAvailable: boolean;
+    isOpen: boolean;
+    locationPermission?: "granted" | "denied";
+  }) => (
+    <View className="flex-row items-center ml-4">
+      <DistanceBadge
+        distance={distance}
+        locationPermission={locationPermission}
+      />
 
-      {/* Availability Badge */}
-      {isOpen && (
-        <View className={`px-2.5 py-1 rounded-full ${isAvailable ? 'bg-green-500/90' : 'bg-red-500/90'}`}>
-          <Text className="text-white font-bold text-xs">
-            {isAvailable ? 'Còn bàn hôm nay' : 'Hết bàn hôm nay'}
-          </Text>
-        </View>
-      )}
+      <View className="flex-row items-center space-x-2 ml-2">
+        {/* Discount Badge */}
+        {discount > 0 && (
+          <View className="bg-yellow-500/90 px-2.5 py-1 rounded-full">
+            <Text className="text-black font-bold text-xs">-{discount}%</Text>
+          </View>
+        )}
+
+        {/* Availability Badge */}
+        {isOpen && (
+          <View
+            className={`px-2.5 py-1 rounded-full ${
+              isAvailable ? "bg-green-500/90" : "bg-red-500/90"
+            }`}
+          >
+            <Text className="text-white font-bold text-xs">
+              {isAvailable ? "Còn bàn hôm nay" : "Hết bàn hôm nay"}
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
-  </View>
-));
+  )
+);
 
 const formatTime = (time: string) => {
   // Đảm bảo giờ luôn có 2 chữ số
-  const [hours, minutes] = time.split(':');
-  return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
+  const [hours, minutes] = time.split(":");
+  return `${hours.padStart(2, "0")}:${minutes.padStart(2, "0")}`;
 };
 
-const formatEventTime = (eventTimes: Event['eventTimeResponses']) => {
-  if (!eventTimes || eventTimes.length === 0) return '';
-  
+const formatEventTime = (eventTimes: Event["eventTimeResponses"]) => {
+  if (!eventTimes || eventTimes.length === 0) return "";
+
   const time = eventTimes[0];
   const formattedStartTime = formatTime(time.startTime);
   const formattedEndTime = formatTime(time.endTime);
 
   if (time.dayOfWeek !== null) {
-    return `T${time.dayOfWeek === 0 ? 'CN' : time.dayOfWeek + 1} hàng tuần, ${formattedStartTime} - ${formattedEndTime}`;
+    return `T${
+      time.dayOfWeek === 0 ? "CN" : time.dayOfWeek + 1
+    } hàng tuần, ${formattedStartTime} - ${formattedEndTime}`;
   } else if (time.date) {
-    return `${format(new Date(time.date), 'dd/MM/yyyy')}, ${formattedStartTime} - ${formattedEndTime}`;
+    return `${format(
+      new Date(time.date),
+      "dd/MM/yyyy"
+    )}, ${formattedStartTime} - ${formattedEndTime}`;
   }
   return `${formattedStartTime} - ${formattedEndTime}`;
 };
@@ -1138,17 +1174,20 @@ export default function BarDetailScreen() {
     fetchData();
   }, [id]);
 
-  const handleOpenDrinkDetail = useCallback((drink: Drink) => {
-    if (isDrinkModalVisible) {
-      setIsTransitioning(true);
-      setSelectedDrink(drink);
-      setShouldReopenDrinksModal(true); // Đánh dấu để mở lại sau
-      setIsDrinkModalVisible(false);
-    } else {
-      setSelectedDrink(drink);
-      setIsDrinkDetailModalVisible(true);
-    }
-  }, [isDrinkModalVisible]);
+  const handleOpenDrinkDetail = useCallback(
+    (drink: Drink) => {
+      if (isDrinkModalVisible) {
+        setIsTransitioning(true);
+        setSelectedDrink(drink);
+        setShouldReopenDrinksModal(true); // Đánh dấu để mở lại sau
+        setIsDrinkModalVisible(false);
+      } else {
+        setSelectedDrink(drink);
+        setIsDrinkDetailModalVisible(true);
+      }
+    },
+    [isDrinkModalVisible]
+  );
 
   // Thêm state và hooks cần thiết
   const { isAuthenticated, user, isGuest } = useAuth();
@@ -1170,7 +1209,7 @@ export default function BarDetailScreen() {
 
   // Thêm các states cho animation
   const scrollY = useSharedValue(0);
-  const HEADER_SCROLL_DISTANCE = (screenWidth / ASPECT_RATIO) - 25;
+  const HEADER_SCROLL_DISTANCE = screenWidth / ASPECT_RATIO - 25;
 
   const headerAnimatedStyle = useAnimatedStyle(() => {
     const backgroundColor = interpolate(
@@ -1260,35 +1299,34 @@ export default function BarDetailScreen() {
 
     return {
       opacity,
-      transform: [
-        { scale },
-        { translateY }
-      ],
+      transform: [{ scale }, { translateY }],
     };
   });
 
   // Thêm state quản lý vị trí người dùng
   const [userLocation, setUserLocation] = useState<GoongLocation | null>(null);
-  
+
   // Thêm state cho quyền truy cập vị trí
-  const [locationPermission, setLocationPermission] = useState<'granted' | 'denied'>('denied');
-  
+  const [locationPermission, setLocationPermission] = useState<
+    "granted" | "denied"
+  >("denied");
+
   // Sửa lại useEffect để kiểm tra quyền
   useEffect(() => {
     const getUserLocation = async () => {
       try {
         const { status } = await Location.getForegroundPermissionsAsync();
-        setLocationPermission(status as 'granted' | 'denied');
-        
-        if (status === 'granted') {
+        setLocationPermission(status as "granted" | "denied");
+
+        if (status === "granted") {
           const location = await Location.getCurrentPositionAsync({});
           setUserLocation({
             lat: location.coords.latitude,
-            lng: location.coords.longitude
+            lng: location.coords.longitude,
           });
         }
       } catch (error) {
-        console.error('Error getting location:', error);
+        console.error("Error getting location:", error);
       }
     };
     getUserLocation();
@@ -1298,7 +1336,10 @@ export default function BarDetailScreen() {
   useEffect(() => {
     const fetchBarDetail = async () => {
       if (id && userLocation) {
-        const detail = await barService.getBarDetailWithDistance(id, userLocation);
+        const detail = await barService.getBarDetailWithDistance(
+          id,
+          userLocation
+        );
         setBarDetail(detail);
       }
     };
@@ -1310,7 +1351,7 @@ export default function BarDetailScreen() {
   const [loadingEvents, setLoadingEvents] = useState(true);
 
   // Thêm state cho title
-  const [eventSectionTitle, setEventSectionTitle] = useState('Sự kiện');
+  const [eventSectionTitle, setEventSectionTitle] = useState("Sự kiện");
 
   // Sửa lại useEffect fetch events
   useEffect(() => {
@@ -1323,24 +1364,24 @@ export default function BarDetailScreen() {
           barId: id,
           isStill: 0,
           pageIndex: 1,
-          pageSize: 10
+          pageSize: 10,
         });
 
         if (currentEvents.events.length > 0) {
           setEvents(currentEvents.events);
-          setEventSectionTitle('Sự kiện đang diễn ra');
+          setEventSectionTitle("Sự kiện đang diễn ra");
         } else {
           // Nếu không có sự kiện đang diễn ra, lấy tất cả sự kiện
           const allEvents = await eventService.getEvents({
             barId: id,
             pageIndex: 1,
-            pageSize: 10
+            pageSize: 10,
           });
           setEvents(allEvents.events);
-          setEventSectionTitle('Sự kiện');
+          setEventSectionTitle("Sự kiện");
         }
       } catch (error) {
-        console.error('Error fetching events:', error);
+        console.error("Error fetching events:", error);
       } finally {
         setLoadingEvents(false);
       }
@@ -1349,15 +1390,29 @@ export default function BarDetailScreen() {
     fetchEvents();
   }, [id]);
 
+  // Thêm animated style cho line separator
+  const lineSeparatorStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(
+      scrollY.value,
+      [HEADER_SCROLL_DISTANCE - 100, HEADER_SCROLL_DISTANCE],
+      [0, 1],
+      Extrapolation.CLAMP
+    );
+
+    return {
+      opacity,
+    };
+  });
+
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1" edges={['top']}>
+      <SafeAreaView className="flex-1" edges={["top"]}>
         {/* Thay header cũ bằng animated header */}
         <Animated.View
           className="absolute top-0 left-0 right-0 z-50"
           style={headerAnimatedStyle}
         >
-          <SafeAreaView edges={['top']}>
+          <SafeAreaView edges={["top"]}>
             <View className="px-4 py-2">
               <View className="flex-row items-center">
                 <TouchableOpacity
@@ -1367,27 +1422,34 @@ export default function BarDetailScreen() {
                   <Ionicons name="arrow-back" size={24} color="white" />
                 </TouchableOpacity>
 
-                {/* Thêm phần title vào đây */}
-                <Animated.View 
-                  className="flex-1 ml-4"
+                <Animated.View
                   style={titleAnimatedStyle}
+                  className="flex-1 ml-4"
                 >
                   <View className="flex-row items-center space-x-2">
-                    <Text className="text-yellow-500 font-bold text-lg" numberOfLines={1}>
+                    <Text
+                      className="text-yellow-500 font-bold text-lg"
+                      numberOfLines={1}
+                    >
                       {barDetail?.barName}
                     </Text>
-                    
+
                     {/* Rating */}
                     <View className="flex-row items-center">
                       <Ionicons name="star" size={14} color="#EAB308" />
                       <Text className="text-white ml-1 text-sm">
-                        {formatRating(averageRating) == "0" ? "Chưa có đánh giá" : formatRating(averageRating)}
+                        {formatRating(averageRating) == "0"
+                          ? "Chưa có đánh giá"
+                          : formatRating(averageRating)}
                       </Text>
                     </View>
                   </View>
 
                   <View className="flex-row items-center space-x-2 mt-1">
-                    <Text className="text-gray-400 text-sm flex-1" numberOfLines={1}>
+                    <Text
+                      className="text-gray-400 text-sm flex-1"
+                      numberOfLines={1}
+                    >
                       {barDetail?.address}
                     </Text>
 
@@ -1395,13 +1457,22 @@ export default function BarDetailScreen() {
                       distance={barDetail?.location?.distance}
                       discount={barDetail?.discount || 0}
                       isAvailable={barDetail?.isAnyTableAvailable || false}
-                      isOpen={barDetail ? isOpenToday(barDetail.barTimeResponses) : false}
+                      isOpen={
+                        barDetail
+                          ? isOpenToday(barDetail.barTimeResponses)
+                          : false
+                      }
                       locationPermission={locationPermission}
                     />
                   </View>
                 </Animated.View>
               </View>
             </View>
+            {/* Cập nhật line separator với animation */}
+            <Animated.View 
+              className="w-full h-[1.5px] bg-neutral-900" 
+              style={lineSeparatorStyle}
+            />
           </SafeAreaView>
         </Animated.View>
 
@@ -1424,7 +1495,7 @@ export default function BarDetailScreen() {
                 className="relative"
                 style={[
                   { height: screenWidth / ASPECT_RATIO },
-                  imageAnimatedStyle // Thêm animation style
+                  imageAnimatedStyle, // Thêm animation style
                 ]}
               >
                 <FlatList
@@ -1486,7 +1557,9 @@ export default function BarDetailScreen() {
                         <View className="flex-row items-center">
                           <Ionicons name="star" size={16} color="#EAB308" />
                           <Text className="text-white ml-1 font-medium">
-                            {formatRating(averageRating) == "0" ? "Chưa có đánh giá" : formatRating(averageRating)}
+                            {formatRating(averageRating) == "0"
+                              ? "Chưa có đánh giá"
+                              : formatRating(averageRating)}
                           </Text>
                         </View>
 
@@ -1494,7 +1567,11 @@ export default function BarDetailScreen() {
                           distance={barDetail?.location?.distance}
                           discount={barDetail?.discount || 0}
                           isAvailable={barDetail?.isAnyTableAvailable || false}
-                          isOpen={barDetail ? isOpenToday(barDetail.barTimeResponses) : false}
+                          isOpen={
+                            barDetail
+                              ? isOpenToday(barDetail.barTimeResponses)
+                              : false
+                          }
                           locationPermission={locationPermission}
                         />
                       </View>
@@ -1643,78 +1720,119 @@ export default function BarDetailScreen() {
                   />
 
                   {/* Events Section */}
-    <View>
-      <Text className="text-white text-lg font-bold mb-4">
-        {eventSectionTitle}
-      </Text>
-      
-      {loadingEvents ? (
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-        >
-          {[1,2,3].map(i => (
-            <View key={i} className="w-72 h-[180px] bg-neutral-900 rounded-xl mr-4 animate-pulse" />
-          ))}
-        </ScrollView>
-      ) : events.length > 0 ? (
-        <FlatList
-          horizontal
-          data={events}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item: event }) => (
-            <TouchableOpacity 
-              className="w-72 mr-4"
-              activeOpacity={0.7}
-              onPress={() => router.push(`/event-detail/${event.eventId}` as any)}
-            >
-              <Image
-                source={{ uri: event.images.split(',')[0] }}
-                className="w-full h-[180px] rounded-xl"
-                resizeMode="cover"
-              />
-              <LinearGradient
-                colors={['transparent', 'rgba(0,0,0,0.7)', 'rgba(0,0,0,0.95)']}
-                className="absolute bottom-0 left-0 right-0 h-32 rounded-b-xl"
-              >
-                <View className="absolute bottom-0 p-4 w-full">
-                  <Text 
-                    numberOfLines={1}
-                    style={{ lineHeight: 24 }}
-                    className="text-yellow-500 text-lg font-bold mb-2"
-                  >
-                    {event.eventName}
-                  </Text>
-                  <View className="flex-row items-center mb-2">
-                    <Ionicons name="time-outline" size={14} color="#9CA3AF" />
-                    <Text 
-                      numberOfLines={1}
-                      style={{ lineHeight: 16 }}
-                      className="text-gray-400 text-xs ml-1 flex-1"
-                    >
-                      {formatEventTime(event.eventTimeResponses)}
-                    </Text>
+                  <View>
+                    <View className="">
+                      <View className="flex-row justify-between items-center mb-4">
+                        <Text className="text-white text-lg font-bold">
+                          {eventSectionTitle}
+                        </Text>
+                        {events.length > 0 && (
+                          <TouchableOpacity
+                            onPress={() => {
+                              router.push({
+                                pathname: "/event/event",
+                                params: {
+                                  preSelectedBarId: barDetail?.barId,
+                                  preSelectedBarName: barDetail?.barName,
+                                },
+                              } as any);
+                            }}
+                            className="active:opacity-70"
+                          >
+                            <Text className="text-yellow-500">Xem tất cả</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+
+                      {/* Rest of the existing events section code */}
+                    </View>
+
+                    {loadingEvents ? (
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                      >
+                        {[1, 2, 3].map((i) => (
+                          <View
+                            key={i}
+                            className="w-72 h-[180px] bg-neutral-900 rounded-xl mr-4 animate-pulse"
+                          />
+                        ))}
+                      </ScrollView>
+                    ) : events.length > 0 ? (
+                      <FlatList
+                        horizontal
+                        data={events}
+                        showsHorizontalScrollIndicator={false}
+                        renderItem={({ item: event }) => (
+                          <TouchableOpacity
+                            className="w-72 mr-4"
+                            activeOpacity={0.7}
+                            onPress={() =>
+                              router.push(
+                                `/event-detail/${event.eventId}` as any
+                              )
+                            }
+                          >
+                            <Image
+                              source={{ uri: event.images.split(",")[0] }}
+                              className="w-full h-[180px] rounded-xl"
+                              resizeMode="cover"
+                            />
+                            <LinearGradient
+                              colors={[
+                                "transparent",
+                                "rgba(0,0,0,0.7)",
+                                "rgba(0,0,0,0.95)",
+                              ]}
+                              className="absolute bottom-0 left-0 right-0 h-32 rounded-b-xl"
+                            >
+                              <View className="absolute bottom-0 p-4 w-full">
+                                <Text
+                                  numberOfLines={1}
+                                  style={{ lineHeight: 24 }}
+                                  className="text-yellow-500 text-lg font-bold mb-2"
+                                >
+                                  {event.eventName}
+                                </Text>
+                                <View className="flex-row items-center mb-2">
+                                  <Ionicons
+                                    name="time-outline"
+                                    size={14}
+                                    color="#9CA3AF"
+                                  />
+                                  <Text
+                                    numberOfLines={1}
+                                    style={{ lineHeight: 16 }}
+                                    className="text-gray-400 text-xs ml-1 flex-1"
+                                  >
+                                    {formatEventTime(event.eventTimeResponses)}
+                                  </Text>
+                                </View>
+                              </View>
+                            </LinearGradient>
+                          </TouchableOpacity>
+                        )}
+                        keyExtractor={(item) => item.eventId}
+                      />
+                    ) : (
+                      <View className="bg-neutral-900 rounded-xl p-6 items-center">
+                        <View className="bg-neutral-800 p-4 rounded-full mb-4">
+                          <Ionicons
+                            name="calendar-outline"
+                            size={40}
+                            color="#9CA3AF"
+                          />
+                        </View>
+                        <Text className="text-gray-300 text-lg font-medium text-center">
+                          Chưa có sự kiện nào
+                        </Text>
+                        <Text className="text-gray-500 text-sm text-center mt-2">
+                          Quán chưa có sự kiện nào được tổ chức
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-          keyExtractor={(item) => item.eventId}
-        />
-      ) : (
-        <View className="bg-neutral-900 rounded-xl p-6 items-center">
-          <View className="bg-neutral-800 p-4 rounded-full mb-4">
-            <Ionicons name="calendar-outline" size={40} color="#9CA3AF" />
-          </View>
-          <Text className="text-gray-300 text-lg font-medium text-center">
-            Chưa có sự kiện nào
-          </Text>
-          <Text className="text-gray-500 text-sm text-center mt-2">
-            Quán chưa có sự kiện nào được tổ chức
-          </Text>
-        </View>
-      )}
-    </View>
 
                   {/* Drinks */}
                   <View className="mt-8">
@@ -1861,25 +1979,27 @@ export default function BarDetailScreen() {
                           </View>
 
                           {/* Category Filters */}
-                          <ScrollView 
-                            horizontal 
+                          <ScrollView
+                            horizontal
                             showsHorizontalScrollIndicator={false}
                             className=""
                           >
                             <TouchableOpacity
                               onPress={() => setSelectedCategory(null)}
                               className={`mr-2 px-4 py-2 rounded-full ${
-                                !selectedCategory 
-                                  ? "bg-yellow-500" 
+                                !selectedCategory
+                                  ? "bg-yellow-500"
                                   : "bg-neutral-900"
                               }`}
                             >
                               <View className="flex-row items-center">
-                                <Text className={`${
-                                  !selectedCategory 
-                                    ? "text-black font-bold" 
-                                    : "text-white"
-                                }`}>
+                                <Text
+                                  className={`${
+                                    !selectedCategory
+                                      ? "text-black font-bold"
+                                      : "text-white"
+                                  }`}
+                                >
                                   Tất cả
                                 </Text>
                                 {!selectedCategory && (
@@ -1897,23 +2017,32 @@ export default function BarDetailScreen() {
                                 key={category.id}
                                 onPress={() => setSelectedCategory(category.id)}
                                 className={`mr-2 px-4 py-2 rounded-full ${
-                                  selectedCategory === category.id 
-                                    ? "bg-yellow-500" 
+                                  selectedCategory === category.id
+                                    ? "bg-yellow-500"
                                     : "bg-neutral-900"
                                 }`}
                               >
                                 <View className="flex-row items-center">
-                                  <Text className={`${
-                                    selectedCategory === category.id 
-                                      ? "text-black font-bold" 
-                                      : "text-white"
-                                  }`}>
+                                  <Text
+                                    className={`${
+                                      selectedCategory === category.id
+                                        ? "text-black font-bold"
+                                        : "text-white"
+                                    }`}
+                                  >
                                     {category.name}
                                   </Text>
                                   {selectedCategory === category.id && (
                                     <View className="bg-black/20 px-2 py-0.5 rounded-full ml-2">
                                       <Text className="text-black text-xs font-medium">
-                                        {drinks.filter(d => d.drinkCategoryResponse.drinksCategoryId === category.id).length}
+                                        {
+                                          drinks.filter(
+                                            (d) =>
+                                              d.drinkCategoryResponse
+                                                .drinksCategoryId ===
+                                              category.id
+                                          ).length
+                                        }
                                       </Text>
                                     </View>
                                   )}
@@ -1929,7 +2058,7 @@ export default function BarDetailScreen() {
                           nestedScrollEnabled={true}
                           showsVerticalScrollIndicator={false}
                         >
-                          <DrinksList 
+                          <DrinksList
                             drinks={getFilteredDrinks()}
                             onDrinkPress={handleOpenDrinkDetail}
                           />

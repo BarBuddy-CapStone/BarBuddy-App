@@ -18,7 +18,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       bundleIdentifier: "com.fptu.barbuddy",
       buildNumber: "1.0.0",
-      supportsTablet: true,
+      supportsTablet: false,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       infoPlist: {
         NSPhotoLibraryUsageDescription: "Ứng dụng cần quyền truy cập vào thư viện ảnh để thay đổi ảnh đại diện của bạn.",
         NSCameraUsageDescription: "Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới.",
@@ -69,6 +72,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         {
           photosPermission: "Ứng dụng cần quyền truy cập vào thư viện ảnh để thay đổi ảnh đại diện của bạn.",
           cameraPermission: "Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
         }
       ]
     ],

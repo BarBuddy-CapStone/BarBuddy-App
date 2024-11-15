@@ -27,8 +27,6 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>com.fptu.barbuddy</string>
-          <string>com.fptu.barbuddy</string>
           <string>com.googleusercontent.apps.294668771815-0oslkkj1gg5sov5o7npbbf6beo7aknni</string>
         </array>
       </dict>
@@ -47,7 +45,7 @@
     <key>NSCameraUsageDescription</key>
     <string>Ứng dụng cần quyền truy cập vào máy ảnh để chụp ảnh đại diện mới.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-    <string>Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.</string>
+    <string>Allow $(PRODUCT_NAME) to use your location.</string>
     <key>NSLocationAlwaysUsageDescription</key>
     <string>Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.</string>
     <key>NSLocationWhenInUseUsageDescription</key>

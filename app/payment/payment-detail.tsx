@@ -1,15 +1,31 @@
-import { View, Text, ScrollView, TouchableOpacity, Image, Alert, Linking, Modal, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { BookingDrinkRequest, bookingTableService } from '@/services/booking-table';
-import { Drink, drinkService } from '@/services/drink';
-import { format } from 'date-fns';
-import { vi } from 'date-fns/locale';
-import Animated, { FadeIn } from 'react-native-reanimated';
-import { BarDetail, barService } from '@/services/bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Alert,
+  Linking,
+  Modal,
+  ActivityIndicator,
+  TextInput,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useState, useEffect } from "react";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import {
+  BookingDrinkRequest,
+  bookingTableService,
+} from "@/services/booking-table";
+import { Drink, drinkService } from "@/services/drink";
+import { format } from "date-fns";
+import { vi } from "date-fns/locale";
+import Animated, { FadeIn } from "react-native-reanimated";
+import { BarDetail, barService } from "@/services/bar";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { voucherService, VoucherResponse } from "@/services/voucher";
+import axios from "axios";
 
 const LoadingPopup = ({ visible }: { visible: boolean }) => (
   <Modal transparent visible={visible}>
@@ -30,19 +46,32 @@ const LoadingPopup = ({ visible }: { visible: boolean }) => (
 export default function PaymentDetailScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+
+  const [bookingRequestState, setBookingRequestState] = useState<BookingDrinkRequest>(
+    typeof params.bookingRequest === "string"
+      ? {
+          ...JSON.parse(params.bookingRequest),
+          voucherCode: null
+        }
+      : {
+          ...params.bookingRequest,
+          voucherCode: null
+        }
+  );
+
+  const discount = Number(params.discount) || 0;
+  const originalPrice = Number(params.originalPrice) || 0;
+  const totalPrice = Number(params.totalPrice) || 0;
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [barDetail, setBarDetail] = useState<BarDetail | null>(null);
   const [showLoadingPopup, setShowLoadingPopup] = useState(false);
-
-  const bookingRequest: BookingDrinkRequest = typeof params.bookingRequest === 'string' 
-    ? JSON.parse(params.bookingRequest)
-    : params.bookingRequest;
-
-  const discount = Number(params.discount) || 0;
-  const originalPrice = Number(params.originalPrice) || 0;
-  const totalPrice = Number(params.totalPrice) || 0;
+  const [appliedVoucher, setAppliedVoucher] = useState<VoucherResponse | null>(
+    null
+  );
+  const [currentTotalPrice, setCurrentTotalPrice] = useState(totalPrice);
 
   useEffect(() => {
     loadDrinks();
@@ -51,22 +80,22 @@ export default function PaymentDetailScreen() {
   useEffect(() => {
     const loadBarDetail = async () => {
       try {
-        const data = await barService.getBarDetail(bookingRequest.barId);
+        const data = await barService.getBarDetail(bookingRequestState.barId);
         setBarDetail(data);
       } catch (error) {
-        console.error('Error loading bar detail:', error);
+        console.error("Error loading bar detail:", error);
       }
     };
-    
+
     loadBarDetail();
-  }, [bookingRequest.barId]);
+  }, [bookingRequestState.barId]);
 
   const loadDrinks = async () => {
     try {
-      const data = await drinkService.getDrinks(bookingRequest.barId);
+      const data = await drinkService.getDrinks(bookingRequestState.barId);
       setDrinks(data);
     } catch (error) {
-      console.error('Error loading drinks:', error);
+      console.error("Error loading drinks:", error);
     }
   };
 
@@ -76,44 +105,47 @@ export default function PaymentDetailScreen() {
 
   const handleConfirmBooking = async () => {
     if (isProcessing) return;
-    
+
     try {
       setIsProcessing(true);
       setShowLoadingPopup(true);
       setShowConfirmModal(false);
-      
+
       // Lưu booking data vào storage
       const bookingData = {
-        bookingRequest,
-        selectedTables: bookingRequest.selectedTables,
-        drinks: bookingRequest.drinks,
+        bookingRequest: bookingRequestState,
+        selectedTables: bookingRequestState.selectedTables,
+        drinks: bookingRequestState.drinks,
         discount,
         originalPrice,
-        totalPrice
+        totalPrice,
       };
 
-      await AsyncStorage.setItem('temp_booking_data', JSON.stringify(bookingData));
-      
-      const response = await bookingTableService.bookTableWithDrinks(bookingRequest);
-      
+      await AsyncStorage.setItem(
+        "temp_booking_data",
+        JSON.stringify(bookingData)
+      );
+
+      const response = await bookingTableService.bookTableWithDrinks(
+        bookingRequestState
+      );
+
       if (response.data?.paymentUrl) {
         await router.replace({
-          pathname: '/(tabs)/booking-history',
-          params: { fromPayment: 'true' }
+          pathname: "/(tabs)/booking-history",
+          params: { fromPayment: "true" },
         });
 
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 300));
         await Linking.openURL(response.data.paymentUrl);
-        
       } else {
-        throw new Error('Không nhận được đường dẫn thanh toán');
+        throw new Error("Không nhận được đường dẫn thanh toán");
       }
-
     } catch (error: any) {
-      console.error('Booking Error:', error);
+      console.error("Booking Error:", error);
       router.replace({
-        pathname: '/payment/error/0' as any,
-        params: { fromPayment: 'true' }
+        pathname: "/payment/error/0" as any,
+        params: { fromPayment: "true" },
       });
     } finally {
       setIsProcessing(false);
@@ -124,13 +156,19 @@ export default function PaymentDetailScreen() {
   const BookingInfo = () => (
     <View className="px-4 mb-4">
       <View className=" bg-neutral-900 rounded-2xl p-4">
-        <Text className="text-white/80 font-semibold mb-4">Thông tin đặt bàn</Text>
+        <Text className="text-white/80 font-semibold mb-4">
+          Thông tin đặt bàn
+        </Text>
         <View className="space-y-3">
           {/* Ngày đặt */}
           <View className="flex-row items-center">
             <Ionicons name="calendar-outline" size={20} color="#ffffff" />
             <Text className="text-white ml-2">
-              {format(new Date(bookingRequest.bookingDate), 'EEEE, dd/MM/yyyy', { locale: vi })}
+              {format(
+                new Date(bookingRequestState.bookingDate),
+                "EEEE, dd/MM/yyyy",
+                { locale: vi }
+              )}
             </Text>
           </View>
 
@@ -138,24 +176,32 @@ export default function PaymentDetailScreen() {
           <View className="flex-row items-center">
             <Ionicons name="time-outline" size={20} color="#ffffff" />
             <Text className="text-white ml-2">
-              {bookingRequest.bookingTime.slice(0, -3)}
+              {bookingRequestState.bookingTime.slice(0, -3)}
             </Text>
           </View>
 
           {/* Số bàn */}
           <View className="flex-row items-center">
-            <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
+            <MaterialCommunityIcons
+              name="table-chair"
+              size={20}
+              color="#ffffff"
+            />
             <Text className="text-white ml-2">
-              {bookingRequest.tableIds.length} bàn đã chọn
+              {bookingRequestState.tableIds.length} bàn đã chọn
             </Text>
           </View>
 
           {/* Ghi chú */}
-          {bookingRequest.note && (
+          {bookingRequestState.note && (
             <View className="flex-row items-start">
-              <Ionicons name="document-text-outline" size={20} color="#ffffff" />
+              <Ionicons
+                name="document-text-outline"
+                size={20}
+                color="#ffffff"
+              />
               <Text className="text-white/80 ml-2 flex-1">
-                Ghi chú: {bookingRequest.note}
+                Ghi chú: {bookingRequestState.note}
               </Text>
             </View>
           )}
@@ -167,20 +213,22 @@ export default function PaymentDetailScreen() {
   const DrinksList = () => (
     <View className="px-4 mb-4">
       <View className="bg-neutral-900 rounded-2xl p-4">
-        <Text className="text-white/80 font-semibold mb-4">Thức uống đã chọn</Text>
+        <Text className="text-white/80 font-semibold mb-4">
+          Thức uống đã chọn
+        </Text>
         <View className="space-y-4">
-          {bookingRequest.drinks.map((orderDrink) => {
-            const drink = drinks.find(d => d.drinkId === orderDrink.drinkId);
+          {bookingRequestState.drinks.map((orderDrink) => {
+            const drink = drinks.find((d) => d.drinkId === orderDrink.drinkId);
             if (!drink) return null;
-            
+
             return (
-              <Animated.View 
-                key={drink.drinkId} 
+              <Animated.View
+                key={drink.drinkId}
                 entering={FadeIn}
                 className="flex-row items-center space-x-3"
               >
-                <Image 
-                  source={{ uri: drink.images.split(',')[0] }}
+                <Image
+                  source={{ uri: drink.images.split(",")[0] }}
                   className="w-16 h-16 rounded-xl"
                 />
                 <View className="flex-1">
@@ -188,7 +236,8 @@ export default function PaymentDetailScreen() {
                     {drink.drinkName}
                   </Text>
                   <Text className="text-white/60 text-sm mt-1">
-                    {drink.price.toLocaleString('vi-VN')}đ x {orderDrink.quantity}
+                    {drink.price.toLocaleString("vi-VN")}đ x{" "}
+                    {orderDrink.quantity}
                   </Text>
                   {/* Thêm thông tin cảm xúc */}
                   {drink.emotionsDrink && drink.emotionsDrink.length > 0 && (
@@ -207,7 +256,7 @@ export default function PaymentDetailScreen() {
                   )}
                 </View>
                 <Text className="text-yellow-500 font-semibold">
-                  {(drink.price * orderDrink.quantity).toLocaleString('vi-VN')}đ
+                  {(drink.price * orderDrink.quantity).toLocaleString("vi-VN")}đ
                 </Text>
               </Animated.View>
             );
@@ -217,56 +266,136 @@ export default function PaymentDetailScreen() {
     </View>
   );
 
-  const PaymentSummary = () => (
-    <View className="px-4 mb-4">
-      <View className="bg-neutral-900 rounded-2xl p-4">
-        <Text className="text-white/80 font-semibold mb-4">Tổng quan thanh toán</Text>
-        <View className="space-y-3">
-          <View className="flex-row justify-between">
-            <Text className="text-white/60">Tổng tiền đồ uống</Text>
-            <Text className="text-white">{originalPrice.toLocaleString('vi-VN')}đ</Text>
-          </View>
-          
-          {discount > 0 && (
+  // Trong PaymentSummary component
+  const PaymentSummary = () => {
+    // Tính toán số tiền giảm giá từ quán
+    const barDiscountAmount = originalPrice * (discount / 100);
+    const priceAfterBarDiscount = originalPrice - barDiscountAmount;
+
+    // Tính toán số tiền giảm giá từ voucher (nếu có)
+    const voucherDiscountAmount = appliedVoucher
+      ? Math.min(
+          priceAfterBarDiscount * (appliedVoucher.discount / 100),
+          appliedVoucher.maxPrice
+        )
+      : 0;
+
+    return (
+      <View className="px-4 mb-4">
+        <View className="bg-neutral-900 rounded-2xl p-4">
+          <Text className="text-white/80 font-semibold mb-4">
+            Tổng quan thanh toán
+          </Text>
+
+          {/* Phần 1: Tổng tiền đồ uống và giảm giá quán */}
+          <View className="space-y-3">
+            {/* Tổng tiền gốc */}
             <View className="flex-row justify-between">
-              <View className="flex-row items-center">
-                <Text className="text-white/60">Giảm giá</Text>
-                <View className="bg-yellow-500/20 px-2 py-1 rounded-lg ml-2">
-                  <Text className="text-yellow-500 text-xs font-bold">-{discount}%</Text>
+              <Text className="text-white/60">Tổng tiền đồ uống</Text>
+              <Text className="text-white">
+                {originalPrice.toLocaleString("vi-VN")}đ
+              </Text>
+            </View>
+
+            {/* Giảm giá từ quán */}
+            {discount > 0 && (
+              <View className="flex-row justify-between">
+                <View className="flex-row items-center">
+                  <Text className="text-white/60">Chiết khấu khi đặt trước</Text>
+                  <View className="bg-yellow-500/20 px-2 py-0.5 rounded-lg ml-2">
+                    <Text className="text-yellow-500 text-xs font-bold">
+                      -{discount}%
+                    </Text>
+                  </View>
+                </View>
+                <Text className="text-yellow-500">
+                  -{barDiscountAmount.toLocaleString("vi-VN")}đ
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Phần 2: Tổng sau chiết khấu và Voucher (nếu có) */}
+          {appliedVoucher && (
+            <View className="border-t border-white/10 mt-3">
+              <View className="space-y-3 pt-3">
+                {/* Tổng sau giảm giá quán */}
+                <View className="flex-row justify-between">
+                  <Text className="text-white font-medium">
+                    Tổng tiền sau chiết khấu
+                  </Text>
+                  <Text className="text-white font-medium">
+                    {priceAfterBarDiscount.toLocaleString("vi-VN")}đ
+                  </Text>
+                </View>
+
+                {/* Voucher */}
+                <View className="flex-row justify-between">
+                  <View className="flex-row items-center flex-1 mr-3">
+                    <Text 
+                      className="text-white/60 flex-shrink" 
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      Voucher {appliedVoucher.eventVoucherName}
+                    </Text>
+                    <View className="bg-yellow-500/20 px-2 py-0.5 rounded-lg ml-2 flex-shrink-0">
+                      <Text className="text-yellow-500 text-xs font-bold">
+                        -{appliedVoucher.discount}%
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="text-yellow-500 flex-shrink-0">
+                    -{(Math.min(
+                      (originalPrice - (originalPrice * discount) / 100) * (appliedVoucher.discount / 100),
+                      appliedVoucher.maxPrice
+                    )).toLocaleString("vi-VN")}đ
+                  </Text>
                 </View>
               </View>
-              <Text className="text-yellow-500">
-                -{(originalPrice - totalPrice).toLocaleString('vi-VN')}đ
-              </Text>
             </View>
           )}
 
-          <View className="flex-row justify-between pt-3 mt-2 border-t border-white/10">
-            <Text className="text-white font-semibold">Tổng thanh toán</Text>
-            <Text className="text-yellow-500 font-bold text-xl">
-              {totalPrice.toLocaleString('vi-VN')}đ
-            </Text>
+          {/* Phần 3: Tổng thanh toán cuối cùng */}
+          <View className="border-t border-white/10 mt-3">
+            <View className="flex-row justify-between pt-3">
+              <Text className="text-white font-semibold">Tổng thanh toán</Text>
+              <Text className="text-yellow-500 font-bold text-xl">
+                {currentTotalPrice.toLocaleString("vi-VN")}đ
+              </Text>
+            </View>
           </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const TablesList = () => (
     <View className="px-4 mb-4">
       <View className="bg-neutral-900 rounded-2xl p-4">
         <Text className="text-white/80 font-semibold mb-4">Bàn đã chọn</Text>
         <View className="space-y-3">
-          {bookingRequest.selectedTables.map((table, index) => (
-            <View key={table.id} className="flex-row items-center justify-between">
+          {bookingRequestState.selectedTables.map((table, index) => (
+            <View
+              key={table.id}
+              className="flex-row items-center justify-between"
+            >
               <View className="flex-row items-center">
-                <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
+                <MaterialCommunityIcons
+                  name="table-chair"
+                  size={20}
+                  color="#ffffff"
+                />
                 <View className="ml-3">
-                  <Text className="text-white font-medium">Bàn {table.name}</Text>
-                  <Text className="text-white/60 text-sm">{table.typeName}</Text>
+                  <Text className="text-white font-medium">
+                    Bàn {table.name}
+                  </Text>
+                  <Text className="text-white/60 text-sm">
+                    {table.typeName}
+                  </Text>
                 </View>
               </View>
-              {index < bookingRequest.selectedTables.length - 1 && (
+              {index < bookingRequestState.selectedTables.length - 1 && (
                 <View className="h-[1px] bg-white/10 my-2" />
               )}
             </View>
@@ -277,72 +406,71 @@ export default function PaymentDetailScreen() {
   );
 
   const PaymentMethods = () => {
-    const [selectedMethod, setSelectedMethod] = useState<'MOMO' | 'VNPAY'>('VNPAY');
+    const [selectedMethod, setSelectedMethod] = useState<"MOMO" | "VNPAY">("VNPAY");
 
     return (
       <View className="px-4 mb-4">
         <View className="bg-neutral-900 rounded-2xl p-4">
-          <Text className="text-white/80 font-semibold mb-4">Phương thức thanh toán</Text>
-          
+          <Text className="text-white/80 font-semibold mb-4">
+            Phương thức thanh toán
+          </Text>
+
           <View className="space-y-3">
             {/* VNPAY */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => {
-                setSelectedMethod('VNPAY');
-                bookingRequest.paymentDestination = 'VNPAY';
+                setSelectedMethod("VNPAY");
+                bookingRequestState.paymentDestination = "VNPAY";
               }}
               className={`flex-row items-center p-3 rounded-xl ${
-                selectedMethod === 'VNPAY' ? 'bg-white/10' : 'border border-white/10'
+                selectedMethod === "VNPAY"
+                  ? "bg-white/10"
+                  : "border border-white/10"
               }`}
             >
-              <Image 
-                source={require('@/assets/images/vnpay-logo.png')}
+              <Image
+                source={require("@/assets/images/vnpay-logo.png")}
                 className="w-8 h-8"
                 resizeMode="contain"
               />
               <View className="flex-1 ml-3">
                 <Text className="text-white font-medium">VNPAY</Text>
-                <Text className="text-white/60 text-xs">Thanh toán qua VNPAY QR</Text>
+                <Text className="text-white/60 text-xs">
+                  Thanh toán qua VNPAY QR
+                </Text>
               </View>
-              <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                selectedMethod === 'VNPAY' 
-                  ? 'border-yellow-500 bg-yellow-500' 
-                  : 'border-white/30'
-              }`}>
-                {selectedMethod === 'VNPAY' && (
+              <View
+                className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
+                  selectedMethod === "VNPAY"
+                    ? "border-yellow-500 bg-yellow-500"
+                    : "border-white/30"
+                }`}
+              >
+                {selectedMethod === "VNPAY" && (
                   <Ionicons name="checkmark" size={14} color="black" />
                 )}
               </View>
             </TouchableOpacity>
 
             {/* MOMO */}
-            <TouchableOpacity 
-              onPress={() => {
-                setSelectedMethod('MOMO');
-                bookingRequest.paymentDestination = 'MOMO';
-              }}
-              className={`flex-row items-center p-3 rounded-xl ${
-                selectedMethod === 'MOMO' ? 'bg-white/10' : 'border border-white/10'
-              }`}
+            <TouchableOpacity
+              disabled={true}
+              className="flex-row items-center p-3 rounded-xl border border-white/5 opacity-50"
             >
-              <Image 
-                source={require('@/assets/images/momo-logo.png')}
+              <Image
+                source={require("@/assets/images/momo-logo.png")}
                 className="w-8 h-8"
                 resizeMode="contain"
               />
               <View className="flex-1 ml-3">
-                <Text className="text-white font-medium">MoMo (Chưa khả dụng)</Text>
-                <Text className="text-white/60 text-xs">Thanh toán qua ví MoMo</Text>
+                <Text className="text-white/60 font-medium">
+                  MoMo (Chưa khả dụng)
+                </Text>
+                <Text className="text-white/40 text-xs">
+                  Thanh toán qua ví MoMo
+                </Text>
               </View>
-              <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                selectedMethod === 'MOMO' 
-                  ? 'border-yellow-500 bg-yellow-500' 
-                  : 'border-white/30'
-              }`}>
-                {selectedMethod === 'MOMO' && (
-                  <Ionicons name="checkmark" size={14} color="black" />
-                )}
-              </View>
+              <View className="w-6 h-6 rounded-full border-2 border-white/10 items-center justify-center" />
             </TouchableOpacity>
           </View>
         </View>
@@ -357,8 +485,8 @@ export default function PaymentDetailScreen() {
         {barDetail && (
           <View>
             {/* Thêm ảnh quán */}
-            <Image 
-              source={{ uri: barDetail.images.split(',')[0] }} 
+            <Image
+              source={{ uri: barDetail.images.split(",")[0] }}
               className="w-full h-40 rounded-xl mb-4"
               resizeMode="cover"
             />
@@ -366,9 +494,7 @@ export default function PaymentDetailScreen() {
               <Text className="text-yellow-500 text-lg font-medium">
                 {barDetail.barName}
               </Text>
-              <Text className="text-white/60">
-                {barDetail.address}
-              </Text>
+              <Text className="text-white/60">{barDetail.address}</Text>
               {barDetail.phoneNumber && (
                 <View className="flex-row items-center">
                   <Ionicons name="call-outline" size={16} color="#ffffff" />
@@ -384,11 +510,135 @@ export default function PaymentDetailScreen() {
     </View>
   );
 
+  const VoucherInput = () => {
+    const [voucherCode, setVoucherCode] = useState("");
+    const [isApplying, setIsApplying] = useState(false);
+    const [error, setError] = useState("");
+
+    const handleApplyVoucher = async () => {
+      if (!voucherCode.trim()) return;
+
+      try {
+        setIsApplying(true);
+        setError("");
+
+        const response = await voucherService.getVoucher(
+          bookingRequestState.bookingDate,
+          bookingRequestState.bookingTime,
+          voucherCode.trim(),
+          bookingRequestState.barId
+        );
+
+        if (response.statusCode === 200 && response.data) {
+          // Tính toán giá sau khi áp dụng giảm giá của quán
+          const priceAfterBarDiscount = originalPrice - (originalPrice * discount) / 100;
+
+          // Tính toán số tiền giảm từ voucher
+          const voucherDiscountAmount = Math.min(
+            priceAfterBarDiscount * (response.data.discount / 100),
+            response.data.maxPrice
+          );
+
+          // Tính giá cuối cùng
+          const finalPrice = priceAfterBarDiscount - voucherDiscountAmount;
+
+          // Cập nhật bookingRequest với mã voucher
+          setBookingRequestState(prev => ({
+            ...prev,
+            voucherCode: voucherCode.trim()
+          }));
+
+          setAppliedVoucher(response.data);
+          setCurrentTotalPrice(finalPrice);
+        }
+      } catch (error: any) {
+        if (axios.isAxiosError(error)) {
+          setError(error.response?.data?.message || "Có lỗi xảy ra");
+        } else {
+          setError("Có lỗi xảy ra");
+        }
+      } finally {
+        setIsApplying(false);
+      }
+    };
+
+    const handleRemoveVoucher = () => {
+      setAppliedVoucher(null);
+      setVoucherCode("");
+      setError("");
+      
+      setBookingRequestState(prev => ({
+        ...prev,
+        voucherCode: null
+      }));
+      
+      const priceAfterBarDiscount = originalPrice - (originalPrice * discount) / 100;
+      setCurrentTotalPrice(priceAfterBarDiscount);
+    };
+
+    return (
+      <View className="px-4 mb-4">
+        <View className="bg-neutral-900 rounded-2xl p-4">
+          <Text className="text-white/80 font-semibold mb-4">Mã giảm giá</Text>
+
+          <View className="flex-row space-x-3">
+            <View className="flex-1 bg-white/5 rounded-xl px-4 py-3">
+              <TextInput
+                value={voucherCode}
+                onChangeText={setVoucherCode}
+                placeholder="Nhập mã giảm giá"
+                placeholderTextColor="#9CA3AF"
+                className="text-white"
+                autoCapitalize="characters"
+                editable={!appliedVoucher}
+              />
+            </View>
+
+            {appliedVoucher ? (
+              <TouchableOpacity
+                onPress={handleRemoveVoucher}
+                className="bg-red-500/20 px-4 rounded-xl items-center justify-center"
+              >
+                <Text className="text-red-500 font-medium">Hủy</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={handleApplyVoucher}
+                disabled={isApplying || !voucherCode.trim()}
+                className={`bg-yellow-500 px-4 rounded-xl items-center justify-center ${
+                  isApplying || !voucherCode.trim() ? "opacity-50" : ""
+                }`}
+              >
+                <Text className="text-black font-medium">
+                  {isApplying ? "Đang áp dụng..." : "Áp dụng"}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {error ? (
+            <Text className="text-red-500 text-sm mt-2">{error}</Text>
+          ) : appliedVoucher ? (
+            <View className="mt-3 bg-yellow-500/20 p-3 rounded-xl">
+              <Text className="text-yellow-500 font-medium">
+                Đã áp dụng voucher {appliedVoucher.eventVoucherName}
+              </Text>
+              <Text className="text-yellow-500/80 text-sm mt-1">
+                Giảm {appliedVoucher.discount}% (tối đa{" "}
+                {appliedVoucher.maxPrice.toLocaleString("vi-VN")}đ)
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1 mt-0.5" edges={['top']}>
+      <SafeAreaView className="flex-1 mt-0.5" edges={["top"]}>
         <View className="px-4 pt-1 pb-2 flex-row items-center border-b border-white/10">
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => router.back()}
             className="h-9 w-9 bg-neutral-800 rounded-full items-center justify-center"
           >
@@ -404,12 +654,14 @@ export default function PaymentDetailScreen() {
           <BookingInfo />
           <TablesList />
           <DrinksList />
+          <VoucherInput />
           <PaymentMethods />
           <PaymentSummary />
-          
+
           {/* Điều khoản */}
           <Text className="text-white/60 text-sm px-4 mb-6 text-center">
-            Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản đặt bàn của chúng tôi
+            Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản đặt bàn của
+            chúng tôi
           </Text>
         </ScrollView>
 
@@ -418,16 +670,16 @@ export default function PaymentDetailScreen() {
             onPress={handlePaymentConfirm}
             disabled={isProcessing}
             className={`bg-yellow-500 p-4 rounded-xl flex-row items-center justify-center ${
-              isProcessing ? 'opacity-50' : ''
+              isProcessing ? "opacity-50" : ""
             }`}
           >
-            <Ionicons 
-              name={isProcessing ? 'time-outline' : 'checkmark-circle-outline'} 
-              size={20} 
-              color="black" 
+            <Ionicons
+              name={isProcessing ? "time-outline" : "checkmark-circle-outline"}
+              size={20}
+              color="black"
             />
             <Text className="text-black font-bold ml-2">
-              {isProcessing ? 'Đang xử lý...' : 'Thanh toán ngay'}
+              {isProcessing ? "Đang xử lý..." : "Thanh toán ngay"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -470,41 +722,66 @@ export default function PaymentDetailScreen() {
                 {/* Thông tin đặt bàn */}
                 <View className="bg-white/5 rounded-xl p-4 mb-4">
                   <View className="flex-row items-center mb-3">
-                    <Ionicons name="calendar-outline" size={20} color="#ffffff" />
+                    <Ionicons
+                      name="calendar-outline"
+                      size={20}
+                      color="#ffffff"
+                    />
                     <Text className="text-white ml-2">
-                      {format(new Date(bookingRequest.bookingDate), 'EEEE, dd/MM/yyyy', { locale: vi })}
+                      {format(
+                        new Date(bookingRequestState.bookingDate),
+                        "EEEE, dd/MM/yyyy",
+                        { locale: vi }
+                      )}
                     </Text>
                   </View>
-                  
+
                   <View className="flex-row items-center mb-3">
                     <Ionicons name="time-outline" size={20} color="#ffffff" />
                     <Text className="text-white ml-2">
-                      {bookingRequest.bookingTime.slice(0, -3)}
+                      {bookingRequestState.bookingTime.slice(0, -3)}
                     </Text>
                   </View>
 
                   <View className="flex-row items-center">
-                    <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
+                    <MaterialCommunityIcons
+                      name="table-chair"
+                      size={20}
+                      color="#ffffff"
+                    />
                     <Text className="text-white ml-2">
-                      {bookingRequest.tableIds.length} bàn đ�� chọn
+                      {bookingRequestState.tableIds.length} bàn đã chọn
                     </Text>
                   </View>
                 </View>
 
                 {/* Thêm vào trong phần content của Modal, sau phần thông tin đặt bàn và trước phần đồ uống */}
                 <View className="bg-white/5 rounded-xl p-4 mb-4">
-                  <Text className="text-white/80 font-medium mb-3">Bàn đã chọn</Text>
+                  <Text className="text-white/80 font-medium mb-3">
+                    Bàn đã chọn
+                  </Text>
                   <View className="space-y-3">
-                    {bookingRequest.selectedTables.map((table, index) => (
-                      <View key={table.id} className="flex-row items-center justify-between">
+                    {bookingRequestState.selectedTables.map((table, index) => (
+                      <View
+                        key={table.id}
+                        className="flex-row items-center justify-between"
+                      >
                         <View className="flex-row items-center">
-                          <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
+                          <MaterialCommunityIcons
+                            name="table-chair"
+                            size={20}
+                            color="#ffffff"
+                          />
                           <View className="ml-3">
-                            <Text className="text-white font-medium">Bàn {table.name}</Text>
-                            <Text className="text-white/60 text-sm">{table.typeName}</Text>
+                            <Text className="text-white font-medium">
+                              Bàn {table.name}
+                            </Text>
+                            <Text className="text-white/60 text-sm">
+                              {table.typeName}
+                            </Text>
                           </View>
                         </View>
-                        {index < bookingRequest.selectedTables.length - 1 && (
+                        {index < bookingRequestState.selectedTables.length - 1 && (
                           <View className="h-[1px] bg-white/10 my-2" />
                         )}
                       </View>
@@ -514,17 +791,24 @@ export default function PaymentDetailScreen() {
 
                 {/* Thông tin đồ uống */}
                 <View className="bg-white/5 rounded-xl p-4 mb-4">
-                  <Text className="text-white/80 font-medium mb-3">Đồ uống đã chọn</Text>
+                  <Text className="text-white/80 font-medium mb-3">
+                    Đồ uống đã chọn
+                  </Text>
                   <View className="space-y-3">
-                    {bookingRequest.drinks.map((orderDrink) => {
-                      const drink = drinks.find(d => d.drinkId === orderDrink.drinkId);
+                    {bookingRequestState.drinks.map((orderDrink) => {
+                      const drink = drinks.find(
+                        (d) => d.drinkId === orderDrink.drinkId
+                      );
                       if (!drink) return null;
-                      
+
                       return (
-                        <View key={drink.drinkId} className="flex-row justify-between items-center">
+                        <View
+                          key={drink.drinkId}
+                          className="flex-row justify-between items-center"
+                        >
                           <View className="flex-row items-center flex-1">
-                            <Image 
-                              source={{ uri: drink.images.split(',')[0] }}
+                            <Image
+                              source={{ uri: drink.images.split(",")[0] }}
                               className="w-10 h-10 rounded-lg"
                             />
                             <View className="ml-3 flex-1">
@@ -532,12 +816,16 @@ export default function PaymentDetailScreen() {
                                 {drink.drinkName}
                               </Text>
                               <Text className="text-white/60 text-sm">
-                                {drink.price.toLocaleString('vi-VN')}đ x {orderDrink.quantity}
+                                {drink.price.toLocaleString("vi-VN")}đ x{" "}
+                                {orderDrink.quantity}
                               </Text>
                             </View>
                           </View>
                           <Text className="text-yellow-500 font-medium ml-2">
-                            {(drink.price * orderDrink.quantity).toLocaleString('vi-VN')}đ
+                            {(drink.price * orderDrink.quantity).toLocaleString(
+                              "vi-VN"
+                            )}
+                            đ
                           </Text>
                         </View>
                       );
@@ -546,26 +834,86 @@ export default function PaymentDetailScreen() {
 
                   {/* Tổng tiền */}
                   <View className="mt-4 pt-3 border-t border-white/10">
-                    <View className="flex-row justify-between items-center">
-                      <Text className="text-white">Tổng cộng</Text>
-                      <Text className="text-yellow-500 font-bold">
-                        {totalPrice.toLocaleString('vi-VN')}đ
-                      </Text>
-                    </View>
-                    {discount > 0 && (
-                      <View className="flex-row items-center mt-2">
-                        <View className="bg-yellow-500/20 px-2 py-1 rounded-lg">
-                          <Text className="text-yellow-500 text-xs font-bold">-{discount}%</Text>
+                    <View className="space-y-3">
+                      <View className="flex-row justify-between items-center">
+                        <Text className="text-white/60">Tổng tiền đồ uống</Text>
+                        <Text className="text-white">
+                          {originalPrice.toLocaleString("vi-VN")}đ
+                        </Text>
+                      </View>
+
+                      {discount > 0 && (
+                        <View className="flex-row justify-between items-center">
+                          <View className="flex-row items-center">
+                            <Text className="text-white/60">Chiết khấu khi đặt trước</Text>
+                            <View className="bg-yellow-500/20 px-2 py-0.5 rounded-lg ml-2">
+                              <Text className="text-yellow-500 text-xs font-bold">
+                                -{discount}%
+                              </Text>
+                            </View>
+                          </View>
+                          <Text className="text-yellow-500">
+                            -{((originalPrice * discount) / 100).toLocaleString("vi-VN")}đ
+                          </Text>
                         </View>
-                        <Text className="text-white/60 ml-2">Đã áp dụng giảm giá</Text>
+                      )}
+                    </View>
+
+                    {/* Phần Voucher nếu có */}
+                    {appliedVoucher && (
+                      <View className="border-t border-white/10 mt-3">
+                        <View className="space-y-3 pt-3">
+                          {/* Tổng sau giảm giá quán */}
+                          <View className="flex-row justify-between">
+                            <Text className="text-white font-medium">Tổng sau chiết khấu</Text>
+                            <Text className="text-white font-medium">
+                              {(originalPrice - (originalPrice * discount) / 100).toLocaleString("vi-VN")}đ
+                            </Text>
+                          </View>
+
+                          {/* Voucher */}
+                          <View className="flex-row justify-between">
+                            <View className="flex-row items-center flex-1 mr-3">
+                              <Text 
+                                className="text-white/60 flex-shrink" 
+                                numberOfLines={1}
+                                ellipsizeMode="tail"
+                              >
+                                Voucher {appliedVoucher.eventVoucherName}
+                              </Text>
+                              <View className="bg-yellow-500/20 px-2 py-0.5 rounded-lg ml-2 flex-shrink-0">
+                                <Text className="text-yellow-500 text-xs font-bold">
+                                  -{appliedVoucher.discount}%
+                                </Text>
+                              </View>
+                            </View>
+                            <Text className="text-yellow-500 flex-shrink-0">
+                              -{(Math.min(
+                                (originalPrice - (originalPrice * discount) / 100) * (appliedVoucher.discount / 100),
+                                appliedVoucher.maxPrice
+                              )).toLocaleString("vi-VN")}đ
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     )}
+
+                    {/* Tổng thanh toán cuối cùng */}
+                    <View className="border-t border-white/10 mt-3">
+                      <View className="flex-row justify-between pt-3">
+                        <Text className="text-white font-semibold mt-1">Tổng thanh toán</Text>
+                        <Text className="text-yellow-500 font-bold text-lg">
+                          {currentTotalPrice.toLocaleString("vi-VN")}đ
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
 
                 {/* Điều khoản */}
                 <Text className="text-white/60 text-sm mb-6 text-center">
-                  Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản thanh toán của chúng tôi
+                  Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản thanh
+                  toán của chúng tôi
                 </Text>
               </View>
             </ScrollView>
@@ -573,16 +921,14 @@ export default function PaymentDetailScreen() {
             {/* Footer buttons */}
             <View className="p-4 border-t border-white/10">
               <View className="flex-row space-x-3">
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setShowConfirmModal(false)}
                   className="flex-1 bg-white/10 py-4 rounded-xl"
                 >
-                  <Text className="text-white text-center font-bold">
-                    Hủy
-                  </Text>
+                  <Text className="text-white text-center font-bold">Hủy</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={handleConfirmBooking}
                   disabled={isProcessing}
                   className="flex-1 bg-yellow-500 py-4 rounded-xl"

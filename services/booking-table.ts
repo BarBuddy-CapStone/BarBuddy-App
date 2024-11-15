@@ -51,6 +51,7 @@ export interface BookingDrinkRequest {
   bookingDate: string;
   bookingTime: string;
   note: string;
+  voucherCode: string | null;
   tableIds: string[];
   selectedTables: SelectedTableInfo[];
   paymentDestination: string;

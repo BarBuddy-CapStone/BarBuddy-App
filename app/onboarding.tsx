@@ -12,6 +12,8 @@ import Animated, {
 import { useAuth } from '@/contexts/AuthContext';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import messaging from '@react-native-firebase/messaging';
+import { fcmService } from '@/services/fcm';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
@@ -24,24 +26,47 @@ export default function OnboardingScreen() {
 
   const requestPermissions = async () => {
     try {
-      // Kiểm tra xem người dùng đã từ chối quyền chưa
-      const hasDeclinedPermission = await AsyncStorage.getItem('hasDeclinedLocationPermission');
-      if (hasDeclinedPermission) return;
+      // Kiểm tra quyền location
+      const hasDeclinedLocationPermission = await AsyncStorage.getItem('hasDeclinedLocationPermission');
+      if (!hasDeclinedLocationPermission) {
+        const foregroundPermission = await Location.requestForegroundPermissionsAsync();
+        
+        if (foregroundPermission.status !== 'granted') {
+          Alert.alert(
+            'Cần quyền truy cập vị trí',
+            'Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.',
+            [{ text: 'OK' }]
+          );
+          await AsyncStorage.setItem('hasDeclinedLocationPermission', 'true');
+        }
+      }
 
-      // Xin quyền truy cập vị trí
-      const foregroundPermission = await Location.requestForegroundPermissionsAsync();
-      
-      if (foregroundPermission.status !== 'granted') {
-        Alert.alert(
-          'Cần quyền truy cập vị trí',
-          'Ứng dụng cần quyền truy cập vị trí để hiển thị các quán bar gần bạn.',
-          [{ text: 'OK' }]
-        );
-        // Chỉ lưu trạng thái khi người dùng từ chối
-        await AsyncStorage.setItem('hasDeclinedLocationPermission', 'true');
+      // Kiểm tra quyền notification
+      const hasDeclinedNotificationPermission = await AsyncStorage.getItem('hasDeclinedNotificationPermission');
+      if (!hasDeclinedNotificationPermission) {
+        const authStatus = await messaging().requestPermission();
+        const enabled =
+          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+        if (!enabled) {
+          Alert.alert(
+            'Cần quyền thông báo',
+            'Ứng dụng cần quyền thông báo để gửi các thông báo quan trọng đến bạn.',
+            [{ text: 'OK' }]
+          );
+          await AsyncStorage.setItem('hasDeclinedNotificationPermission', 'true');
+        }
+
+        if (Platform.OS === 'android') {
+          await messaging().setAutoInitEnabled(true);
+        }
+
+        // Đăng ký device token cho guest
+        await fcmService.registerGuestDevice();
       }
     } catch (error) {
-      console.error('Lỗi khi xin quyền truy cập vị trí:', error);
+      console.error('Lỗi khi xin quyền:', error);
     }
   };
 
@@ -62,7 +87,6 @@ export default function OnboardingScreen() {
     const startAnimation = async () => {
       if (!isMounted) return;
 
-      // Xin quyền trước khi bắt đầu animation
       await runOnJS(requestPermissions)();
 
       opacity.value = withSequence(

@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useAuth, AuthProvider } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { View, Linking } from 'react-native';
+import '@/services/background-messaging';
 
 // Giữ splash screen hiển thị
 SplashScreen.preventAutoHideAsync();

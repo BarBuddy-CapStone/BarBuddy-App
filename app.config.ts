@@ -57,7 +57,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           ],
           category: ["BROWSABLE", "DEFAULT"]
         }
-      ]
+      ],
+      googleServicesFile: "./google-services.json"
     },
     web: {
       bundler: "metro",
@@ -79,7 +80,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         {
           "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location."
         }
-      ]
+      ],
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging"
     ],
     experiments: {
       typedRoutes: true

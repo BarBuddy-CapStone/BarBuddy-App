@@ -59,6 +59,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Thông báo',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons 
+              name={focused ? 'notifications' : 'notifications-outline'} 
+              size={24} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="booking-history"
         options={{
           title: 'Lịch sử',

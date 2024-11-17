@@ -5,6 +5,9 @@ import { authService } from '@/services/auth';
 import axios from 'axios'; // Thêm import axios
 import { googleAuthService } from '@/services/google-auth';
 import { LoginResponse } from '@/types/auth';
+import { notificationService } from '@/services/notification';
+import { Platform } from 'react-native';
+import { fcmService } from '@/services/fcm';
 
 // Định nghĩa kiểu dữ liệu cho user
 type User = UserInfo;
@@ -38,13 +41,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Thêm state mới
   const [allowNavigation, setAllowNavigation] = useState(true);
 
   // Load trạng thái ngay khi component mount
   useEffect(() => {
     loadStoredAuth();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      notificationService.setupMessageListeners();
+    }
+  }, [isAuthenticated, user]);
 
   const loadStoredAuth = async () => {
     try {
@@ -75,17 +83,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setError(null);
 
-      const user = await authService.login({ email, password });
+      const loginRequest = {
+        email,
+        password
+      };
 
-      // Lưu thông tin authentication
+      const response = await authService.login(loginRequest);
+
       await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-        user
+        user: response
       }));
 
-      await AsyncStorage.setItem('userToken', user.accessToken);
-      setUser(user);
+      await AsyncStorage.setItem('userToken', response.accessToken);
+      setUser(response);
       setIsAuthenticated(true);
+
+      // Cập nhật device token sau khi login thành công
+      await fcmService.updateAccountDeviceToken(true);
+
     } catch (error: any) {
+      console.error('Login Error:', error.message);
       setError(error.message);
       throw error;
     }
@@ -93,15 +110,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      // Cập nhật device token với isLoginOrLogout = false
+      await fcmService.updateAccountDeviceToken(false);
+
       // Xóa user từ state
       setUser(null);
-      setIsAuthenticated(false); // Thêm dòng này
+      setIsAuthenticated(false);
       
       // Xóa token và thông tin user từ AsyncStorage
       await AsyncStorage.multiRemove([
         AUTH_STORAGE_KEY,
         GUEST_MODE_KEY,
-        // Thêm các key khác nếu có lưu thêm thông tin
       ]);
       
       // Xóa token khỏi header của axios

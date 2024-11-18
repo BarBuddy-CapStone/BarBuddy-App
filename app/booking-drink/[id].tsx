@@ -229,7 +229,8 @@ export default function BookingDrinkScreen() {
       tableIds: JSON.parse(params.tableIds as string),
       selectedTables: selectedTablesInfo,
       paymentDestination: "VNPAY",
-      drinks
+      drinks,
+      voucherCode: params.voucherCode as string || ''
     };
 
     router.push({
@@ -700,6 +701,9 @@ export default function BookingDrinkScreen() {
     );
   };
 
+  // Thêm state để lưu emotion được phân tích
+  const [analyzedEmotion, setAnalyzedEmotion] = useState<string>('');
+  
   // Cập nhật hàm handleSendEmotion
   const handleSendEmotion = async () => {
     if (!emotionText.trim()) return;
@@ -710,11 +714,13 @@ export default function BookingDrinkScreen() {
     setSelectedEmotion('');
     
     try {
-      const recommendations = await emotionService.getDrinkRecommendations(
+      const response = await emotionService.getDrinkRecommendations(
         emotionText,
         params.id as string
       );
-      setRecommendedDrinks(recommendations);
+      
+      setRecommendedDrinks(response.drinkList);
+      setAnalyzedEmotion(response.emotion);
       setIsEmotionMode(true);
       setCurrentSource('emotion');
     } catch (error) {
@@ -986,7 +992,7 @@ export default function BookingDrinkScreen() {
                                       </Text>
                                     </View>
                                     
-                                    {/* Nút điều chỉnh số lượng */}
+                                    {/* Nút điều chỉnh s�� lượng */}
                                     <View className="bg-white/5 rounded-xl p-1">
                                       <View className="flex-row items-center">
                                         <TouchableOpacity

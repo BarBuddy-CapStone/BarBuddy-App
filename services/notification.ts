@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
 import api from './api';
+import { PermissionsAndroid } from 'react-native';
 
 export interface Notification {
   id: string;
@@ -20,14 +21,23 @@ class NotificationService {
   async registerForPushNotificationsAsync() {
     try {
       if (Platform.OS === 'android') {
-        await messaging().requestPermission({
-          alert: true,
-          announcement: false,
-          badge: true,
-          carPlay: false,
-          provisional: false,
-          sound: true,
-        });
+        // Kiểm tra phiên bản Android
+        if (Platform.Version >= 33) { // Android 13 trở lên
+          const permission = await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+            {
+              title: "Yêu cầu quyền thông báo",
+              message: "Ứng dụng cần quyền thông báo để gửi các thông báo quan trọng đến bạn",
+              buttonNeutral: "Hỏi lại sau",
+              buttonNegative: "Từ chối",
+              buttonPositive: "Đồng ý"
+            }
+          );
+          
+          if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+            return null;
+          }
+        }
       }
 
       const fcmToken = await messaging().getToken();

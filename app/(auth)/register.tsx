@@ -96,7 +96,7 @@ export default function RegisterScreen() {
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [otp, setOtp] = useState('');
-  const [timeLeft, setTimeLeft] = useState(5);
+  const [timeLeft, setTimeLeft] = useState(60);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const otpInputRefs = useRef(Array(6).fill(0).map(() => React.createRef<TextInput>()));
   const [isResendingOTP, setIsResendingOTP] = useState(false);
@@ -249,7 +249,7 @@ export default function RegisterScreen() {
   };
 
   const handleBack = () => {
-    router.replace('/(auth)/welcome');
+    router.back();
   };
 
   const handleRegister = async () => {

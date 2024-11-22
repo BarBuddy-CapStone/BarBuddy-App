@@ -8,6 +8,8 @@ import { router } from 'expo-router';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { savePreviousScreen } from '@/utils/navigation';
+import { GuestView } from '@/components/GuestView';
 
 // Định nghĩa interfaces
 interface MenuItem {
@@ -162,36 +164,6 @@ const LogoutModal = memo(({
   </Modal>
 ));
 
-const GuestView = memo(() => (
-  <View className="flex-1 bg-black p-6 items-center justify-center">
-    <Ionicons name="person-circle-outline" size={64} color="#EAB308" />
-    <Text className="text-white text-xl font-bold mt-4 text-center">
-      Chưa đăng nhập
-    </Text>
-    <Text className="text-white/60 text-center mt-2 mb-8">
-      Vui lòng đăng nhập để xem thông tin tài khoản
-    </Text>
-    
-    <TouchableOpacity
-      className="bg-yellow-500 py-3 px-6 rounded-xl w-full"
-      onPress={() => router.push('/(auth)/login')}
-    >
-      <Text className="text-black font-bold text-center">
-        Đăng nhập
-      </Text>
-    </TouchableOpacity>
-
-    <TouchableOpacity
-      className="bg-transparent border border-yellow-500 mt-3 py-3 px-6 rounded-xl w-full"
-      onPress={() => router.push('/(auth)/register')}
-    >
-      <Text className="text-yellow-500 font-bold text-center">
-        Đăng ký
-      </Text>
-    </TouchableOpacity>
-  </View>
-));
-
 export default function ProfileScreen() {
   const { user, logout, isGuest, setIsGuest } = useAuth();
   const [account, setAccount] = useState<Account | null>(null);
@@ -275,7 +247,7 @@ export default function ProfileScreen() {
   // Render content based on guest status
   const renderContent = () => {
     if (isGuest || !user?.accountId) {
-      return <GuestView />;
+      return <GuestView screenName="profile" />;
     }
 
     return (

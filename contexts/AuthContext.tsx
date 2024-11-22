@@ -55,6 +55,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, user]);
 
+  useEffect(() => {
+    tokenService.setAuthContext({
+      setUser,
+      setIsAuthenticated,
+      setIsGuest,
+      resetAllStorage
+    });
+  }, []);
+
   const loadStoredAuth = async () => {
     try {
       const [authValue, guestValue] = await Promise.all([

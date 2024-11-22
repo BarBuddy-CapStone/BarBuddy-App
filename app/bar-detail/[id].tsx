@@ -34,6 +34,7 @@ import * as Location from "expo-location";
 import { GoongLocation } from "@/services/goong";
 import { eventService, type Event } from "@/services/event";
 import { format } from "date-fns";
+import { savePreviousScreen } from '@/utils/navigation';
 
 // Thêm hàm xử lý images
 const getImageArray = (imagesString: string): string[] => {
@@ -2160,13 +2161,15 @@ export default function BarDetailScreen() {
       <AuthModal
         isVisible={isAuthModalVisible}
         onClose={() => setIsAuthModalVisible(false)}
-        onLogin={() => {
+        onLogin={async () => {
           setIsAuthModalVisible(false);
-          router.push("/login");
+          await savePreviousScreen('bar-detail');
+          router.push('/login');
         }}
-        onRegister={() => {
+        onRegister={async () => {
           setIsAuthModalVisible(false);
-          router.push("/register");
+          await savePreviousScreen('bar-detail');
+          router.push('/register');
         }}
       />
     </View>

@@ -7,30 +7,34 @@ import Animated, {
   withTiming,
   withSequence,
   runOnJS,
-  cancelAnimation
+  cancelAnimation,
+  withDelay
 } from 'react-native-reanimated';
 import { useAuth } from '@/contexts/AuthContext';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import { fcmService } from '@/services/fcm';
+import { tokenService } from '@/services/token';
+import { ActivityIndicator } from 'react-native';
+import { notificationService } from '@/services/notification';
 
 const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 export default function OnboardingScreen() {
   const router = useRouter();
-  const { isGuest, isLoading } = useAuth();
+  const { isGuest, isLoading, resetAllStorage } = useAuth();
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.3);
+  const spinnerOpacity = useSharedValue(0);
   const hasNavigated = useRef(false);
 
   const requestPermissions = async () => {
     try {
-      // Kiểm tra quyền location
+      // Kiểm tra quyền vị trí
       const hasDeclinedLocationPermission = await AsyncStorage.getItem('hasDeclinedLocationPermission');
       if (!hasDeclinedLocationPermission) {
         const foregroundPermission = await Location.requestForegroundPermissionsAsync();
-        
         if (foregroundPermission.status !== 'granted') {
           Alert.alert(
             'Cần quyền truy cập vị trí',
@@ -40,85 +44,133 @@ export default function OnboardingScreen() {
           await AsyncStorage.setItem('hasDeclinedLocationPermission', 'true');
         }
       }
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Kiểm tra quyền notification
+      // Kiểm tra quyền thông báo
       const hasDeclinedNotificationPermission = await AsyncStorage.getItem('hasDeclinedNotificationPermission');
       if (!hasDeclinedNotificationPermission) {
-        const authStatus = await messaging().requestPermission();
-        const enabled =
-          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-        if (!enabled) {
-          Alert.alert(
-            'Cần quyền thông báo',
-            'Ứng dụng cần quyền thông báo để gửi các thông báo quan trọng đến bạn.',
-            [{ text: 'OK' }]
-          );
+        try {
+          // Yêu cầu quyền thông báo trực tiếp
+          const permissionResult = await messaging().requestPermission();
+          
+          if (permissionResult === messaging.AuthorizationStatus.DENIED) {
+            Alert.alert(
+              'Cần quyền thông báo',
+              'Ứng dụng cần quyền thông báo để gửi các thông báo quan trọng đến bạn.',
+              [{ text: 'OK' }]
+            );
+            await AsyncStorage.setItem('hasDeclinedNotificationPermission', 'true');
+          } else if (permissionResult === messaging.AuthorizationStatus.AUTHORIZED ||
+                    permissionResult === messaging.AuthorizationStatus.PROVISIONAL) {
+            if (Platform.OS === 'android') {
+              await messaging().setAutoInitEnabled(true);
+            }
+            const fcmToken = await notificationService.registerForPushNotificationsAsync();
+            if (fcmToken) {
+              await fcmService.registerGuestDevice();
+            }
+          }
+        } catch (error) {
+          console.error('Lỗi khi xin quyền thông báo:', error);
           await AsyncStorage.setItem('hasDeclinedNotificationPermission', 'true');
         }
-
-        if (Platform.OS === 'android') {
-          await messaging().setAutoInitEnabled(true);
+      } else {
+        // Kiểm tra nếu đã có quyền thì đăng ký device
+        const currentPermission = await messaging().hasPermission();
+        if (currentPermission === messaging.AuthorizationStatus.AUTHORIZED ||
+            currentPermission === messaging.AuthorizationStatus.PROVISIONAL) {
+          if (Platform.OS === 'android') {
+            await messaging().setAutoInitEnabled(true);
+          }
+          const fcmToken = await notificationService.registerForPushNotificationsAsync();
+          if (fcmToken) {
+            await fcmService.registerGuestDevice();
+          }
         }
-
-        // Đăng ký device token cho guest
-        await fcmService.registerGuestDevice();
       }
     } catch (error) {
       console.error('Lỗi khi xin quyền:', error);
     }
   };
 
-  const navigateNext = () => {
+  const checkAuth = async () => {
+    if (!isGuest) {
+      try {
+        const isValid = await tokenService.checkAndSetupAuth();
+        if (!isValid) {
+          await resetAllStorage();
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error('Error checking auth:', error);
+        await resetAllStorage();
+        return false;
+      }
+    }
+    return false;
+  };
+
+  const performChecks = async () => {
+    // Hiển thị spinner
+    spinnerOpacity.value = withTiming(1, { duration: 150 });
+    
+    // Thực hiện các kiểm tra
+    await requestPermissions();
+    const isAuthenticated = await checkAuth();
+
+    // Animation kết thúc và chuyển màn hình ngay lập tức
+    opacity.value = withTiming(0, { duration: 200 });
+    scale.value = withTiming(0.8, { duration: 200 });
+    spinnerOpacity.value = withTiming(0, { duration: 200 }, () => {
+      runOnJS(navigateToNextScreen)(isAuthenticated);
+    });
+  };
+
+  const navigateToNextScreen = (isAuthenticated: boolean) => {
     if (isLoading || hasNavigated.current) return;
-    
     hasNavigated.current = true;
-    const nextRoute = isGuest ? '/(tabs)' : '/(auth)/welcome';
     
-    setTimeout(() => {
-      router.replace(nextRoute);
-    }, 100);
+    if (!isAuthenticated && !isGuest) {
+      router.replace('/(auth)/welcome');
+      return;
+    }
+    router.replace('/(tabs)');
   };
 
   useEffect(() => {
     let isMounted = true;
 
-    const startAnimation = async () => {
+    const startAnimation = () => {
       if (!isMounted) return;
 
-      await runOnJS(requestPermissions)();
-
-      opacity.value = withSequence(
-        withTiming(1, { duration: 150 }),
-        withTiming(1, { duration: 700 }),
-        withTiming(0, { duration: 150 }, (finished) => {
-          if (finished && isMounted) {
-            runOnJS(navigateNext)();
-          }
-        })
-      );
-
-      scale.value = withSequence(
-        withTiming(1, { duration: 150 }),
-        withTiming(1, { duration: 700 }),
-        withTiming(0.8, { duration: 150 })
-      );
+      // Animation xuất hiện logo
+      opacity.value = withTiming(1, { duration: 500 });
+      scale.value = withTiming(1, { duration: 500 }, () => {
+        // Sau khi logo xuất hiện, bắt đầu kiểm tra
+        runOnJS(performChecks)();
+      });
     };
 
-    const timeout = setTimeout(startAnimation, 100);
+    // Bắt đầu animation ngay lập tức
+    startAnimation();
 
     return () => {
       isMounted = false;
-      clearTimeout(timeout);
       cancelAnimation(opacity);
       cancelAnimation(scale);
+      cancelAnimation(spinnerOpacity);
     };
   }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
+  const logoStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,
     transform: [{ scale: scale.value }]
+  }));
+
+  const spinnerStyle = useAnimatedStyle(() => ({
+    opacity: spinnerOpacity.value
   }));
 
   return (
@@ -127,8 +179,14 @@ export default function OnboardingScreen() {
         <AnimatedImage
           source={require('../assets/images/icon.png')}
           className="w-48 h-48"
-          style={animatedStyle}
+          style={logoStyle}
         />
+        <Animated.View 
+          className="absolute bottom-32"
+          style={spinnerStyle}
+        >
+          <ActivityIndicator size="large" color="#EAB308" />
+        </Animated.View>
       </Animated.View>
       
       <View className="absolute bottom-10 w-full items-center">

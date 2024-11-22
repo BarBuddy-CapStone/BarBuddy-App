@@ -8,42 +8,7 @@ import { BookingHistory, bookingService } from '@/services/booking';
 import { format, parseISO, differenceInDays } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FeedbackDetail, feedbackService } from '@/services/feedback';
-
-const GuestView = () => {
-  return (
-    <View className="flex-1 bg-black">
-      <SafeAreaView className="flex-1">
-        <View className="flex-1 items-center justify-center p-6">
-          <Ionicons name="lock-closed-outline" size={64} color="#EAB308" />
-          <Text className="text-white text-xl font-bold mt-6 text-center">
-            Đăng nhập để xem lịch sử
-          </Text>
-          <Text className="text-white/60 text-center mt-2 mb-6">
-            Bạn cần đăng nhập để xem lịch sử đặt bàn của mình
-          </Text>
-          
-          <TouchableOpacity
-            className="bg-yellow-500 w-full py-3 rounded-xl"
-            onPress={() => router.push('/login')}
-          >
-            <Text className="text-black font-bold text-center text-lg">
-              Đăng nhập ngay
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className="mt-4 w-full py-3 rounded-xl border border-yellow-500"
-            onPress={() => router.push('/register')}
-          >
-            <Text className="text-yellow-500 font-bold text-center text-lg">
-              Đăng ký tài khoản
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </View>
-  );
-};
+import { GuestView } from '@/components/GuestView';
 
 const FilterTab = memo(({ 
   active, 
@@ -908,7 +873,7 @@ export default function BookingHistoryScreen() {
 
   const keyExtractor = useCallback((item: BookingHistory) => item.bookingId, []);
 
-  // Nhóm tất cả useMemo hooks
+  // Nh��m tất cả useMemo hooks
   const filteredBookings = useMemo(() => {
     // Lọc theo status
     let filtered = bookings.filter(booking => booking.status === selectedStatus);
@@ -1072,7 +1037,7 @@ export default function BookingHistoryScreen() {
   }, [fromBooking, params.fromPayment]);
 
   if (isGuest || !user?.accountId) {
-    return <GuestView />;
+    return <GuestView screenName="booking-history" />;
   }
 
   return Platform.OS === 'ios' ? (

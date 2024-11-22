@@ -21,6 +21,7 @@ import { validateEmail, validatePassword } from '@/utils/validation';
 import { ScrollView } from 'react-native';
 import { googleAuthService } from '@/services/google-auth';
 import { MaterialIcons } from '@expo/vector-icons';
+import { getPreviousScreen, clearPreviousScreen } from '@/utils/navigation';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -60,7 +61,37 @@ export default function LoginScreen() {
   }, [error]);
 
   const handleBack = () => {
-    router.replace('/(auth)/welcome');
+    router.back();
+  };
+
+  const handleLoginSuccess = async () => {
+    try {
+      const previousScreen = await getPreviousScreen();
+      
+      // Clear previous screen sau khi đã lấy
+      await clearPreviousScreen();
+      
+      if (previousScreen) {
+        switch (previousScreen) {
+          case 'profile':
+            router.replace('/(tabs)/profile');
+            break;
+          case 'booking-history':
+            router.replace('/(tabs)/booking-history');
+            break;
+          case 'bar-detail':
+            router.back();
+            break;
+          default:
+            router.replace('/(tabs)');
+        }
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch (error) {
+      console.error('Error handling login success:', error);
+      router.replace('/(tabs)');
+    }
   };
 
   const handleLogin = async () => {
@@ -98,17 +129,7 @@ export default function LoginScreen() {
       );
 
       await login(email, password);
-
-      // Animation hoàn thành
-      progressWidth.value = withTiming(0);
-      buttonScale.value = withSequence(
-        withSpring(1.05),
-        withSpring(1)
-      );
-
-      setTimeout(() => {
-        router.replace('/(tabs)');
-      }, 500);
+      await handleLoginSuccess();
 
     } catch (err: any) {
       // Reset animation khi có lỗi
@@ -190,32 +211,8 @@ export default function LoginScreen() {
       );
 
       const response = await loginWithGoogle();
-      
-      // Reset animation và loading state nếu response là null (người dùng hủy)
-      if (!response) {
-        // Dừng tất cả animation trước
-        googleProgressWidth.value = withTiming(0, undefined, (finished) => {
-          if (finished) {
-            runOnJS(setError)('Đăng nhập đã bị hủy');
-          }
-        });
-        googleButtonScale.value = withSpring(1);
-        googleLoadingRotate.value = 0;
-        setIsGoogleLoading(false);
-        return;
-      }
-      
-      if (response.statusCode === 200 && response.data) {
-        // Animation hoàn thành
-        googleProgressWidth.value = withTiming(0);
-        googleButtonScale.value = withSequence(
-          withSpring(1.05),
-          withSpring(1)
-        );
-
-        setTimeout(() => {
-          router.replace('/(tabs)');
-        }, 500);
+      if (response) {
+        await handleLoginSuccess();
       }
     } catch (error: any) {
       // Reset animation khi có lỗi

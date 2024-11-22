@@ -2,6 +2,7 @@ import api from './api';
 import { ErrorResponse, LoginRequest, LoginResponse, UserInfo } from '@/types/auth';
 import { jwtDecode } from 'jwt-decode';
 import { AxiosError } from 'axios';
+import { tokenService } from '@/services/token';
 
 interface JwtPayload {
   'http://schemas.microsoft.com/ws/2008/06/identity/claims/role': string;
@@ -44,7 +45,10 @@ class AuthService {
       const response = await api.post<LoginResponse>('/api/authen/login', credentials);
       
       if (response.data.statusCode === 200 && response.data.data) {
-        const decodedToken = jwtDecode<JwtPayload>(response.data.data.accessToken);
+        const { accessToken, refreshToken } = response.data.data;
+        await tokenService.saveTokens(accessToken, refreshToken);
+        
+        const decodedToken = jwtDecode<JwtPayload>(accessToken);
         const role = decodedToken['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
         
         if (role !== 'CUSTOMER') {

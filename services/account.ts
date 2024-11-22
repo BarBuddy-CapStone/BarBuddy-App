@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 import { validateFullname, validatePhone, validateBirthDate } from '@/utils/validation';
 import { format } from 'date-fns';
 import * as FileSystem from 'expo-file-system';
@@ -23,8 +22,8 @@ export type UpdateAccountData = {
 class AccountService {
   async getAccountInfo(accountId: string): Promise<Account> {
     try {
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/v1/customer/${accountId}`
+      const response = await api.get(
+        `/api/v1/customer/${accountId}`
       );
       return response.data.data;
     } catch (error) {
@@ -61,8 +60,8 @@ class AccountService {
         ...data
       };
 
-      const response = await axios.patch(
-        `${API_CONFIG.BASE_URL}/api/v1/customer-account?accountId=${accountId}`,
+      const response = await api.patch(
+        `/api/v1/customer-account?accountId=${accountId}`,
         payload
       );
       return response.data.data;
@@ -104,8 +103,8 @@ class AccountService {
         name: `avatar.${extension || 'jpg'}`
       } as any);
 
-      const response = await axios.patch(
-        `${API_CONFIG.BASE_URL}/api/v1/customer/avatar/${accountId}`,
+      const response = await api.patch(
+        `/api/v1/customer/avatar/${accountId}`,
         formData,
         {
           headers: {
@@ -118,10 +117,6 @@ class AccountService {
       return response.data.data;
     } catch (error) {
       console.error('Error uploading avatar:', error);
-      if (axios.isAxiosError(error) && error.response?.data?.errors?.Image) {
-        // Trả về lỗi cụ thể từ API
-        throw new Error(error.response.data.errors.Image[0]);
-      }
       throw error;
     }
   }

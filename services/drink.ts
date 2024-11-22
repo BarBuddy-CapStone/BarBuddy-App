@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 
 export type Drink = {
   drinkId: string;
@@ -36,9 +35,7 @@ export interface DrinkCategory {
 class DrinkService {
   async getDrinks(barId: string): Promise<Drink[]> {
     try {
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/v1/Drink/customer/${barId}`
-      );
+      const response = await api.get(`/api/v1/Drink/customer/${barId}`);
       return response.data.data;
     } catch (error) {
       console.error('Error fetching drinks:', error);
@@ -48,9 +45,7 @@ class DrinkService {
 
   async getDrinkDetail(drinkId: string): Promise<DrinkDetail | null> {
     try {
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/v1/Drink/${drinkId}`
-      );
+      const response = await api.get(`/api/v1/Drink/${drinkId}`);
       return response.data.data;
     } catch (error) {
       console.error('Error fetching drink detail:', error);

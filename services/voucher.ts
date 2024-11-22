@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 
 export interface VoucherResponse {
   eventVoucherId: string;
@@ -21,8 +20,8 @@ export interface VoucherApiResponse {
 class VoucherService {
   async getVoucher(bookingDate: string, bookingTime: string, voucherCode: string, barId: string) {
     try {
-      const response = await axios.get<VoucherApiResponse>(
-        `${API_CONFIG.BASE_URL}/api/Voucher/getOneVoucher`,
+      const response = await api.get<VoucherApiResponse>(
+        `/api/Voucher/getOneVoucher`,
         {
           params: {
             bookingDate,

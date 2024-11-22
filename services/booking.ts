@@ -1,4 +1,4 @@
-import axios from 'axios';
+import api from './api';
 import { API_CONFIG } from '@/config/api';
 import { getAuthHeader } from '@/utils/auth-header';
 
@@ -67,10 +67,8 @@ class BookingService {
     pageSize: number = 10
   ): Promise<BookingHistoryResponse> {
     try {
-      const authHeader = await getAuthHeader();
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/Booking/${accountId}?PageIndex=${pageIndex}&PageSize=${pageSize}`,
-        authHeader
+      const response = await api.get(
+        `/api/Booking/${accountId}?PageIndex=${pageIndex}&PageSize=${pageSize}`
       );
       return response.data;
     } catch (error) {
@@ -81,10 +79,8 @@ class BookingService {
 
   async getBookingDetail(bookingId: string): Promise<BookingDetailResponse> {
     try {
-      const authHeader = await getAuthHeader();
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/Booking/detail/${bookingId}`,
-        authHeader
+      const response = await api.get(
+        `/api/Booking/detail/${bookingId}`
       );
       return response.data;
     } catch (error) {
@@ -95,16 +91,10 @@ class BookingService {
 
   async cancelBooking(bookingId: string): Promise<boolean> {
     try {
-      const authHeader = await getAuthHeader();
-      if (!authHeader.headers) {
-        throw new Error('Bạn cần đăng nhập để thực hiện chức năng này');
-      }
-
-      const response = await axios.patch(
-        `${API_CONFIG.BASE_URL}/api/Booking/cancel/${bookingId}`,
+      const response = await api.patch(
+        `/api/Booking/cancel/${bookingId}`,
         {},
         {
-          ...authHeader,
           validateStatus: (status) => true
         }
       );

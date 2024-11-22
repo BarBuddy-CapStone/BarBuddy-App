@@ -1,8 +1,6 @@
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 import { Platform } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
-import { getAuthHeader } from '@/utils/auth-header';
 import { signalRService } from '@/services/signalr';
 
 class FCMService {
@@ -15,8 +13,8 @@ class FCMService {
         return null;
       }
 
-      const response = await axios.post(
-        `${API_CONFIG.BASE_URL}/api/Fcm/sign-device-token`,
+      const response = await api.post(
+        `/api/Fcm/sign-device-token`,
         {
           deviceToken: fcmToken,
           platform: Platform.OS
@@ -45,14 +43,12 @@ class FCMService {
         return null;
       }
 
-      const authHeader = await getAuthHeader();
-      const response = await axios.patch(
-        `${API_CONFIG.BASE_URL}/api/Fcm/update-account-device-token`,
+      const response = await api.patch(
+        `/api/Fcm/update-account-device-token`,
         {
           deviceToken: fcmToken,
           isLoginOrLogout
-        },
-        authHeader
+        }
       );
 
       if (response.data.statusCode === 200) {

@@ -3,6 +3,7 @@ import { LoginResponse } from '@/types/auth';
 import { AxiosResponse } from 'axios';
 import { API_CONFIG } from '@/config/api';
 import api from './api';
+import { tokenService } from '@/services/token';
 
 class GoogleAuthService {
   private initialized = false;
@@ -44,6 +45,11 @@ class GoogleAuthService {
       const response = await api.post<LoginResponse>(`${API_CONFIG.BASE_URL}/api/authen/google-login`, {
         idToken: tokens.idToken
       });
+
+      if (response.data.statusCode === 200 && response.data.data) {
+        const { accessToken, refreshToken } = response.data.data;
+        await tokenService.saveTokens(accessToken, refreshToken);
+      }
 
       return response;
     } catch (error: any) {

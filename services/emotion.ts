@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 import { Drink } from './drink';
 
 interface EmotionResponse {
@@ -16,12 +15,12 @@ class EmotionService {
    */
   async getDrinkRecommendations(emotion: string, barId: string) {
     try {
-      const response = await axios.get<{
+      const response = await api.get<{
         statusCode: number;
         message: string;
         data: EmotionResponse;
       }>(
-        `${API_CONFIG.BASE_URL}/api/DrinkRecommendation/drink-recommendation`, 
+        `/api/DrinkRecommendation/drink-recommendation`, 
         {
           params: {
             emotion,

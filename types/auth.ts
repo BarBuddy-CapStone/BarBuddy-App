@@ -28,7 +28,9 @@ export interface LoginResponse {
     phone: string;
     image: string;
     accessToken: string;
+    refreshToken: string;
     identityId: string | null;
+    barName: string | null;
   };
 }
 
@@ -57,4 +59,20 @@ export interface VerifyOTPResponse {
   statusCode: number;
   message: string;
   data: null;
+}
+
+export interface RefreshTokenResponse {
+  statusCode: number;
+  message: string;
+  data: {
+    accountId: string;
+    fullname: string;
+    email: string;
+    phone: string;
+    image: string;
+    accessToken: string;
+    refreshToken: string;
+    identityId: string | null;
+    barName: string | null;
+  };
 }

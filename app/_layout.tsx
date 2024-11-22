@@ -7,6 +7,7 @@ import { useAuth, AuthProvider } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { View, Linking } from 'react-native';
 import '@/services/background-messaging';
+import { tokenService } from '@/services/token';
 
 // Giữ splash screen hiển thị
 SplashScreen.preventAutoHideAsync();
@@ -133,6 +134,10 @@ export default function RootLayout() {
       router.replace('/payment/error/0');
     }
   };
+
+  useEffect(() => {
+    tokenService.setupAxiosInterceptors();
+  }, []);
 
   return (
     <View style={{ flex: 1, backgroundColor: 'black' }}>

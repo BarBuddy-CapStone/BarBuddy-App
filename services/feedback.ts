@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 
 export interface FeedbackDetail {
   feedbackId: string;
@@ -24,9 +23,9 @@ interface CreateFeedbackRequest {
 
 export const feedbackService = {
   getFeedbackByBooking: async (bookingId: string) => {
-    return await axios.get<{ data: FeedbackDetail }>(`${API_CONFIG.BASE_URL}/api/feedback/booking/${bookingId}`);
+    return await api.get<{ data: FeedbackDetail }>(`/api/feedback/booking/${bookingId}`);
   },
   createFeedback: async (data: CreateFeedbackRequest) => {
-    return await axios.post(`${API_CONFIG.BASE_URL}/api/feedback/createFeedBack`, data);
+    return await api.post(`/api/feedback/createFeedBack`, data);
   }
 }; 

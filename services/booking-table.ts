@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type BookingTableFilter = {
@@ -72,8 +71,8 @@ class BookingTableService {
   async findAvailableTables(filter: BookingTableFilter): Promise<BookingTableResponse> {
     try {
       const headers = await this.getAuthHeader();
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/bookingTable/filter`,
+      const response = await api.get(
+        `/api/bookingTable/filter`,
         {
           params: {
             BarId: filter.barId,
@@ -102,8 +101,8 @@ class BookingTableService {
   async bookTable(request: BookingTableRequest) {
     try {
       const headers = await this.getAuthHeader();
-      const response = await axios.post(
-        `${API_CONFIG.BASE_URL}/api/Booking/booking-table`,
+      const response = await api.post(
+        `/api/Booking/booking-table`,
         request,
         { headers }
       );
@@ -117,22 +116,14 @@ class BookingTableService {
   async bookTableWithDrinks(request: BookingDrinkRequest) {
     try {
       const headers = await this.getAuthHeader();
-
-      const response = await axios.post(
-        `${API_CONFIG.BASE_URL}/api/Booking/booking-drink/mobile`,
+      const response = await api.post(
+        `/api/Booking/booking-drink/mobile`,
         request,
         { headers }
       );
       return response.data;
     } catch (error) {
       console.error('Error booking table with drinks:', error);
-      // Log thêm response error nếu có
-      if (axios.isAxiosError(error)) {
-        console.error('Error response:', {
-          status: error.response?.status,
-          data: error.response?.data
-        });
-      }
       throw error;
     }
   }

@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 
 export interface EventVoucher {
   eventVoucherId: string;
@@ -80,14 +79,14 @@ class EventService {
     pageSize = 8
   }: GetEventsParams = {}): Promise<PaginatedEvents> {
     try {
-      let url = `${API_CONFIG.BASE_URL}/api/Event?PageIndex=${pageIndex}&PageSize=${pageSize}`;
+      let url = `/api/Event?PageIndex=${pageIndex}&PageSize=${pageSize}`;
       
       if (barId) url += `&BarId=${barId}`;
       if (isStill !== null) url += `&IsStill=${isStill}`;
       if (search) url += `&Search=${encodeURIComponent(search)}`;
       if (isEveryWeekEvent !== null) url += `&IsEveryWeekEvent=${isEveryWeekEvent}`;
 
-      const response = await axios.get<EventResponse>(url);
+      const response = await api.get<EventResponse>(url);
       const { eventResponses, totalPages, currentPage, totalItems } = response.data.data;
       
       return {
@@ -105,7 +104,6 @@ class EventService {
           totalItems: 0
         };
       }
-      console.error('Error fetching events:', error);
       throw error;
     }
   }
@@ -131,8 +129,8 @@ class EventService {
 
   async getEventDetail(eventId: string): Promise<EventDetail> {
     try {
-      const response = await axios.get<EventDetailResponse>(
-        `${API_CONFIG.BASE_URL}/api/Event/getOne/${eventId}`
+      const response = await api.get<EventDetailResponse>(
+        `/api/Event/getOne/${eventId}`
       );
       return response.data.data;
     } catch (error) {

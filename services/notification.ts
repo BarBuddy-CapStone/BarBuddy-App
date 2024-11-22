@@ -1,7 +1,6 @@
 import { Platform } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
-import axios from 'axios';
-import { API_CONFIG } from '@/config/api';
+import api from './api';
 
 export interface Notification {
   id: string;
@@ -59,8 +58,8 @@ class NotificationService {
   async getPublicNotifications(pageNumber: number = 1) {
     try {
       const fcmToken = await messaging().getToken();
-      const response = await axios.get(
-        `${API_CONFIG.BASE_URL}/api/Fcm/notifications/public?deviceToken=${fcmToken}&page=${pageNumber}`
+      const response = await api.get(
+        `/api/Fcm/notifications/public?deviceToken=${fcmToken}&page=${pageNumber}`
       );
       
       if (response.data.statusCode === 200) {

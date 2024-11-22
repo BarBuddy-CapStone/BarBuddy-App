@@ -8,6 +8,7 @@ import { LoginResponse } from '@/types/auth';
 import { notificationService } from '@/services/notification';
 import { Platform } from 'react-native';
 import { fcmService } from '@/services/fcm';
+import { tokenService } from '@/services/token';
 
 // Định nghĩa kiểu dữ liệu cho user
 type User = UserInfo;
@@ -110,8 +111,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      setAllowNavigation(false);
+      
       // Cập nhật device token với isLoginOrLogout = false
       await fcmService.updateAccountDeviceToken(false);
+
+      // Gọi API logout để hủy refresh token
+      await tokenService.logout();
 
       // Xóa user từ state
       setUser(null);
@@ -125,6 +131,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Xóa token khỏi header của axios
       delete axios.defaults.headers.common['Authorization'];
+
+      setAllowNavigation(true);
     } catch (error) {
       console.error('Error during logout:', error);
       throw error;

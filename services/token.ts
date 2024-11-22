@@ -101,6 +101,34 @@ class TokenService {
       }
     );
   }
+
+  async logout() {
+    try {
+      const { accessToken, refreshToken } = await this.getTokens();
+      
+      if (!refreshToken || !accessToken) {
+        throw new Error('Không tìm thấy token');
+      }
+
+      await api.post(
+        '/api/authen/logout',
+        refreshToken,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // Xóa tokens khỏi storage
+      await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+      
+    } catch (error) {
+      console.error('Error logging out:', error);
+      throw error;
+    }
+  }
 }
 
 export const tokenService = new TokenService();

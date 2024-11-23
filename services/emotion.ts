@@ -1,5 +1,6 @@
 import api from './api';
 import { Drink } from './drink';
+import { handleConnectionError } from '@/utils/error-handler';
 
 interface EmotionResponse {
   drinkList: Drink[];
@@ -14,26 +15,28 @@ class EmotionService {
    * @returns Promise<Drink[]> - Array of recommended drinks
    */
   async getDrinkRecommendations(emotion: string, barId: string) {
-    try {
-      const response = await api.get<{
-        statusCode: number;
-        message: string;
-        data: EmotionResponse;
-      }>(
-        `/api/DrinkRecommendation/drink-recommendation`, 
-        {
-          params: {
-            emotion,
-            barId
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get<{
+          statusCode: number;
+          message: string;
+          data: EmotionResponse;
+        }>(
+          `/api/DrinkRecommendation/drink-recommendation`, 
+          {
+            params: {
+              emotion,
+              barId
+            }
           }
-        }
-      );
-      
-      return response.data.data;
-    } catch (error) {
-      console.error('Error getting drink recommendations:', error);
-      throw error;
-    }
+        );
+        
+        return response.data.data;
+      } catch (error) {
+        console.error('Error getting drink recommendations:', error);
+        throw error;
+      }
+    }, 'Không thể lấy gợi ý đồ uống. Vui lòng thử lại sau.');
   }
 }
 

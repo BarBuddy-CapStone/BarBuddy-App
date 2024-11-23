@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
 import api from './api';
 import { PermissionsAndroid } from 'react-native';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export interface Notification {
   id: string;
@@ -66,20 +67,22 @@ class NotificationService {
   }
 
   async getPublicNotifications(pageNumber: number = 1) {
-    try {
-      const fcmToken = await messaging().getToken();
-      const response = await api.get(
-        `/api/Fcm/notifications/public?deviceToken=${fcmToken}&page=${pageNumber}`
-      );
-      
-      if (response.data.statusCode === 200) {
-        return response.data.data;
+    return handleConnectionError(async () => {
+      try {
+        const fcmToken = await messaging().getToken();
+        const response = await api.get(
+          `/api/Fcm/notifications/public?deviceToken=${fcmToken}&page=${pageNumber}`
+        );
+        
+        if (response.data.statusCode === 200) {
+          return response.data.data;
+        }
+        return [];
+      } catch (error) {
+        console.error('Lỗi khi lấy thông báo:', error);
+        return [];
       }
-      return [];
-    } catch (error) {
-      console.error('Lỗi khi lấy thông báo:', error);
-      return [];
-    }
+    }, 'Không thể tải thông báo. Vui lòng thử lại sau.');
   }
 }
 

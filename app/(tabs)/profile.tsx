@@ -33,8 +33,6 @@ const ProfileHeader = memo(({ account }: { account: Account | null }) => (
       className="w-24 h-24 rounded-full bg-neutral-800"
       defaultSource={require('@/assets/images/default-avatar.png')}
       onError={(e) => {
-        // Khi load ảnh bị lỗi sẽ tự động dùng defaultSource
-        console.log('Error loading avatar:', e.nativeEvent.error);
       }}
     />
     <Text className="text-white text-xl font-bold mt-4">

@@ -1,4 +1,5 @@
 import api from './api';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export type Drink = {
   drinkId: string;
@@ -34,23 +35,27 @@ export interface DrinkCategory {
 
 class DrinkService {
   async getDrinks(barId: string): Promise<Drink[]> {
-    try {
-      const response = await api.get(`/api/v1/Drink/customer/${barId}`);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching drinks:', error);
-      return [];
-    }
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get(`/api/v1/Drink/customer/${barId}`);
+        return response.data.data;
+      } catch (error) {
+        console.error('Error fetching drinks:', error);
+        return [];
+      }
+    }, 'Không thể tải danh sách đồ uống. Vui lòng thử lại sau.');
   }
 
   async getDrinkDetail(drinkId: string): Promise<DrinkDetail | null> {
-    try {
-      const response = await api.get(`/api/v1/Drink/${drinkId}`);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching drink detail:', error);
-      return null;
-    }
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get(`/api/v1/Drink/${drinkId}`);
+        return response.data.data;
+      } catch (error) {
+        console.error('Error fetching drink detail:', error);
+        return null;
+      }
+    }, 'Không thể tải chi tiết đồ uống. Vui lòng thử lại sau.');
   }
 }
 

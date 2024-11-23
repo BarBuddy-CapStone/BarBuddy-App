@@ -617,7 +617,7 @@ export default function HomeScreen() {
                 {user?.fullname || 'Khách'}
               </Text>
             </View>
-            <TouchableOpacity className="w-10 h-10 items-center justify-center rounded-full bg-white/10">
+            <TouchableOpacity className="w-10 h-10 items-center justify-center rounded-full bg-white/10" onPress={() => router.push('/notifications' as any)}>
               <Ionicons name="notifications-outline" size={24} color="white" />
             </TouchableOpacity>
           </View>
@@ -731,7 +731,7 @@ export default function HomeScreen() {
                 {user?.fullname || 'Khách'}
               </Text>
             </View>
-            <TouchableOpacity className="w-10 h-10 items-center justify-center rounded-full bg-white/10">
+            <TouchableOpacity className="w-10 h-10 items-center justify-center rounded-full bg-white/10" onPress={() => router.push('/notifications' as any)}>
               <Ionicons name="notifications-outline" size={24} color="white" />
             </TouchableOpacity>
           </View>

@@ -1,4 +1,5 @@
 import api from './api';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export interface TableType {
   tableTypeId: string;  // thay vì id
@@ -9,13 +10,15 @@ export interface TableType {
 
 class TableTypeService {
   async getTableTypesOfBar(barId: string): Promise<TableType[]> {
-    try {
-      const response = await api.get(`/api/TableType/getTTOfBar/${barId}`);
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching table types of bar:', error);
-      return [];
-    }
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get(`/api/TableType/getTTOfBar/${barId}`);
+        return response.data.data;
+      } catch (error) {
+        console.error('Error fetching table types of bar:', error);
+        return [];
+      }
+    }, 'Không thể tải loại bàn. Vui lòng thử lại sau.');
   }
 }
 

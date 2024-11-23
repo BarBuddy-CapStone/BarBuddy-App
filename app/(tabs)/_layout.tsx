@@ -59,12 +59,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="notifications"
+        name="booking-history"
         options={{
-          title: 'Thông báo',
+          title: 'Lịch sử',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'notifications' : 'notifications-outline'} 
+              name={focused ? 'calendar' : 'calendar-outline'} 
               size={24} 
               color={color} 
             />
@@ -72,12 +72,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="booking-history"
+        name="notifications"
         options={{
-          title: 'Lịch sử',
+          title: 'Thông báo',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons 
-              name={focused ? 'calendar' : 'calendar-outline'} 
+              name={focused ? 'notifications' : 'notifications-outline'} 
               size={24} 
               color={color} 
             />

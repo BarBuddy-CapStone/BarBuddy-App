@@ -1,4 +1,5 @@
 import api from './api';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export interface EventVoucher {
   eventVoucherId: string;
@@ -78,34 +79,36 @@ class EventService {
     pageIndex = 1,
     pageSize = 8
   }: GetEventsParams = {}): Promise<PaginatedEvents> {
-    try {
-      let url = `/api/Event?PageIndex=${pageIndex}&PageSize=${pageSize}`;
-      
-      if (barId) url += `&BarId=${barId}`;
-      if (isStill !== null) url += `&IsStill=${isStill}`;
-      if (search) url += `&Search=${encodeURIComponent(search)}`;
-      if (isEveryWeekEvent !== null) url += `&IsEveryWeekEvent=${isEveryWeekEvent}`;
+    return handleConnectionError(async () => {
+      try {
+        let url = `/api/Event?PageIndex=${pageIndex}&PageSize=${pageSize}`;
+        
+        if (barId) url += `&BarId=${barId}`;
+        if (isStill !== null) url += `&IsStill=${isStill}`;
+        if (search) url += `&Search=${encodeURIComponent(search)}`;
+        if (isEveryWeekEvent !== null) url += `&IsEveryWeekEvent=${isEveryWeekEvent}`;
 
-      const response = await api.get<EventResponse>(url);
-      const { eventResponses, totalPages, currentPage, totalItems } = response.data.data;
-      
-      return {
-        events: eventResponses || [],
-        totalPages,
-        currentPage,
-        totalItems
-      };
-    } catch (error: any) {
-      if (error.response?.status === 404) {
+        const response = await api.get<EventResponse>(url);
+        const { eventResponses, totalPages, currentPage, totalItems } = response.data.data;
+        
         return {
-          events: [],
-          totalPages: 0,
-          currentPage: 1,
-          totalItems: 0
+          events: eventResponses || [],
+          totalPages,
+          currentPage,
+          totalItems
         };
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          return {
+            events: [],
+            totalPages: 0,
+            currentPage: 1,
+            totalItems: 0
+          };
+        }
+        throw error;
       }
-      throw error;
-    }
+    }, 'Không thể tải danh sách sự kiện. Vui lòng thử lại sau.');
   }
 
   async getCurrentEvents(): Promise<Event[]> {
@@ -128,15 +131,17 @@ class EventService {
   }
 
   async getEventDetail(eventId: string): Promise<EventDetail> {
-    try {
-      const response = await api.get<EventDetailResponse>(
-        `/api/Event/getOne/${eventId}`
-      );
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching event detail:', error);
-      throw error;
-    }
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get<EventDetailResponse>(
+          `/api/Event/getOne/${eventId}`
+        );
+        return response.data.data;
+      } catch (error) {
+        console.error('Error fetching event detail:', error);
+        throw error;
+      }
+    }, 'Không thể tải chi tiết sự kiện. Vui lòng thử lại sau.');
   }
 }
 

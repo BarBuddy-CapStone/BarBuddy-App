@@ -5,6 +5,7 @@ import axios from 'axios';
 import { API_CONFIG } from '@/config/api';
 import { Alert } from 'react-native';
 import { fcmService } from '@/services/fcm';
+import { handleConnectionError } from '@/utils/error-handler';
 
 class TokenService {
   private isRefreshing = false;
@@ -26,7 +27,6 @@ class TokenService {
       ['accessToken', accessToken],
       ['refreshToken', refreshToken],
     ]);
-    console.log('Tokens saved:', { accessToken, refreshToken });
   }
 
   async refreshToken() {
@@ -79,8 +79,6 @@ class TokenService {
         const originalRequest = error.config;
 
         if (error.response?.status === 401 && !originalRequest._retry) {
-          console.log('Received 401 error, attempting to refresh token');
-          
           if (this.isRefreshing) {
             return new Promise(resolve => {
               this.addRefreshSubscriber(token => {
@@ -140,10 +138,46 @@ class TokenService {
   }
 
   async checkAndSetupAuth() {
-    try {
-      const { accessToken, refreshToken } = await this.getTokens();
-      
-      if (!accessToken || !refreshToken) {
+    return handleConnectionError(async () => {
+      try {
+        const { accessToken, refreshToken } = await this.getTokens();
+        
+        if (!accessToken || !refreshToken) {
+          if (this.authContext) {
+            await fcmService.updateAccountDeviceToken(false);
+            // Alert.alert(
+            //   'Phiên đăng nhập hết hạn',
+            //   'Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.',
+            //   [{ text: 'OK' }]
+            // );
+            await this.authContext.resetAllStorage();
+          }
+          return false;
+        }
+
+        this.setupAxiosInterceptors();
+
+        try {
+          await this.refreshToken();
+          return true;
+        } catch (error) {
+          if (error instanceof Error) {
+            if (['TOKEN_NOT_FOUND', 'TOKEN_INVALID', 'REFRESH_FAILED'].includes(error.message)) {
+              if (this.authContext) {
+                await fcmService.updateAccountDeviceToken(false);
+                Alert.alert(
+                  'Phiên đăng nhập hết hạn',
+                  'Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.',
+                  [{ text: 'OK' }]
+                );
+                await this.authContext.resetAllStorage();
+              }
+            }
+          }
+          return false;
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error);
         if (this.authContext) {
           await fcmService.updateAccountDeviceToken(false);
           Alert.alert(
@@ -155,42 +189,7 @@ class TokenService {
         }
         return false;
       }
-
-      this.setupAxiosInterceptors();
-
-      try {
-        await this.refreshToken();
-        return true;
-      } catch (error) {
-        if (error instanceof Error) {
-          if (['TOKEN_NOT_FOUND', 'TOKEN_INVALID', 'REFRESH_FAILED'].includes(error.message)) {
-            if (this.authContext) {
-              await fcmService.updateAccountDeviceToken(false);
-              Alert.alert(
-                'Phiên đăng nhập hết hạn',
-                'Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.',
-                [{ text: 'OK' }]
-              );
-              await this.authContext.resetAllStorage();
-            }
-          }
-        }
-        console.log('Đã xóa thông tin người dùng');
-        return false;
-      }
-    } catch (error) {
-      console.error('Error checking auth:', error);
-      if (this.authContext) {
-        await fcmService.updateAccountDeviceToken(false);
-        Alert.alert(
-          'Phiên đăng nhập hết hạn',
-          'Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.',
-          [{ text: 'OK' }]
-        );
-        await this.authContext.resetAllStorage();
-      }
-      return false;
-    }
+    }, 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
   }
 }
 

@@ -103,7 +103,6 @@ class BarService implements IBarService {
       return await operation();
     } catch (error) {
       if (retries > 0 && axios.isAxiosError(error) && error.response?.status === 429) {
-        console.log(`Rate limited, retrying in ${this.retryDelay}ms... (${retries} attempts left)`);
         await this.delay(this.retryDelay);
         return this.retryOperation(operation, retries - 1);
       }
@@ -217,7 +216,6 @@ class BarService implements IBarService {
             return await goongService.geocodeAddress(barDetail.address);
           } catch (error) {
             if (retries > 0 && axios.isAxiosError(error) && error.response?.status === 429) {
-              console.log(`Rate limited on geocoding, retrying in 500ms... (${retries} attempts left)`);
               await this.delay(500);
               return processLocation(retries - 1);
             }
@@ -230,7 +228,6 @@ class BarService implements IBarService {
             return await goongService.calculateDistance(userLocation, location);
           } catch (error) {
             if (retries > 0 && axios.isAxiosError(error) && error.response?.status === 429) {
-              console.log(`Rate limited on distance calculation, retrying in 500ms... (${retries} attempts left)`);
               await this.delay(500);
               return processDistance(location, retries - 1);
             }

@@ -1,4 +1,5 @@
 import api from './api';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export interface PaymentDetail {
   paymentHistoryId: string;
@@ -52,24 +53,28 @@ interface PaymentHistoryResponse {
 
 export const paymentService = {
   getPaymentDetail: async (paymentId: string): Promise<PaymentDetail> => {
-    try {
-      const response = await api.get(`/api/v1/Payment/payment-detail/${paymentId}`);
-      return response.data.data;
-    } catch (error) {
-      console.error('=== Payment Service Error ===');
-      throw error;
-    }
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get(`/api/v1/Payment/payment-detail/${paymentId}`);
+        return response.data.data;
+      } catch (error) {
+        console.error('=== Payment Service Error ===');
+        throw error;
+      }
+    }, 'Không thể tải chi tiết thanh toán. Vui lòng thử lại sau.');
   },
 
   getPaymentHistory: async (accountId: string, pageIndex: number = 1): Promise<PaymentHistoryResponse> => {
-    try {
-      const response = await api.get(
-        `/api/PaymentHistory/${accountId}?PageIndex=${pageIndex}&PageSize=1000`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('=== Payment History Service Error ===');
-      throw error;
-    }
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get(
+          `/api/PaymentHistory/${accountId}?PageIndex=${pageIndex}&PageSize=1000`
+        );
+        return response.data;
+      } catch (error) {
+        console.error('=== Payment History Service Error ===');
+        throw error;
+      }
+    }, 'Không thể tải lịch sử thanh toán. Vui lòng thử lại sau.');
   }
 }; 

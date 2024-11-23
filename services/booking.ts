@@ -1,6 +1,7 @@
 import api from './api';
 import { API_CONFIG } from '@/config/api';
 import { getAuthHeader } from '@/utils/auth-header';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export interface BookingHistory {
   bookingId: string;
@@ -66,64 +67,70 @@ class BookingService {
     pageIndex: number = 1,
     pageSize: number = 10
   ): Promise<BookingHistoryResponse> {
-    try {
-      const response = await api.get(
-        `/api/Booking/${accountId}?PageIndex=${pageIndex}&PageSize=${pageSize}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching booking history:', error);
-      throw error;
-    }
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get(
+          `/api/Booking/${accountId}?PageIndex=${pageIndex}&PageSize=${pageSize}`
+        );
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching booking history:', error);
+        throw error;
+      }
+    }, 'Không thể tải lịch sử đặt bàn. Vui lòng thử lại sau.');
   }
 
   async getBookingDetail(bookingId: string): Promise<BookingDetailResponse> {
-    try {
-      const response = await api.get(
-        `/api/Booking/detail/${bookingId}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching booking detail:', error);
-      throw error;
-    }
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get(
+          `/api/Booking/detail/${bookingId}`
+        );
+        return response.data;
+      } catch (error) {
+        console.error('Error fetching booking detail:', error);
+        throw error;
+      }
+    }, 'Không thể tải chi tiết đặt bàn. Vui lòng thử lại sau.');
   }
 
   async cancelBooking(bookingId: string): Promise<boolean> {
-    try {
-      const response = await api.patch(
-        `/api/Booking/cancel/${bookingId}`,
-        {},
-        {
-          validateStatus: (status) => true
-        }
-      );
-      
-      if (response.status === 405) {
-        throw new Error('Phương thức không được phép. Vui lòng liên hệ admin.');
-      }
-      
-      if (response.status === 202) {
-        throw new Error(`Bạn chỉ có thể hủy bàn trước ${response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
-      }
-      
-      if (response.data.statusCode !== 200) {
-        throw new Error(response.data.message || 'Không thể hủy đặt bàn');
-      }
-      
-      return true;
-    } catch (error: any) {
-      if (error.response?.status === 202) {
-        throw new Error(`Bạn chỉ có thể hủy bàn trước ${error.response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
-      }
-      if (error.response) {
-        throw new Error(
-          error.response.data.message || 
-          `Lỗi ${error.response.status}: Không thể hủy đặt bàn`
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.patch(
+          `/api/Booking/cancel/${bookingId}`,
+          {},
+          {
+            validateStatus: (status) => true
+          }
         );
+        
+        if (response.status === 405) {
+          throw new Error('Phương thức không được phép. Vui lòng liên hệ admin.');
+        }
+        
+        if (response.status === 202) {
+          throw new Error(`Bạn chỉ có thể hủy bàn trước ${response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
+        }
+        
+        if (response.data.statusCode !== 200) {
+          throw new Error(response.data.message || 'Không thể hủy đặt bàn');
+        }
+        
+        return true;
+      } catch (error: any) {
+        if (error.response?.status === 202) {
+          throw new Error(`Bạn chỉ có thể hủy bàn trước ${error.response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
+        }
+        if (error.response) {
+          throw new Error(
+            error.response.data.message || 
+            `Lỗi ${error.response.status}: Không thể hủy đặt bàn`
+          );
+        }
+        throw error;
       }
-      throw error;
-    }
+    }, 'Không thể hủy đặt bàn. Vui lòng thử lại sau.');
   }
 
   // Có thể thêm các method khác liên quan đến booking ở đây

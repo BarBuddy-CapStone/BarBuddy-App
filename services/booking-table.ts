@@ -1,5 +1,6 @@
 import api from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export type BookingTableFilter = {
   barId: string;
@@ -69,11 +70,10 @@ class BookingTableService {
   }
 
   async findAvailableTables(filter: BookingTableFilter): Promise<BookingTableResponse> {
-    try {
-      const headers = await this.getAuthHeader();
-      const response = await api.get(
-        `/api/bookingTable/filter`,
-        {
+    return handleConnectionError(async () => {
+      try {
+        const headers = await this.getAuthHeader();
+        const response = await api.get('/api/bookingTable/filter', {
           params: {
             BarId: filter.barId,
             TableTypeId: filter.tableTypeId,
@@ -81,51 +81,47 @@ class BookingTableService {
             Time: filter.timeSpan
           },
           headers
-        }
-      );
-      return response.data.data;
-    } catch (error) {
-      return {
-        tableTypeId: filter.tableTypeId,
-        typeName: '',
-        description: '',
-        bookingTables: [{
-          reservationDate: filter.date,
-          reservationTime: filter.timeSpan,
-          tables: []
-        }]
-      };
-    }
+        });
+        return response.data.data;
+      } catch (error) {
+        return {
+          tableTypeId: filter.tableTypeId,
+          typeName: '',
+          description: '',
+          bookingTables: [{
+            reservationDate: filter.date,
+            reservationTime: filter.timeSpan,
+            tables: []
+          }]
+        };
+      }
+    }, 'Không thể tìm bàn trống. Vui lòng thử lại sau.');
   }
 
   async bookTable(request: BookingTableRequest) {
-    try {
-      const headers = await this.getAuthHeader();
-      const response = await api.post(
-        `/api/Booking/booking-table`,
-        request,
-        { headers }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error booking table:', error);
-      throw error;
-    }
+    return handleConnectionError(async () => {
+      try {
+        const headers = await this.getAuthHeader();
+        const response = await api.post('/api/Booking/booking-table', request, { headers });
+        return response.data;
+      } catch (error) {
+        console.error('Error booking table:', error);
+        throw error;
+      }
+    }, 'Không thể đặt bàn. Vui lòng thử lại sau.');
   }
 
   async bookTableWithDrinks(request: BookingDrinkRequest) {
-    try {
-      const headers = await this.getAuthHeader();
-      const response = await api.post(
-        `/api/Booking/booking-drink/mobile`,
-        request,
-        { headers }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error booking table with drinks:', error);
-      throw error;
-    }
+    return handleConnectionError(async () => {
+      try {
+        const headers = await this.getAuthHeader();
+        const response = await api.post('/api/Booking/booking-drink/mobile', request, { headers });
+        return response.data;
+      } catch (error) {
+        console.error('Error booking table with drinks:', error);
+        throw error;
+      }
+    }, 'Không thể đặt bàn và đồ uống. Vui lòng thử lại sau.');
   }
 }
 

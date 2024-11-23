@@ -1,4 +1,5 @@
 import api from './api';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export interface VoucherResponse {
   eventVoucherId: string;
@@ -19,22 +20,24 @@ export interface VoucherApiResponse {
 
 class VoucherService {
   async getVoucher(bookingDate: string, bookingTime: string, voucherCode: string, barId: string) {
-    try {
-      const response = await api.get<VoucherApiResponse>(
-        `/api/Voucher/getOneVoucher`,
-        {
-          params: {
-            bookingDate,
-            bookingTime,
-            voucherCode,
-            barId
+    return handleConnectionError(async () => {
+      try {
+        const response = await api.get<VoucherApiResponse>(
+          `/api/Voucher/getOneVoucher`,
+          {
+            params: {
+              bookingDate,
+              bookingTime,
+              voucherCode,
+              barId
+            }
           }
-        }
-      );
-      return response.data;
-    } catch (error) {
-      throw error;
-    }
+        );
+        return response.data;
+      } catch (error) {
+        throw error;
+      }
+    }, 'Không thể kiểm tra mã giảm giá. Vui lòng thử lại sau.');
   }
 }
 

@@ -1,4 +1,5 @@
 import api from './api';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export interface FeedbackDetail {
   feedbackId: string;
@@ -23,9 +24,13 @@ interface CreateFeedbackRequest {
 
 export const feedbackService = {
   getFeedbackByBooking: async (bookingId: string) => {
-    return await api.get<{ data: FeedbackDetail }>(`/api/feedback/booking/${bookingId}`);
+    return handleConnectionError(async () => {
+      return await api.get<{ data: FeedbackDetail }>(`/api/feedback/booking/${bookingId}`);
+    }, 'Không thể tải đánh giá. Vui lòng thử lại sau.');
   },
   createFeedback: async (data: CreateFeedbackRequest) => {
-    return await api.post(`/api/feedback/createFeedBack`, data);
+    return handleConnectionError(async () => {
+      return await api.post(`/api/feedback/createFeedBack`, data);
+    }, 'Không thể tạo đánh giá. Vui lòng thử lại sau.');
   }
 }; 

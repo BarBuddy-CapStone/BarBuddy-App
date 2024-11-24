@@ -231,13 +231,14 @@ const BookingItem = memo(({ booking, onRefreshList }: {
 
       setRatingStatus('success');
       
-      // Reset form ngay sau khi gửi thành công
+      // Reset form
       setRating(5);
       setComment('');
       
       setTimeout(() => {
         setShowRatingModal(false);
         setRatingStatus('idle');
+        // Gọi onRefresh để cập nhật toàn bộ danh sách
         onRefreshList();
       }, 1500);
 
@@ -573,7 +574,7 @@ const BookingItem = memo(({ booking, onRefreshList }: {
                   </View>
                 </View>
 
-                {/* Nội dung đánh giá */}
+                {/* Nội dung đánh gi */}
                 <View className="bg-neutral-700 rounded-xl p-4">
                   <Text className="text-white/90 leading-6">
                     {feedback?.comment}
@@ -814,11 +815,12 @@ export default function BookingHistoryScreen() {
       const response = await bookingService.getBookingHistory(
         user.accountId,
         page,
-        1000
+        1000,
       );
       
       if (refresh) {
         setBookings(response.data.response);
+        setPageIndex(1); // Reset page index khi refresh
       } else {
         setBookings(prev => [...prev, ...response.data.response]);
       }
@@ -834,8 +836,8 @@ export default function BookingHistoryScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    setBookings([]); // Clear current bookings trước khi fetch mới
     await fetchBookings(1, true);
-    setRefreshing(false);
   }, [fetchBookings]);
 
   const loadMore = useCallback(() => {
@@ -873,7 +875,7 @@ export default function BookingHistoryScreen() {
 
   const keyExtractor = useCallback((item: BookingHistory) => item.bookingId, []);
 
-  // Nh��m tất cả useMemo hooks
+  // Nhm tất cả useMemo hooks
   const filteredBookings = useMemo(() => {
     // Lọc theo status
     let filtered = bookings.filter(booking => booking.status === selectedStatus);
@@ -1036,6 +1038,63 @@ export default function BookingHistoryScreen() {
     }
   }, [fromBooking, params.fromPayment]);
 
+  // Thêm FilterModal component
+  const FilterModal = () => (
+    <Modal
+      visible={showFilterModal}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => setShowFilterModal(false)}
+    >
+      <TouchableOpacity 
+        activeOpacity={1}
+        onPress={() => setShowFilterModal(false)}
+        className="flex-1 bg-black/50 justify-center items-center p-6"
+      >
+        <View className="bg-neutral-800 rounded-2xl w-full overflow-hidden">
+          <View className="p-4 border-b border-white/10">
+            <Text className="text-white text-lg font-bold text-center">
+              Sắp xếp theo
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={() => handleFilterChange('createAt')}
+            className={`p-4 flex-row items-center justify-between ${
+              filterBy === 'createAt' ? 'bg-yellow-500/10' : ''
+            }`}
+          >
+            <Text className={`text-base ${
+              filterBy === 'createAt' ? 'text-yellow-500' : 'text-white'
+            }`}>
+              Thời gian đặt bàn
+            </Text>
+            {filterBy === 'createAt' && (
+              <Ionicons name="checkmark" size={24} color="#EAB308" />
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => handleFilterChange('bookingTime')}
+            className={`p-4 flex-row items-center justify-between ${
+              filterBy === 'bookingTime' ? 'bg-yellow-500/10' : ''
+            }`}
+          >
+            <Text className={`text-base ${
+              filterBy === 'bookingTime' ? 'text-yellow-500' : 'text-white'
+            }`}>
+              Thời gian phục vụ
+            </Text>
+            {filterBy === 'bookingTime' && (
+              <Ionicons name="checkmark" size={24} color="#EAB308" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+
   if (isGuest || !user?.accountId) {
     return <GuestView screenName="booking-history" />;
   }
@@ -1064,11 +1123,24 @@ export default function BookingHistoryScreen() {
           </View>
 
           {/* Filter button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={() => setShowFilterModal(true)}
-            className="h-9 w-9 rounded-full items-center justify-center bg-neutral-900"
+            className={`h-9 w-auto rounded-full items-center justify-center ml-3 px-3 ${
+              filterBy === 'bookingTime' ? 'bg-yellow-500' : 'bg-neutral-900'
+            }`}
           >
-            <Ionicons name="filter" size={18} color="white" />
+            <View className="flex-row items-center">
+              <Ionicons 
+                name={filterBy === 'bookingTime' ? "time" : "time-outline"} 
+                size={18} 
+                color={filterBy === 'bookingTime' ? "black" : "white"} 
+              />
+              <Text className={`ml-2 text-xs font-medium ${
+                filterBy === 'bookingTime' ? 'text-black' : 'text-white'
+              }`}>
+                {filterBy === 'bookingTime' ? 'Giờ phục vụ' : 'Thời gian đặt'}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -1140,6 +1212,7 @@ export default function BookingHistoryScreen() {
           ListEmptyComponent={ListEmptyComponent}
         />
       )}
+      <FilterModal />
     </SafeAreaView>
   ) : (
     // Android Layout
@@ -1166,11 +1239,24 @@ export default function BookingHistoryScreen() {
             </View>
 
             {/* Filter button */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => setShowFilterModal(true)}
-              className="h-9 w-9 rounded-full items-center justify-center bg-neutral-900"
+              className={`h-9 w-auto rounded-full items-center justify-center ml-3 px-3 ${
+                filterBy === 'bookingTime' ? 'bg-yellow-500' : 'bg-neutral-900'
+              }`}
             >
-              <Ionicons name="filter" size={18} color="white" />
+              <View className="flex-row items-center">
+                <Ionicons 
+                  name={filterBy === 'bookingTime' ? "time" : "time-outline"} 
+                  size={18} 
+                  color={filterBy === 'bookingTime' ? "black" : "white"} 
+                />
+                <Text className={`ml-2 text-xs font-medium ${
+                  filterBy === 'bookingTime' ? 'text-black' : 'text-white'
+                }`}>
+                  {filterBy === 'bookingTime' ? 'Giờ phục vụ' : 'Thời gian đặt'}
+                </Text>
+              </View>
             </TouchableOpacity>
           </View>
 
@@ -1242,6 +1328,7 @@ export default function BookingHistoryScreen() {
             ListEmptyComponent={ListEmptyComponent}
           />
         )}
+        <FilterModal />
       </SafeAreaView>
     </View>
   );

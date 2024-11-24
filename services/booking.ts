@@ -1,7 +1,6 @@
 import api from './api';
-import { API_CONFIG } from '@/config/api';
-import { getAuthHeader } from '@/utils/auth-header';
 import { handleConnectionError } from '@/utils/error-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface BookingHistory {
   bookingId: string;
@@ -85,7 +84,7 @@ class BookingService {
       try {
         const response = await api.get(
           `/api/Booking/detail/${bookingId}`
-        );
+        );  
         return response.data;
       } catch (error) {
         console.error('Error fetching booking detail:', error);
@@ -97,11 +96,18 @@ class BookingService {
   async cancelBooking(bookingId: string): Promise<boolean> {
     return handleConnectionError(async () => {
       try {
+        // Lấy token hiện tại
+        const accessToken = await AsyncStorage.getItem('accessToken');
+        
         const response = await api.patch(
           `/api/Booking/cancel/${bookingId}`,
           {},
-          {
-            validateStatus: (status) => true
+          { 
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            validateStatus: (status) => true 
           }
         );
         
@@ -119,9 +125,19 @@ class BookingService {
         
         return true;
       } catch (error: any) {
+        // Nếu là lỗi 401, để interceptor xử lý
+        if (error.response?.status === 401) {
+          return api.patch(
+            `/api/Booking/cancel/${bookingId}`,
+            {},
+            { validateStatus: (status) => true }
+          );
+        }
+        
         if (error.response?.status === 202) {
           throw new Error(`Bạn chỉ có thể hủy bàn trước ${error.response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
         }
+        
         if (error.response) {
           throw new Error(
             error.response.data.message || 
@@ -132,9 +148,6 @@ class BookingService {
       }
     }, 'Không thể hủy đặt bàn. Vui lòng thử lại sau.');
   }
-
-  // Có thể thêm các method khác liên quan đến booking ở đây
-  // Ví dụ: cancelBooking, getBookingDetail, ...
 }
 
 export const bookingService = new BookingService();

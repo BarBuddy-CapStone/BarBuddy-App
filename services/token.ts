@@ -51,6 +51,7 @@ class TokenService {
       if (response.data.statusCode === 200 && response.data.data) {
         const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.data;
         await this.saveTokens(newAccessToken, newRefreshToken);
+        console.log('newAccessToken', newAccessToken);
         return newAccessToken;
       }
 

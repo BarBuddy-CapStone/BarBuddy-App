@@ -1,9 +1,40 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform } from 'react-native';
-import React from 'react';
+import { Platform, View, Text } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { notificationService } from '@/services/notification';
+import { signalRService } from '@/services/signalr';
 
 export default function TabLayout() {
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const setupNotifications = async () => {
+      await signalRService.connect();
+      
+      // Lắng nghe cập nhật số lượng thông báo chưa đọc
+      signalRService.setUnreadCountCallback((count) => {
+        setUnreadCount(count);
+      });
+
+      // Lắng nghe thông báo mới
+      signalRService.setNotificationCallback((notification) => {
+        setUnreadCount(prev => prev + 1);
+      });
+
+      // Lấy số lượng ban đầu
+      const initialCount = await notificationService.getUnreadCount();
+      setUnreadCount(initialCount);
+    };
+
+    setupNotifications();
+
+    return () => {
+      signalRService.setUnreadCountCallback(() => {});
+      signalRService.setNotificationCallback(() => {});
+    };
+  }, []);
+
   return (
     <Tabs
       screenOptions={{
@@ -76,11 +107,20 @@ export default function TabLayout() {
         options={{
           title: 'Thông báo',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'notifications' : 'notifications-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <View>
+              <Ionicons 
+                name={focused ? 'notifications' : 'notifications-outline'} 
+                size={24} 
+                color={color} 
+              />
+              {unreadCount > 0 && (
+                <View className="absolute -right-2 -top-1 bg-red-500 rounded-full min-w-[16px] h-4 items-center justify-center px-1">
+                  <Text className="text-white text-xs font-bold">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />

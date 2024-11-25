@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 class SignalRService {
   private connection: HubConnection | null = null;
   private notificationCallback: ((notification: Notification) => void) | null = null;
+  private unreadCountCallback: ((count: number) => void) | null = null;
   private isConnecting: boolean = false;
 
   async connect() {
@@ -111,10 +112,21 @@ class SignalRService {
     this.connection.onreconnected((connectionId) => {
       console.log('SignalR đã kết nối lại thành công');
     });
+
+    this.connection.on('ReceiveUnreadCount', (count: number) => {
+      console.log('Nhận unread count mới:', count);
+      if (this.unreadCountCallback) {
+        this.unreadCountCallback(count);
+      }
+    });
   }
 
   setNotificationCallback(callback: (notification: Notification) => void) {
     this.notificationCallback = callback;
+  }
+
+  setUnreadCountCallback(callback: (count: number) => void) {
+    this.unreadCountCallback = callback;
   }
 
   async disconnect() {
@@ -122,6 +134,7 @@ class SignalRService {
       await this.connection.stop();
       this.connection = null;
       this.notificationCallback = null;
+      this.unreadCountCallback = null;
       console.log('Đã ngắt kết nối SignalR');
     }
   }

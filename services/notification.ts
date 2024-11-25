@@ -99,6 +99,43 @@ class NotificationService {
       }
     }, 'Không thể tải thông báo. Vui lòng thử lại sau.');
   }
+
+  async getUnreadCount(): Promise<number> {
+    return handleConnectionError(async () => {
+      try {
+        const fcmToken = await messaging().getToken();
+        
+        if (!fcmToken) {
+          console.log('Không thể lấy FCM token');
+          return 0;
+        }
+
+        // Lấy auth data từ AsyncStorage
+        const authData = await AsyncStorage.getItem('@auth');
+        const headers: any = {};
+        
+        if (authData) {
+          const userData = JSON.parse(authData);
+          if (userData?.user?.accessToken) {
+            headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
+          }
+        }
+
+        const response = await api.get(
+          `/api/Fcm/unread-count?deviceToken=${fcmToken}`,
+          { headers }
+        );
+        
+        if (response.data.statusCode === 200) {
+          return response.data.data;
+        }
+        return 0;
+      } catch (error) {
+        console.log('Lỗi khi lấy số thông báo chưa đọc:', error);
+        return 0;
+      }
+    }, 'Không thể tải số thông báo chưa đọc');
+  }
 }
 
 export const notificationService = new NotificationService(); 

@@ -24,17 +24,16 @@ export default function NotificationsScreen() {
         console.log('Nhận notification mới trong component:', newNotification);
         setNotifications(prev => {
           const exists = prev.some(n => n.id === newNotification.id);
-          console.log('Notification đã tồn tại:', exists);
           if (exists) return prev;
-          
-          const newNotifications = [newNotification, ...prev];
-          console.log('Danh sách notifications mới:', newNotifications);
-          return newNotifications;
+          return [newNotification, ...prev];
         });
       });
     };
 
     setupSignalR();
+    
+    // Reset unread count khi vào màn hình notifications
+    notificationService.getUnreadCount();
 
     return () => {
       console.log('Cleanup SignalR connection...');

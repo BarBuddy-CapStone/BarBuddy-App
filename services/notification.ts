@@ -3,6 +3,7 @@ import messaging from '@react-native-firebase/messaging';
 import api from './api';
 import { PermissionsAndroid } from 'react-native';
 import { handleConnectionError } from '@/utils/error-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Notification {
   id: string;
@@ -52,26 +53,40 @@ class NotificationService {
 
   setupMessageListeners() {
     messaging().onMessage(async remoteMessage => {
-      console.log('Received foreground message:', remoteMessage);
     });
 
     messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log('Notification opened app from background:', remoteMessage);
     });
 
     messaging().getInitialNotification().then(remoteMessage => {
       if (remoteMessage) {
-        console.log('Notification opened app from quit state:', remoteMessage);
       }
     });
   }
 
-  async getPublicNotifications(pageNumber: number = 1) {
+  async getNotifications(pageNumber: number = 1) {
     return handleConnectionError(async () => {
       try {
         const fcmToken = await messaging().getToken();
+        if (!fcmToken) {
+          console.error('Không thể lấy FCM token');
+          return [];
+        }
+
+        // Lấy auth data từ AsyncStorage
+        const authData = await AsyncStorage.getItem('@auth');
+        const headers: any = {};
+        
+        if (authData) {
+          const userData = JSON.parse(authData);
+          if (userData?.user?.accessToken) {
+            headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
+          }
+        }
+
         const response = await api.get(
-          `/api/Fcm/notifications/public?deviceToken=${fcmToken}&page=${pageNumber}`
+          `/api/Fcm/notifications?deviceToken=${fcmToken}&page=${pageNumber}`,
+          { headers }
         );
         
         if (response.data.statusCode === 200) {

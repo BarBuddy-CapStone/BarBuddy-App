@@ -44,9 +44,7 @@ export default function NotificationsScreen() {
 
   const fetchNotifications = async (pageNumber: number = 1) => {
     try {
-      console.log('Đang lấy notifications trang:', pageNumber);
-      const data = await notificationService.getPublicNotifications(pageNumber);
-      console.log('Nhận được notifications:', data);
+      const data = await notificationService.getNotifications(pageNumber);
       
       if (pageNumber === 1) {
         setNotifications(data);

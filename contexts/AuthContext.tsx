@@ -9,6 +9,7 @@ import { notificationService } from '@/services/notification';
 import { Platform } from 'react-native';
 import { fcmService } from '@/services/fcm';
 import { tokenService } from '@/services/token';
+import { signalRService } from '@/services/signalr';
 
 // Định nghĩa kiểu dữ liệu cho user
 type User = UserInfo;
@@ -111,6 +112,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Cập nhật device token sau khi login thành công
       await fcmService.updateAccountDeviceToken(true);
 
+      // Ngắt kết nối SignalR hiện tại và kết nối lại với auth header mới
+      await signalRService.disconnect();
+      await signalRService.connect();
+
     } catch (error: any) {
       console.error('Login Error:', error.message);
       setError(error.message);
@@ -124,6 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Cập nhật device token với isLoginOrLogout = false
       await fcmService.updateAccountDeviceToken(false);
+
+      // Ngắt kết nối SignalR hiện tại
+      await signalRService.disconnect();
 
       // Gọi API logout để hủy refresh token
       await tokenService.logout();
@@ -140,6 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       // Xóa token khỏi header của axios
       delete axios.defaults.headers.common['Authorization'];
+
+      // Kết nối lại SignalR không có accountId
+      await signalRService.connect();
 
       setAllowNavigation(true);
     } catch (error) {
@@ -196,12 +207,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const response = await googleAuthService.signIn();
       
-      // Nếu response là null (người dùng hủy), return ngay
       if (!response) {
         return null;
       }
       
-      // Kiểm tra response trước khi xử lý
       if (!response.data?.data) {
         throw new Error('Không nhận được dữ liệu người dùng');
       }
@@ -229,6 +238,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userData);
       setIsAuthenticated(true);
       setIsGuest(false);
+
+      // Ngắt kết nối SignalR hiện tại và kết nối lại với auth header mới
+      await signalRService.disconnect();
+      await signalRService.connect();
 
       return response.data;
     } catch (error: any) {

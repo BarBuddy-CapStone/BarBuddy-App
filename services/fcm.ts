@@ -48,9 +48,19 @@ class FCMService {
           return null;
         }
 
+        // Kiểm tra authorization header
         const authHeader = await getAuthHeader();
+        if (!authHeader?.headers?.Authorization) {
+          console.log('Bỏ qua update device token vì chưa có authorization header');
+          return null;
+        }
+
+        const url = `${API_CONFIG.BASE_URL}/api/Fcm/update-account-device-token`;
+        console.log('Update device token URL:', url);
+        console.log('Request payload:', { deviceToken: fcmToken, isLoginOrLogout });
+        
         const response = await axios.patch(
-          `${API_CONFIG.BASE_URL}/api/Fcm/update-account-device-token`,
+          url,
           {
             deviceToken: fcmToken,
             isLoginOrLogout

@@ -4,6 +4,7 @@ import api from './api';
 import { PermissionsAndroid } from 'react-native';
 import { handleConnectionError } from '@/utils/error-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { router } from 'expo-router';
 
 export interface Notification {
   id: string;
@@ -52,14 +53,22 @@ class NotificationService {
   }
 
   setupMessageListeners() {
+    // Xử lý thông báo khi app đang mở (foreground)
     messaging().onMessage(async remoteMessage => {
+      // Không xử lý gì cả, để Firebase tự động hiển thị thông báo
+      return Promise.resolve();
     });
 
+    // Giữ nguyên phần xử lý deep link khi nhấn vào thông báo
     messaging().onNotificationOpenedApp(remoteMessage => {
+      if (remoteMessage.data?.deepLink) {
+        router.push(remoteMessage.data.deepLink as any);
+      }
     });
 
     messaging().getInitialNotification().then(remoteMessage => {
-      if (remoteMessage) {
+      if (remoteMessage?.data?.deepLink) {
+        router.push(remoteMessage.data.deepLink as any);
       }
     });
   }

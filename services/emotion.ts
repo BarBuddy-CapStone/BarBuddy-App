@@ -2,9 +2,15 @@ import api from './api';
 import { Drink } from './drink';
 import { handleConnectionError } from '@/utils/error-handler';
 
-interface EmotionResponse {
-  drinkList: Drink[];
-  emotion: string;
+export interface EmotionResponseItem {
+  drink: Drink;
+  reason: string;
+}
+
+interface EmotionApiResponse {
+  statusCode: number;
+  message: string;
+  data: EmotionResponseItem[];
 }
 
 class EmotionService {
@@ -14,15 +20,11 @@ class EmotionService {
    * @param barId - ID of the bar
    * @returns Promise<Drink[]> - Array of recommended drinks
    */
-  async getDrinkRecommendations(emotion: string, barId: string) {
+  async getDrinkRecommendations(emotion: string, barId: string): Promise<EmotionResponseItem[]> {
     return handleConnectionError(async () => {
       try {
-        const response = await api.get<{
-          statusCode: number;
-          message: string;
-          data: EmotionResponse;
-        }>(
-          `/api/DrinkRecommendation/drink-recommendation`, 
+        const response = await api.get<EmotionApiResponse>(
+          `/api/DrinkRecommendation/drink-recommendation-v2`, 
           {
             params: {
               emotion,
@@ -31,7 +33,10 @@ class EmotionService {
           }
         );
         
-        return response.data.data;
+        if (response?.data?.data) {
+          return response.data.data;
+        }
+        throw new Error('Invalid response format');
       } catch (error) {
         console.error('Error getting drink recommendations:', error);
         throw error;

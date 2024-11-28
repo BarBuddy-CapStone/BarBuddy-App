@@ -1,15 +1,15 @@
 import { View, Text, ScrollView, TouchableOpacity, Image, TextInput, Alert, Modal, GestureResponderEvent, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { DrinkOrderItem, BookingDrinkRequest, bookingTableService, SelectedTableInfo } from '@/services/booking-table';
 import { Drink, drinkService } from '@/services/drink';
-import Animated, { FadeIn, withRepeat, withTiming, useAnimatedStyle, useSharedValue, withSequence, withSpring, Easing, cancelAnimation } from 'react-native-reanimated';
+import Animated, { FadeIn, withRepeat, withTiming, useAnimatedStyle, useSharedValue, withSequence, withSpring, Easing, cancelAnimation, interpolate, withDelay } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import ImageViewing from 'react-native-image-viewing'
 import ReactNativeModal from 'react-native-modal';
-import { emotionService } from '@/services/emotion';
+import { emotionService, EmotionResponseItem } from '@/services/emotion';
 import { BlurView } from "@react-native-community/blur";
 
 // Thêm component DrinkSkeleton
@@ -55,6 +55,191 @@ const DrinkSkeleton = () => {
         </View>
       </View>
     </Animated.View>
+  );
+};
+
+// Tách thành component riêng ở ngoài component chính
+const OrderSummaryModal = ({
+  isVisible,
+  onClose,
+  drinks,
+  selectedDrinks,
+  setSelectedDrinks,
+  handleIncrement,
+  totalPrice,
+  originalPrice,
+  discount,
+  handleBooking,
+  isBooking
+}: {
+  isVisible: boolean;
+  onClose: () => void;
+  drinks: Drink[];
+  selectedDrinks: Map<string, number>;
+  setSelectedDrinks: (drinks: Map<string, number>) => void;
+  handleIncrement: (drinkId: string, increment: boolean) => void;
+  totalPrice: number;
+  originalPrice: number;
+  discount: number;
+  handleBooking: () => void;
+  isBooking: boolean;
+}) => {
+  const selectedDrinksList = useMemo(() => 
+    Array.from(selectedDrinks.entries())
+      .filter(([_, quantity]) => quantity > 0)
+      .map(([drinkId, quantity]) => ({
+        drink: drinks.find(d => d.drinkId === drinkId)!,
+        quantity
+      }))
+  , [selectedDrinks, drinks]);
+
+  const handleRemoveDrink = useCallback((drinkId: string) => {
+    const newSelectedDrinks = new Map(selectedDrinks);
+    newSelectedDrinks.delete(drinkId);
+    setSelectedDrinks(newSelectedDrinks);
+  }, [selectedDrinks, setSelectedDrinks]);
+
+  // Tách riêng hàm xử lý đặt món trong modal
+  const handleConfirmBooking = useCallback(async () => {
+    try {
+      await handleBooking();
+      // Đóng modal sau khi đặt hàng thành công
+      onClose();
+    } catch (error) {
+      // Xử lý lỗi nếu cần
+      console.error('Booking error:', error);
+    }
+  }, [handleBooking, onClose]);
+
+  return (
+    <ReactNativeModal
+      isVisible={isVisible}
+      onBackdropPress={onClose}
+      backdropOpacity={0.5}
+      style={{ margin: 0 }}
+      animationIn="slideInUp"
+      animationOut="slideOutDown"
+      // Thêm các props để handle cleanup tốt hơn
+      useNativeDriver={true}
+      hideModalContentWhileAnimating={true}
+      onModalHide={() => {
+        // Cleanup khi modal đóng
+        if (isBooking) {
+          setSelectedDrinks(new Map());
+        }
+      }}
+    >
+      <View className="bg-neutral-900 rounded-t-3xl absolute bottom-0 left-0 right-0 max-h-[80%]">
+        {/* Header */}
+        <View className="flex-row items-center justify-between p-4 border-b border-white/10">
+          <Text className="text-white text-lg font-bold">Thức uống đã chọn</Text>
+          <TouchableOpacity 
+            onPress={onClose}
+            className="w-8 h-8 items-center justify-center rounded-full bg-white/10"
+          >
+            <Ionicons name="close" size={20} color="white" />
+          </TouchableOpacity>
+        </View>
+
+        {/* Content */}
+        <ScrollView className="p-4" showsVerticalScrollIndicator={false}>
+          {selectedDrinksList.map(({ drink, quantity }) => (
+            <View 
+              key={drink.drinkId} 
+              className="flex-row items-center mb-4 bg-white/5 p-3 rounded-xl"
+            >
+              {/* Drink Image */}
+              <Image 
+                source={{ uri: drink.images.split(',')[0] }}
+                className="w-16 h-16 rounded-lg"
+                resizeMode="cover"
+              />
+              
+              {/* Drink Info */}
+              <View className="flex-1 ml-3">
+                <Text className="text-white font-medium">{drink.drinkName}</Text>
+                <Text className="text-yellow-500 font-bold mt-1">
+                  {drink.price.toLocaleString('vi-VN')}đ
+                </Text>
+              </View>
+
+              {/* Quantity Controls */}
+              <View className="flex-row items-center space-x-2">
+                <TouchableOpacity
+                  onPress={() => handleIncrement(drink.drinkId, false)}
+                  className="w-8 h-8 items-center justify-center rounded-lg bg-white/10"
+                >
+                  <Ionicons name="remove" size={18} color="white" />
+                </TouchableOpacity>
+
+                <Text className="text-white font-medium w-8 text-center">
+                  {quantity}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => handleIncrement(drink.drinkId, true)}
+                  className="w-8 h-8 items-center justify-center rounded-lg bg-white/10"
+                >
+                  <Ionicons name="add" size={18} color="white" />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => handleRemoveDrink(drink.drinkId)}
+                  className="w-8 h-8 items-center justify-center rounded-lg bg-red-500/20 ml-2"
+                >
+                  <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+
+          {selectedDrinksList.length === 0 && (
+            <View className="items-center py-8">
+              <Text className="text-gray-400 text-base">
+                Chưa có thức uống nào được chọn
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Footer */}
+        <View className="p-4 border-t border-white/10">
+          <View className="flex-row items-center justify-between mb-4">
+            <Text className="text-white text-base">Tổng cộng:</Text>
+            <Text className="text-yellow-500 text-xl font-bold">
+              {totalPrice.toLocaleString('vi-VN')}đ
+            </Text>
+          </View>
+
+          {discount > 0 && (
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-gray-400">Giảm giá:</Text>
+              <View className="flex-row items-center">
+                <Text className="text-gray-400 line-through mr-2">
+                  {originalPrice.toLocaleString('vi-VN')}đ
+                </Text>
+                <View className="bg-yellow-500/20 px-2 py-1 rounded-lg">
+                  <Text className="text-yellow-500 text-xs font-bold">-{discount}%</Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          <TouchableOpacity
+            onPress={handleConfirmBooking}
+            disabled={isBooking || totalPrice === 0}
+            className={`bg-yellow-500 p-4 rounded-xl flex-row items-center justify-center ${
+              (isBooking || totalPrice === 0) ? 'opacity-50' : ''
+            }`}
+          >
+            <Ionicons name="cart" size={20} color="black" />
+            <Text className="text-black font-bold ml-2 text-base">
+              {isBooking ? 'Đang xử lý...' : 'Xác nhận đặt món'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </ReactNativeModal>
   );
 };
 
@@ -621,18 +806,88 @@ export default function BookingDrinkScreen() {
   // Thêm component GlassOverlay
   const GlassOverlay = ({ visible }: { visible: boolean }) => {
     const scaleAnim = useSharedValue(1);
+    const translateY = useSharedValue(0);
+    const iconIndex = useSharedValue(0);
     
     useEffect(() => {
       if (visible) {
+        // Animation cho scale
         scaleAnim.value = withSequence(
           withSpring(1.1, { damping: 12 }),
           withSpring(1, { damping: 8 })
         );
+
+        // Animation cho bounce
+        translateY.value = withRepeat(
+          withSequence(
+            withSpring(-10, {
+              damping: 8,
+              stiffness: 100,
+            }),
+            withSpring(0, {
+              damping: 8,
+              stiffness: 100,
+            })
+          ),
+          -1, // Lặp vô hạn
+          true // Reverse animation
+        );
+
+        // Animation chuyển đổi icon
+        iconIndex.value = withRepeat(
+          withSequence(
+            withDelay(
+              1000, // Delay 1s trước khi đổi icon
+              withTiming(1, { duration: 200 })  // Thêm duration cho animation chuyển đổi
+            ),
+            withDelay(
+              1000, // Giữ icon mới 1s
+              withTiming(0, { duration: 200 })  // Thêm duration cho animation chuyển đổi
+            )
+          ),
+          -1,
+          true
+        );
+      } else {
+        // Reset animations khi overlay ẩn
+        cancelAnimation(translateY);
+        cancelAnimation(iconIndex);
+        translateY.value = 0;
+        iconIndex.value = 0;
       }
+
+      return () => {
+        cancelAnimation(translateY);
+        cancelAnimation(iconIndex);
+      };
     }, [visible]);
 
     const iconStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: scaleAnim.value }]
+      transform: [
+        { scale: scaleAnim.value },
+        { translateY: translateY.value }
+      ],
+      opacity: interpolate(
+        translateY.value,
+        [-10, 0],
+        [0.7, 1]
+      )
+    }));
+
+    const firstIconStyle = useAnimatedStyle(() => ({
+      opacity: interpolate(
+        iconIndex.value,
+        [0, 0.5, 1],
+        [1, 0, 0]
+      ),
+    }));
+
+    const secondIconStyle = useAnimatedStyle(() => ({
+      opacity: interpolate(
+        iconIndex.value,
+        [0, 0.5, 1],
+        [0, 0, 1]
+      ),
     }));
 
     if (!visible) return null;
@@ -661,7 +916,35 @@ export default function BookingDrinkScreen() {
           blurAmount={10}
           reducedTransparencyFallbackColor="black"
         >
-          {/* Glass effect layer */}
+          {/* Gradient background */}
+          <LinearGradient
+            colors={[
+              'rgba(41, 171, 255, 0.1)',   // Light blue
+              'rgba(95, 145, 255, 0.1)',    // Blue
+              'rgba(149, 119, 255, 0.1)',   // Purple
+              'rgba(202, 115, 217, 0.1)',   // Pink purple
+              'rgba(255, 110, 178, 0.1)',   // Pink
+              'rgba(255, 98, 132, 0.1)',    // Light red
+              'rgba(255, 85, 85, 0.1)',     // Red
+              'rgba(255, 113, 85, 0.1)',    // Orange red
+              'rgba(255, 141, 85, 0.1)',    // Light orange
+              'rgba(255, 169, 85, 0.1)',    // Orange yellow
+              'rgba(255, 197, 85, 0.1)',    // Yellow
+              'rgba(148, 184, 255, 0.1)',   // Sky blue
+              'rgba(41, 171, 255, 0.1)'     // Back to light blue (để tạo gradient liền mạch)
+            ]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+            }}
+          />
+          
+          {/* Glass effect overlay */}
           <LinearGradient
             colors={[
               'rgba(255,255,255,0.1)',
@@ -680,10 +963,18 @@ export default function BookingDrinkScreen() {
         {/* Content */}
         <View className="flex-1 items-center justify-center">
           <Animated.View style={iconStyle}>
-            <Image 
-              source={require("@/assets/images/happy-face.png")}
-              className="w-8 h-8"
-            />
+            <View className="relative w-8 h-8">
+              <Animated.Image 
+                source={require("@/assets/images/smile-face.png")}
+                className="w-8 h-8 absolute"
+                style={firstIconStyle}
+              />
+              <Animated.Image 
+                source={require("@/assets/images/happy-face.png")}
+                className="w-8 h-8 absolute"
+                style={secondIconStyle}
+              />
+            </View>
           </Animated.View>
           
           <Text 
@@ -704,7 +995,13 @@ export default function BookingDrinkScreen() {
   // Thêm state để lưu emotion được phân tích
   const [analyzedEmotion, setAnalyzedEmotion] = useState<string>('');
   
-  // Cập nhật hàm handleSendEmotion
+  // Thêm interface cho response item
+  interface EmotionResponseItem {
+    drink: Drink;
+    reason: string;
+  }
+
+  // Cập nhật lại hàm handleSendEmotion
   const handleSendEmotion = async () => {
     if (!emotionText.trim()) return;
     
@@ -714,25 +1011,54 @@ export default function BookingDrinkScreen() {
     setSelectedEmotion('');
     
     try {
-      const response = await emotionService.getDrinkRecommendations(
-        emotionText,
-        params.id as string
-      );
+      // Thêm timeout để tránh trường hợp API bị treo
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Request timeout'));
+        }, 20000);
+      });
+
+      // Race giữa API call và timeout
+      const response = await Promise.race([
+        emotionService.getDrinkRecommendations(
+          emotionText,
+          params.id as string
+        ),
+        timeoutPromise
+      ]);
       
-      setRecommendedDrinks(response.drinkList);
-      setAnalyzedEmotion(response.emotion);
-      setIsEmotionMode(true);
-      setCurrentSource('emotion');
+      if (response && Array.isArray(response)) {
+        const recommendedDrinksList = response.map((item: EmotionResponseItem) => item.drink);
+        const reasonsMap = new Map(
+          response.map((item: EmotionResponseItem) => [item.drink.drinkId, item.reason])
+        );
+        
+        setRecommendedDrinks(recommendedDrinksList);
+        setDrinkReasons(reasonsMap);
+        setIsEmotionMode(true);
+        setCurrentSource('emotion');
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (error) {
       console.error('Error:', error);
-      Alert.alert(
-        'Lỗi',
-        'Không thể lấy được gợi ý thức uống. Vui lòng thử lại sau.'
-      );
-    } finally {
+      // Đảm bảo tắt GlassOverlay trước khi hiển thị Alert
       setIsAnalyzing(false);
       setIsLoadingRecommendation(false);
+      
+      // Hin thị thông báo lỗi sau khi đã tắt GlassOverlay
+      setTimeout(() => {
+        Alert.alert(
+          'Lỗi',
+          'Không thể lấy được gợi ý thức uống. Vui lòng thử lại sau.'
+        );
+      }, 100);
+      return; // Thoát sớm để không chạy vào finally
     }
+    
+    // Chỉ chạy khi thành công
+    setIsAnalyzing(false);
+    setIsLoadingRecommendation(false);
   };
 
   // Thêm state để lưu available categories cho emotion hiện tại
@@ -777,6 +1103,24 @@ export default function BookingDrinkScreen() {
       setAvailableCategories([]); // Reset khi không ở emotion mode
     }
   }, [isEmotionMode, recommendedDrinks]);
+
+  const [drinkReasons, setDrinkReasons] = useState<Map<string, string>>(new Map());
+
+  const [isOrderSummaryVisible, setIsOrderSummaryVisible] = useState<boolean>(false);
+
+  // Thêm hook này vào đầu component
+  const insets = useSafeAreaInsets();
+
+  // Thêm hàm handleConfirmBooking vào component chính
+  const handleConfirmBooking = useCallback(async () => {
+    try {
+      await handleBooking();
+      setIsOrderSummaryVisible(false);
+    } catch (error) {
+      console.error('Booking error:', error);
+      Alert.alert('Lỗi', 'Không thể đặt món. Vui lòng thử lại.');
+    }
+  }, [handleBooking]);
 
   return (
     <View className="flex-1 bg-black">
@@ -982,17 +1326,13 @@ export default function BookingDrinkScreen() {
 
                                 {/* Phần thông tin */}
                                 <View className="p-4">
-                                  <View className="flex-row items-start justify-between">
-                                    <View className="flex-1 mr-4">
-                                      <Text className="text-white text-lg font-bold mb-1">
-                                        {drink.drinkName}
-                                      </Text>
-                                      <Text numberOfLines={2} className="text-gray-400 text-sm leading-5">
-                                        {drink.description}
-                                      </Text>
-                                    </View>
+                                  {/* Header row với tên và số lượng */}
+                                  <View className="flex-row items-start justify-between mb-2">
+                                    <Text className="text-white text-xl font-bold flex-1 mr-4 mt-2">
+                                      {drink.drinkName}
+                                    </Text>
                                     
-                                    {/* Nút điều chỉnh s�� lượng */}
+                                    {/* Nút điều chỉnh số lượng */}
                                     <View className="bg-white/5 rounded-xl p-1">
                                       <View className="flex-row items-center">
                                         <TouchableOpacity
@@ -1014,9 +1354,16 @@ export default function BookingDrinkScreen() {
                                     </View>
                                   </View>
 
-                                  {/* Emotions tags */}
+                                  {/* Description */}
+                                  <Text numberOfLines={2} className="text-gray-400 text-sm leading-5 mb-3">
+                                    {drink.description}
+                                  </Text>
+
+                                  
+
+                                  {/* Emotions tags (chỉ hiển thị khi không ở emotion mode) */}
                                   {drink.emotionsDrink && drink.emotionsDrink.length > 0 && (
-                                    <View className="flex-row flex-wrap gap-2 mt-3">
+                                    <View className="flex-row flex-wrap gap-2">
                                       {drink.emotionsDrink.slice(0, 2).map((emotion) => (
                                         <View
                                           key={emotion.emotionalDrinksCategoryId}
@@ -1034,6 +1381,18 @@ export default function BookingDrinkScreen() {
                                           </Text>
                                         </View>
                                       )}
+                                    </View>
+                                  )}
+
+                                  {/* Reason (chỉ hiển thị trong emotion mode) */}
+                                  {isEmotionMode && drinkReasons.get(drink.drinkId) && (
+                                    <View className="bg-white/5 p-3 rounded-lg mt-4">
+                                      <Text className="text-gray-300 text-sm font-medium mb-1">
+                                        Giải thích:
+                                      </Text>
+                                      <Text className="text-gray-300 text-sm italic">
+                                        "{drinkReasons.get(drink.drinkId)}"
+                                      </Text>
                                     </View>
                                   )}
                                 </View>
@@ -1085,15 +1444,11 @@ export default function BookingDrinkScreen() {
 
                             {/* Phần thông tin */}
                             <View className="p-4">
-                              <View className="flex-row items-start justify-between">
-                                <View className="flex-1 mr-4">
-                                  <Text className="text-white text-lg font-bold mb-1">
-                                    {drink.drinkName}
-                                  </Text>
-                                  <Text numberOfLines={2} className="text-gray-400 text-sm leading-5">
-                                    {drink.description}
-                                  </Text>
-                                </View>
+                              {/* Header row với tên và số lượng */}
+                              <View className="flex-row items-start justify-between mb-2">
+                                <Text className="text-white text-lg font-bold flex-1 mr-4">
+                                  {drink.drinkName}
+                                </Text>
                                 
                                 {/* Nút điều chỉnh số lượng */}
                                 <View className="bg-white/5 rounded-xl p-1">
@@ -1117,9 +1472,14 @@ export default function BookingDrinkScreen() {
                                 </View>
                               </View>
 
-                              {/* Emotions tags */}
-                              {drink.emotionsDrink && drink.emotionsDrink.length > 0 && (
-                                <View className="flex-row flex-wrap gap-2 mt-3">
+                              {/* Description */}
+                              <Text numberOfLines={2} className="text-gray-400 text-sm leading-5 mb-3">
+                                {drink.description}
+                              </Text>
+
+                              {/* Emotions tags (chỉ hiển thị khi không ở emotion mode) */}
+                              {!isEmotionMode && drink.emotionsDrink && drink.emotionsDrink.length > 0 && (
+                                <View className="flex-row flex-wrap gap-2">
                                   {drink.emotionsDrink.slice(0, 2).map((emotion) => (
                                     <View
                                       key={emotion.emotionalDrinksCategoryId}
@@ -1157,51 +1517,68 @@ export default function BookingDrinkScreen() {
             { 
               borderTopWidth: 1,
               borderTopColor: 'rgba(255,255,255,0.1)',
-              backgroundColor: 'rgba(23,23,23,0.95)'
+              backgroundColor: 'rgba(23,23,23,0.95)',
+              paddingBottom: insets.bottom, // Sử dụng insets.bottom thay vì bottom
             },
             footerSlideAnim
           ]}
         >
-          <View className="px-4 py-3 flex-row items-center justify-between mb-4">
-            <View>
-              {discount > 0 ? (
-                <>
-                  <View className="flex-row items-center mb-1">
-                    <Text className="text-gray-400 text-sm line-through mr-2">
-                      {originalPrice.toLocaleString('vi-VN')}đ
-                    </Text>
-                    <View className="bg-yellow-500/20 px-2 py-1 rounded-lg">
-                      <Text className="text-yellow-500 text-xs font-bold">-{discount}%</Text>
-                    </View>
-                  </View>
-                  <View className="flex-row items-center">
-                    <Ionicons name="pricetag" size={16} color="#FBBF24" />
-                    <Text className="text-yellow-500 font-bold text-xl ml-1">
-                      {totalPrice.toLocaleString('vi-VN')}đ
-                    </Text>
-                  </View>
-                </>
-              ) : (
+          {/* Main Footer */}
+          <View className="px-4 py-3">
+            <View className="flex-row items-center">
+              {/* Price Section */}
+              <View className="flex-1">
+                {discount > 0 && (
+                  <Text className="text-gray-400 text-sm line-through">
+                    {originalPrice.toLocaleString('vi-VN')}đ
+                  </Text>
+                )}
                 <View className="flex-row items-center">
-                  <Ionicons name="pricetag" size={16} color="#FBBF24" />
-                  <Text className="text-yellow-500 font-bold text-xl ml-1">
+                  <Text className="text-yellow-500 font-bold text-xl">
                     {totalPrice.toLocaleString('vi-VN')}đ
                   </Text>
+                  {discount > 0 && (
+                    <View className="bg-yellow-500/20 px-2 py-0.5 rounded-full ml-2">
+                      <Text className="text-yellow-500 text-xs font-bold">-{discount}%</Text>
+                    </View>
+                  )}
                 </View>
-              )}
+              </View>
+
+              {/* Actions Section */}
+              <View className="flex-row items-center space-x-3">
+                {/* Order Summary Button */}
+                <TouchableOpacity
+                  onPress={() => setIsOrderSummaryVisible(true)}
+                  className="bg-neutral-800 w-10 h-10 rounded-xl items-center justify-center"
+                >
+                  <View className="relative">
+                    <Ionicons name="list-outline" size={20} color="white" />
+                    {Array.from(selectedDrinks.values()).reduce((a, b) => a + b, 0) > 0 && (
+                      <View className="absolute -top-2 -right-2 bg-yellow-500 w-5 h-5 rounded-full items-center justify-center">
+                        <Text className="text-black text-xs font-bold">
+                          {Array.from(selectedDrinks.values()).reduce((a, b) => a + b, 0)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+
+                {/* Confirm Button */}
+                <TouchableOpacity
+                  onPress={handleConfirmBooking}
+                  disabled={isBooking || totalPrice === 0}
+                  className={`bg-yellow-500 px-5 py-2.5 rounded-xl flex-row items-center ${
+                    (isBooking || totalPrice === 0) ? 'opacity-50' : ''
+                  }`}
+                >
+                  <Ionicons name="cart" size={18} color="black" />
+                  <Text className="text-black font-bold ml-2">
+                    {isBooking ? 'Đang xử lý...' : 'Xác nhận'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity
-              onPress={handleBooking}
-              disabled={isBooking || totalPrice === 0}
-              className={`bg-yellow-500 px-4 py-2 rounded-xl flex-row items-center ${
-                (isBooking || totalPrice === 0) ? 'opacity-50' : ''
-              }`}
-            >
-              <Ionicons name="cart" size={18} color="black" />
-              <Text className="text-black font-bold ml-2">
-                {isBooking ? 'Đang xử lý...' : 'Xác nhận'}
-              </Text>
-            </TouchableOpacity>
           </View>
         </Animated.View>
 
@@ -1338,6 +1715,19 @@ export default function BookingDrinkScreen() {
         />
       </SafeAreaView>
       <GlassOverlay visible={isAnalyzing} />
+      <OrderSummaryModal 
+        isVisible={isOrderSummaryVisible}
+        onClose={() => setIsOrderSummaryVisible(false)}
+        drinks={drinks}
+        selectedDrinks={selectedDrinks}
+        setSelectedDrinks={setSelectedDrinks}
+        handleIncrement={handleIncrement}
+        totalPrice={totalPrice}
+        originalPrice={originalPrice}
+        discount={discount}
+        handleBooking={handleConfirmBooking}
+        isBooking={isBooking}
+      />
     </View>
   );
 } 

@@ -4,7 +4,7 @@ const { apiUrl, apiTimeout } = Constants.expoConfig?.extra || {};
 
 export const API_CONFIG = {
   BASE_URL: apiUrl,
-  TIMEOUT: parseInt(apiTimeout || '10000', 10),
+  TIMEOUT: parseInt(apiTimeout || '30000', 30),
 };
 
 if (!apiUrl) {

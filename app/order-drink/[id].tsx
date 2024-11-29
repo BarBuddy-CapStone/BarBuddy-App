@@ -3,7 +3,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { DrinkOrderItem, BookingDrinkRequest, bookingTableService, SelectedTableInfo } from '@/services/booking-table';
 import { Drink, drinkService } from '@/services/drink';
 import Animated, { FadeIn, withRepeat, withTiming, useAnimatedStyle, useSharedValue, withSequence, withSpring, Easing, cancelAnimation, interpolate, withDelay } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +10,10 @@ import ImageViewing from 'react-native-image-viewing'
 import ReactNativeModal from 'react-native-modal';
 import { emotionService, EmotionResponseItem } from '@/services/emotion';
 import { BlurView } from "@react-native-community/blur";
+import { bookingService } from '@/services/booking';
+
+// Định nghĩa type cho status
+type LoadingStatus = 'loading' | 'success' | 'error';
 
 // Thêm component DrinkSkeleton
 const DrinkSkeleton = () => {
@@ -67,10 +70,8 @@ const OrderSummaryModal = ({
   setSelectedDrinks,
   handleIncrement,
   totalPrice,
-  originalPrice,
-  discount,
-  handleBooking,
-  isBooking
+  bookingId,
+  onConfirm
 }: {
   isVisible: boolean;
   onClose: () => void;
@@ -79,37 +80,23 @@ const OrderSummaryModal = ({
   setSelectedDrinks: (drinks: Map<string, number>) => void;
   handleIncrement: (drinkId: string, increment: boolean) => void;
   totalPrice: number;
-  originalPrice: number;
-  discount: number;
-  handleBooking: () => void;
-  isBooking: boolean;
+  bookingId: string;
+  onConfirm: () => Promise<void>;
 }) => {
-  const selectedDrinksList = useMemo(() => 
-    Array.from(selectedDrinks.entries())
-      .filter(([_, quantity]) => quantity > 0)
-      .map(([drinkId, quantity]) => ({
-        drink: drinks.find(d => d.drinkId === drinkId)!,
-        quantity
-      }))
-  , [selectedDrinks, drinks]);
+  const [isOrdering, setIsOrdering] = useState(false);
 
-  const handleRemoveDrink = useCallback((drinkId: string) => {
-    const newSelectedDrinks = new Map(selectedDrinks);
-    newSelectedDrinks.delete(drinkId);
-    setSelectedDrinks(newSelectedDrinks);
-  }, [selectedDrinks, setSelectedDrinks]);
+  const handleConfirmOrder = useCallback(async () => {
+    if (selectedDrinks.size === 0) return;
 
-  // Tách riêng hàm xử lý đặt món trong modal
-  const handleConfirmBooking = useCallback(async () => {
+    setIsOrdering(true);
     try {
-      await handleBooking();
-      // Đóng modal sau khi đặt hàng thành công
-      onClose();
-    } catch (error) {
-      // Xử lý lỗi nếu cần
-      console.error('Booking error:', error);
+      await onConfirm();
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể đặt thêm đồ uống');
+    } finally {
+      setIsOrdering(false);
     }
-  }, [handleBooking, onClose]);
+  }, [selectedDrinks, onConfirm]);
 
   return (
     <ReactNativeModal
@@ -122,12 +109,6 @@ const OrderSummaryModal = ({
       // Thêm các props để handle cleanup tốt hơn
       useNativeDriver={true}
       hideModalContentWhileAnimating={true}
-      onModalHide={() => {
-        // Cleanup khi modal đóng
-        if (isBooking) {
-          setSelectedDrinks(new Map());
-        }
-      }}
     >
       <View className="bg-neutral-900 rounded-t-3xl absolute bottom-0 left-0 right-0 max-h-[80%]">
         {/* Header */}
@@ -143,30 +124,30 @@ const OrderSummaryModal = ({
 
         {/* Content */}
         <ScrollView className="p-4" showsVerticalScrollIndicator={false}>
-          {selectedDrinksList.map(({ drink, quantity }) => (
+          {Array.from(selectedDrinks.entries()).map(([drinkId, quantity]) => (
             <View 
-              key={drink.drinkId} 
+              key={drinkId} 
               className="flex-row items-center mb-4 bg-white/5 p-3 rounded-xl"
             >
               {/* Drink Image */}
               <Image 
-                source={{ uri: drink.images.split(',')[0] }}
+                source={{ uri: drinks.find(d => d.drinkId === drinkId)!.images.split(',')[0] }}
                 className="w-16 h-16 rounded-lg"
                 resizeMode="cover"
               />
               
               {/* Drink Info */}
               <View className="flex-1 ml-3">
-                <Text className="text-white font-medium">{drink.drinkName}</Text>
+                <Text className="text-white font-medium">{drinks.find(d => d.drinkId === drinkId)!.drinkName}</Text>
                 <Text className="text-yellow-500 font-bold mt-1">
-                  {drink.price.toLocaleString('vi-VN')}đ
+                  {drinks.find(d => d.drinkId === drinkId)!.price.toLocaleString('vi-VN')}đ
                 </Text>
               </View>
 
               {/* Quantity Controls */}
               <View className="flex-row items-center space-x-2">
                 <TouchableOpacity
-                  onPress={() => handleIncrement(drink.drinkId, false)}
+                  onPress={() => handleIncrement(drinkId, false)}
                   className="w-8 h-8 items-center justify-center rounded-lg bg-white/10"
                 >
                   <Ionicons name="remove" size={18} color="white" />
@@ -177,14 +158,18 @@ const OrderSummaryModal = ({
                 </Text>
 
                 <TouchableOpacity
-                  onPress={() => handleIncrement(drink.drinkId, true)}
+                  onPress={() => handleIncrement(drinkId, true)}
                   className="w-8 h-8 items-center justify-center rounded-lg bg-white/10"
                 >
                   <Ionicons name="add" size={18} color="white" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  onPress={() => handleRemoveDrink(drink.drinkId)}
+                  onPress={() => {
+                    const newMap = new Map(selectedDrinks);
+                    newMap.delete(drinkId);
+                    setSelectedDrinks(newMap);
+                  }}
                   className="w-8 h-8 items-center justify-center rounded-lg bg-red-500/20 ml-2"
                 >
                   <Ionicons name="trash-outline" size={16} color="#EF4444" />
@@ -193,7 +178,7 @@ const OrderSummaryModal = ({
             </View>
           ))}
 
-          {selectedDrinksList.length === 0 && (
+          {selectedDrinks.size === 0 && (
             <View className="items-center py-8">
               <Text className="text-gray-400 text-base">
                 Chưa có thức uống nào được chọn
@@ -211,31 +196,23 @@ const OrderSummaryModal = ({
             </Text>
           </View>
 
-          {discount > 0 && (
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-gray-400">Giảm giá:</Text>
-              <View className="flex-row items-center">
-                <Text className="text-gray-400 line-through mr-2">
-                  {originalPrice.toLocaleString('vi-VN')}đ
-                </Text>
-                <View className="bg-yellow-500/20 px-2 py-1 rounded-lg">
-                  <Text className="text-yellow-500 text-xs font-bold">-{discount}%</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
           <TouchableOpacity
-            onPress={handleConfirmBooking}
-            disabled={isBooking || totalPrice === 0}
+            onPress={handleConfirmOrder}
+            disabled={isOrdering || selectedDrinks.size === 0}
             className={`bg-yellow-500 p-4 rounded-xl flex-row items-center justify-center ${
-              (isBooking || totalPrice === 0) ? 'opacity-50' : ''
+              (isOrdering || selectedDrinks.size === 0) ? 'opacity-50' : ''
             }`}
           >
-            <Ionicons name="cart" size={20} color="black" />
-            <Text className="text-black font-bold ml-2 text-base">
-              {isBooking ? 'Đang xử lý...' : 'Xác nhận đặt món'}
-            </Text>
+            {isOrdering ? (
+              <ActivityIndicator size="small" color="black" />
+            ) : (
+              <>
+                <Ionicons name="cart" size={20} color="black" />
+                <Text className="text-black font-bold ml-2 text-base">
+                  Xác nhận gọi món
+                </Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -243,13 +220,136 @@ const OrderSummaryModal = ({
   );
 };
 
-export default function BookingDrinkScreen() {
-  const params = useLocalSearchParams();
+// Cập nhật LoadingPopup component
+const LoadingPopup = ({ 
+  visible, 
+  status = 'loading' 
+}: { 
+  visible: boolean;
+  status?: LoadingStatus;
+}) => (
+  <Modal transparent visible={visible}>
+    <View className="flex-1 bg-black/50 items-center justify-center">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4">
+        {status === 'loading' && (
+          <>
+            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đang xử lý đặt món...
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng không tắt ứng dụng
+            </Text>
+          </>
+        )}
+
+        {status === 'success' && (
+          <>
+            <View className="mb-4 bg-green-500/20 p-3 rounded-full">
+              <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Đặt món thành công!
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Đơn của bạn đã được gửi đến quán
+            </Text>
+          </>
+        )}
+
+        {status === 'error' && (
+          <>
+            <View className="mb-4 bg-red-500/20 p-3 rounded-full">
+              <Ionicons name="close-circle" size={32} color="#EF4444" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Đặt món thất bại
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng thử lại sau
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  </Modal>
+);
+
+// Cập nhật ConfirmationPopup với animation fade
+const ConfirmationPopup = ({
+  visible,
+  onClose,
+  onConfirm,
+  isProcessing
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isProcessing: boolean;
+}) => {
+  const fadeAnim = useSharedValue(0);
+
+  useEffect(() => {
+    if (visible) {
+      fadeAnim.value = withTiming(1, { duration: 200 });
+    } else {
+      fadeAnim.value = withTiming(0, { duration: 200 });
+    }
+  }, [visible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: fadeAnim.value
+  }));
+
+  if (!visible && fadeAnim.value === 0) return null;
+
+  return (
+    <Modal transparent visible={visible}>
+      <Animated.View 
+        style={[{ flex: 1 }, animatedStyle]} 
+        className="bg-black/50 items-center justify-center"
+      >
+        <View className="bg-neutral-900 rounded-2xl p-6 mx-4 w-[90%] max-w-sm">
+          <Text className="text-white text-lg font-bold text-center mb-2">
+            Xác nhận đặt món
+          </Text>
+          <Text className="text-white/60 text-center mb-6">
+            Bạn có chắc chắn muốn đặt thêm những món này?
+          </Text>
+
+          <View className="flex-row space-x-3">
+            <TouchableOpacity
+              onPress={onClose}
+              disabled={isProcessing}
+              className="flex-1 bg-white/10 py-3 rounded-xl"
+            >
+              <Text className="text-white text-center font-bold">Hủy</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={onConfirm}
+              disabled={isProcessing}
+              className="flex-1 bg-yellow-500 py-3 rounded-xl"
+            >
+              {isProcessing ? (
+                <ActivityIndicator size="small" color="black" />
+              ) : (
+                <Text className="text-black text-center font-bold">Xác nhận</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
+export default function OrderDrinkScreen() {
+  const { id: bookingId, barId } = useLocalSearchParams<{ id: string; barId: string }>();
   const router = useRouter();
   const [drinks, setDrinks] = useState<Drink[]>([]);
   const [selectedDrinks, setSelectedDrinks] = useState<Map<string, number>>(new Map());
   const [isLoading, setIsLoading] = useState(false);
-  const [isBooking, setIsBooking] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchText, setSearchText] = useState('');
   const [totalPrice, setTotalPrice] = useState(0);
@@ -258,10 +358,8 @@ export default function BookingDrinkScreen() {
     drinksCategoryName: string;
   }[]>([]);
   const [filteredDrinks, setFilteredDrinks] = useState<Drink[]>([]);
-  const discount = Number(params.discount) || 0;
   const [selectedDrink, setSelectedDrink] = useState<Drink | null>(null);
   const [isDrinkDetailVisible, setIsDrinkDetailVisible] = useState(false);
-  const [originalPrice, setOriginalPrice] = useState(0);
   // Thêm state để lưu recommended drinks
   const [recommendedDrinks, setRecommendedDrinks] = useState<Drink[]>([]);
   const [selectedEmotion, setSelectedEmotion] = useState<string>('');
@@ -376,7 +474,7 @@ export default function BookingDrinkScreen() {
   const loadDrinks = async () => {
     setIsLoading(true);
     try {
-      const data = await drinkService.getDrinks(params.id as string);
+      const data = await drinkService.getDrinks(barId as string);
       setDrinks(data);
     } catch (error) {
       console.error('Error loading drinks:', error);
@@ -389,46 +487,7 @@ export default function BookingDrinkScreen() {
     setSelectedDrinks(new Map(selectedDrinks.set(drinkId, quantity)));
   };
 
-  const handleBooking = () => {
-    if (isBooking) return;
-    
-    const drinks: DrinkOrderItem[] = Array.from(selectedDrinks.entries())
-      .filter(([_, quantity]) => quantity > 0)
-      .map(([drinkId, quantity]) => ({
-        drinkId,
-        quantity
-      }));
-
-    if (drinks.length === 0) {
-      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một thức uống');
-      return;
-    }
-
-    const selectedTablesInfo: SelectedTableInfo[] = JSON.parse(params.selectedTables as string);
-
-    const bookingRequest: BookingDrinkRequest = {
-      barId: params.id as string,
-      bookingDate: params.bookingDate as string,
-      bookingTime: params.bookingTime as string,
-      note: params.note as string,
-      tableIds: JSON.parse(params.tableIds as string),
-      selectedTables: selectedTablesInfo,
-      paymentDestination: "VNPAY",
-      drinks,
-      voucherCode: params.voucherCode as string || ''
-    };
-
-    router.push({
-      pathname: "/payment/payment-detail" as any,
-      params: {
-        bookingRequest: JSON.stringify(bookingRequest),
-        discount: params.discount,
-        originalPrice: originalPrice.toString(),
-        totalPrice: totalPrice.toString()
-      }
-    });
-  };
-
+  // Tính tổng tiền dựa trên số lượng đồ uống được chọn
   useEffect(() => {
     let total = 0;
     selectedDrinks.forEach((quantity, drinkId) => {
@@ -437,13 +496,8 @@ export default function BookingDrinkScreen() {
         total += drink.price * quantity;
       }
     });
-    setOriginalPrice(total);
-    
-    if (discount > 0) {
-      total = total * (1 - discount/100);
-    }
     setTotalPrice(total);
-  }, [selectedDrinks, drinks, discount]);
+  }, [selectedDrinks, drinks]);
 
   useEffect(() => {
     if (drinks.length > 0) {
@@ -589,9 +643,6 @@ export default function BookingDrinkScreen() {
           imageIndex={0}
           visible={isImageViewVisible}
           onRequestClose={() => setIsImageViewVisible(false)}
-          backgroundColor="black"
-          swipeToCloseEnabled={true}
-          doubleTapToZoomEnabled={true}
         />
       </ScrollView>
     );
@@ -794,7 +845,7 @@ export default function BookingDrinkScreen() {
     setEmotionText('');
   };
 
-  // Thêm state để lưu giá trị input
+  // Thêm state để lưu giá tr input
   const [emotionText, setEmotionText] = useState('');
   const [isLoadingRecommendation, setIsLoadingRecommendation] = useState(false);
 
@@ -1015,14 +1066,14 @@ export default function BookingDrinkScreen() {
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
           reject(new Error('Request timeout'));
-        }, 30000);
+        }, 20000);
       });
 
       // Race giữa API call và timeout
       const response = await Promise.race([
         emotionService.getDrinkRecommendations(
           emotionText,
-          params.id as string
+          barId as string
         ),
         timeoutPromise
       ]);
@@ -1111,16 +1162,53 @@ export default function BookingDrinkScreen() {
   // Thêm hook này vào đầu component
   const insets = useSafeAreaInsets();
 
-  // Thêm hàm handleConfirmBooking vào component chính
-  const handleConfirmBooking = useCallback(async () => {
+  // Thêm state để quản lý loading popup
+  const [showLoadingPopup, setShowLoadingPopup] = useState(false);
+
+  // Thêm state để quản lý status
+  const [loadingStatus, setLoadingStatus] = useState<LoadingStatus>('loading');
+
+  // Thêm state cho confirmation popup
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Cập nhật hàm handleConfirmOrder
+  const handleConfirmOrder = useCallback(async () => {
+    if (selectedDrinks.size === 0) return;
+    setShowConfirmPopup(true);
+  }, [selectedDrinks]);
+
+  // Thêm hàm xử lý khi user xác nhận
+  const handleProcessOrder = async () => {
     try {
-      await handleBooking();
-      setIsOrderSummaryVisible(false);
-    } catch (error) {
-      console.error('Booking error:', error);
-      Alert.alert('Lỗi', 'Không thể đặt món. Vui lòng thử lại.');
+      setIsProcessing(true);
+      setLoadingStatus('loading');
+      setShowLoadingPopup(true);
+      
+      const orderRequest = Array.from(selectedDrinks.entries()).map(([drinkId, quantity]) => ({
+        drinkId,
+        quantity
+      }));
+
+      const success = await bookingService.orderExtraDrinks(bookingId as string, orderRequest);
+      
+      if (success) {
+        setLoadingStatus('success');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        setSelectedDrinks(new Map());
+        setIsOrderSummaryVisible(false);
+      }
+    } catch (error: any) {
+      setLoadingStatus('error');
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      Alert.alert('Lỗi', error.message || 'Không thể đặt thêm đồ uống');
+    } finally {
+      setShowConfirmPopup(false);
+      setIsProcessing(false);
+      setShowLoadingPopup(false);
+      setLoadingStatus('loading');
     }
-  }, [handleBooking]);
+  };
 
   return (
     <View className="flex-1 bg-black">
@@ -1403,7 +1491,7 @@ export default function BookingDrinkScreen() {
                       )}
                     </>
                   ) : (
-                    // Hiện danh sách drinks khi không ở emotion mode
+                    // Hiện danh sách drinks khi không �� emotion mode
                     displayedDrinks.map((drink, index) => (
                       <Animated.View
                         entering={FadeIn.delay(index * 100)}
@@ -1528,21 +1616,9 @@ export default function BookingDrinkScreen() {
             <View className="flex-row items-center">
               {/* Price Section */}
               <View className="flex-1">
-                {discount > 0 && (
-                  <Text className="text-gray-400 text-sm line-through">
-                    {originalPrice.toLocaleString('vi-VN')}đ
-                  </Text>
-                )}
-                <View className="flex-row items-center">
-                  <Text className="text-yellow-500 font-bold text-xl">
-                    {totalPrice.toLocaleString('vi-VN')}đ
-                  </Text>
-                  {discount > 0 && (
-                    <View className="bg-yellow-500/20 px-2 py-0.5 rounded-full ml-2">
-                      <Text className="text-yellow-500 text-xs font-bold">-{discount}%</Text>
-                    </View>
-                  )}
-                </View>
+                <Text className="text-yellow-500 font-bold text-xl">
+                  {totalPrice.toLocaleString('vi-VN')}đ
+                </Text>
               </View>
 
               {/* Actions Section */}
@@ -1566,15 +1642,15 @@ export default function BookingDrinkScreen() {
 
                 {/* Confirm Button */}
                 <TouchableOpacity
-                  onPress={handleConfirmBooking}
-                  disabled={isBooking || totalPrice === 0}
+                  onPress={handleConfirmOrder}
                   className={`bg-yellow-500 px-5 py-2.5 rounded-xl flex-row items-center ${
-                    (isBooking || totalPrice === 0) ? 'opacity-50' : ''
+                    totalPrice === 0 ? 'opacity-50' : ''
                   }`}
+                  disabled={totalPrice === 0}
                 >
                   <Ionicons name="cart" size={18} color="black" />
                   <Text className="text-black font-bold ml-2">
-                    {isBooking ? 'Đang xử lý...' : 'Xác nhận'}
+                    Xác nhận
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -1723,10 +1799,18 @@ export default function BookingDrinkScreen() {
         setSelectedDrinks={setSelectedDrinks}
         handleIncrement={handleIncrement}
         totalPrice={totalPrice}
-        originalPrice={originalPrice}
-        discount={discount}
-        handleBooking={handleConfirmBooking}
-        isBooking={isBooking}
+        bookingId={bookingId || ''}
+        onConfirm={handleConfirmOrder}
+      />
+      <LoadingPopup 
+        visible={showLoadingPopup} 
+        status={loadingStatus}
+      />
+      <ConfirmationPopup
+        visible={showConfirmPopup}
+        onClose={() => setShowConfirmPopup(false)}
+        onConfirm={handleProcessOrder}
+        isProcessing={isProcessing}
       />
     </View>
   );

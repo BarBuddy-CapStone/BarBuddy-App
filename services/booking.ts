@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface BookingHistory {
   bookingId: string;
+  barId: string;
   barName: string;
   bookingDate: string;
   bookingTime: string;
@@ -34,6 +35,7 @@ export interface BookingDrink {
 
 export interface BookingDetail {
   bookingId: string;
+  barId: string;
   barName: string;
   barAddress: string;
   bookingCode: string;
@@ -58,6 +60,12 @@ export interface BookingDetailResponse {
   statusCode: number;
   message: string;
   data: BookingDetail;
+}
+
+// Thêm interface cho request
+interface ExtraDrinkRequest {
+  drinkId: string;
+  quantity: number;
 }
 
 class BookingService {
@@ -147,6 +155,56 @@ class BookingService {
         throw error;
       }
     }, 'Không thể hủy đặt bàn. Vui lòng thử lại sau.');
+  }
+
+  async orderExtraDrinks(bookingId: string, drinks: ExtraDrinkRequest[]): Promise<boolean> {
+    return handleConnectionError(async () => {
+      try {
+        // Lấy token hiện tại
+        const accessToken = await AsyncStorage.getItem('accessToken');
+  
+        const response = await api.post(
+          `/api/Booking/extra-drink/${bookingId}`,
+          drinks,
+          { 
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            validateStatus: (status) => true 
+          }
+        );
+  
+        // Nếu token hết hạn
+        if (response.status === 401) {
+          // Đợi kết quả của request mới sau khi refresh token
+          const retryResponse = await api.post(
+            `/api/Booking/extra-drink/${bookingId}`,
+            drinks,
+            { 
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
+          );
+          
+          return retryResponse.status === 200;
+        }
+  
+        if (response.status === 404) {
+          throw new Error('Không tìm thấy booking');
+        }
+  
+        if (response.status === 500) {
+          throw new Error('Lỗi server');
+        }
+  
+        return response.status === 200;
+      } catch (error: any) {
+        console.error('Error ordering extra drinks:', error);
+        throw error;
+      }
+    }, 'Không thể đặt thêm đồ uống. Vui lòng thử lại sau.');
   }
 }
 

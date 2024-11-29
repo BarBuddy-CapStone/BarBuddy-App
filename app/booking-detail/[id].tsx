@@ -659,7 +659,7 @@ export default function BookingDetailScreen() {
               scrollEventThrottle={16}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{
-                paddingBottom: booking?.status === 3 ? 60 : 16 // Thêm padding khi có nút đánh giá
+                paddingBottom: booking?.status === 3 || booking?.status === 2 ? 60 : 16 // Thêm padding khi có nút đánh giá
               }}
             >
               <Animated.View entering={FadeIn}>
@@ -741,26 +741,43 @@ export default function BookingDetailScreen() {
               </Animated.View>
             </Animated.ScrollView>
 
-            {/* Footer trong suốt cho nút đánh giá */}
-            {booking?.status === 3 && (
+            {/* Footer trong suốt cho nút đánh giá hoặc gọi thức uống */}
+            {(booking?.status === 3 || booking?.status === 2) && (
               <View className="absolute bottom-0 left-0 right-0 px-6 py-4 bg-black/0 backdrop-blur-sm mb-2">
-                {booking.isRated ? (
-                  <TouchableOpacity 
-                    className="bg-yellow-500/95 backdrop-blur-sm py-4 rounded-xl"
-                    onPress={fetchFeedback}
-                    disabled={loadingFeedback}
-                  >
-                    <Text className="text-black font-bold text-center text-lg">
-                      {loadingFeedback ? 'Đang tải...' : 'Xem đánh giá'}
-                    </Text>
-                  </TouchableOpacity>
+                {booking.status === 3 ? (
+                  booking.isRated ? (
+                    <TouchableOpacity 
+                      className="bg-yellow-500/95 backdrop-blur-sm py-4 rounded-xl"
+                      onPress={fetchFeedback}
+                      disabled={loadingFeedback}
+                    >
+                      <Text className="text-black font-bold text-center text-lg">
+                        {loadingFeedback ? 'Đang tải...' : 'Xem đánh giá'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity 
+                      className="bg-yellow-500/95 py-4 rounded-xl"
+                      onPress={() => setShowRatingModal(true)}
+                    >
+                      <Text className="text-black font-bold text-center text-lg">
+                        Đánh giá
+                      </Text>
+                    </TouchableOpacity>
+                  )
                 ) : (
+                  // Nút gọi thức uống cho status = 2
                   <TouchableOpacity 
                     className="bg-yellow-500/95 py-4 rounded-xl"
-                    onPress={() => setShowRatingModal(true)}
+                    onPress={() => router.push({
+                      pathname: `/order-drink/${booking.bookingId}` as any,
+                      params: { 
+                        barId: booking.barId
+                      }
+                    })}
                   >
                     <Text className="text-black font-bold text-center text-lg">
-                      Đánh giá
+                      Gọi thức uống
                     </Text>
                   </TouchableOpacity>
                 )}

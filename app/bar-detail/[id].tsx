@@ -35,6 +35,7 @@ import { GoongLocation } from "@/services/goong";
 import { eventService, type Event } from "@/services/event";
 import { format } from "date-fns";
 import { savePreviousScreen } from '@/utils/navigation';
+import ReactNativeModal from 'react-native-modal';
 
 // Thêm hàm xử lý images
 const getImageArray = (imagesString: string): string[] => {
@@ -1057,6 +1058,88 @@ const formatEventTime = (eventTimes: Event["eventTimeResponses"]) => {
   return `${formattedStartTime} - ${formattedEndTime}`;
 };
 
+// Thêm component WarningModal với animation
+const WarningModal = ({ 
+  isVisible, 
+  onClose, 
+  onAccept 
+}: { 
+  isVisible: boolean; 
+  onClose: () => void; 
+  onAccept: () => void;
+}) => {
+  return (
+    <ReactNativeModal
+      isVisible={isVisible}
+      onBackdropPress={onClose}
+      onBackButtonPress={onClose}
+      useNativeDriver
+      hideModalContentWhileAnimating
+      animationIn="fadeIn"
+      animationOut="fadeOut"
+      animationInTiming={300}
+      animationOutTiming={300}
+      backdropTransitionInTiming={300}
+      backdropTransitionOutTiming={300}
+      className="m-0"
+    >
+      <Animated.View 
+        entering={FadeIn.duration(300)} 
+        className="bg-neutral-900 rounded-2xl p-6 mx-4"
+      >
+        {/* Tiêu đề Cảnh báo */}
+        <Text className="text-yellow-500 text-xl font-bold text-center mb-6">
+          Cảnh báo
+        </Text>
+
+        {/* Ảnh cảnh báo */}
+        <View className="flex-row justify-between mb-6">
+          <Image 
+            source={require('../../assets/images/warningAlcohol3.png')}
+            className="w-24 h-24 rounded-xl"
+            resizeMode="cover"
+          />
+          <Image 
+            source={require('../../assets/images/warningAlcohol2.png')}
+            className="w-24 h-24 rounded-xl"
+            resizeMode="cover"
+          />
+          <Image 
+            source={require('../../assets/images/warningAlcohol1.png')}
+            className="w-24 h-24 rounded-xl"
+            resizeMode="cover"
+          />
+        </View>
+
+        {/* Text cảnh báo */}
+        <Text className="text-white text-center text-base mb-6">
+          Chúng tôi không phục vụ rượu bia cho người dưới 18 tuổi. Vui lòng uống có trách nhiệm.
+        </Text>
+
+        {/* Buttons */}
+        <View className="flex-row space-x-4">
+          <TouchableOpacity
+            className="flex-1 bg-neutral-800 py-3 rounded-xl"
+            onPress={onClose}
+          >
+            <Text className="text-white font-semibold text-center">
+              Đóng
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            className="flex-1 bg-yellow-500 py-3 rounded-xl"
+            onPress={onAccept}
+          >
+            <Text className="text-black font-semibold text-center">
+              Đồng ý
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </ReactNativeModal>
+  );
+};
+
 // 2. Component chính
 export default function BarDetailScreen() {
   const router = useRouter();
@@ -1202,7 +1285,14 @@ export default function BarDetailScreen() {
       return;
     }
 
-    // Nếu đ đăng nhập và là CUSTOMER thì cho phép đặt bàn
+    // Nếu đã đăng nhập, hiện warning modal
+    setIsWarningModalVisible(true);
+  };
+
+  // Thêm hàm xử lý khi user đồng ý
+  const handleAcceptWarning = () => {
+    setIsWarningModalVisible(false);
+    // Nếu đã đăng nhập và là CUSTOMER thì cho phép đặt bàn
     if (barDetail?.barId) {
       router.push(`/booking-table/${barDetail.barId}` as any);
     }
@@ -1404,6 +1494,9 @@ export default function BarDetailScreen() {
       opacity,
     };
   });
+
+  // Thêm state cho modal cảnh báo
+  const [isWarningModalVisible, setIsWarningModalVisible] = useState(false);
 
   return (
     <View className="flex-1 bg-black">
@@ -2171,6 +2264,13 @@ export default function BarDetailScreen() {
           await savePreviousScreen('bar-detail');
           router.push('/register');
         }}
+      />
+
+      {/* Thêm WarningModal vào cuối, trước khi đóng View */}
+      <WarningModal 
+        isVisible={isWarningModalVisible}
+        onClose={() => setIsWarningModalVisible(false)}
+        onAccept={handleAcceptWarning}
       />
     </View>
   );

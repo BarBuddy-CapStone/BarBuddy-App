@@ -101,20 +101,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const response = await authService.login(loginRequest);
 
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-        user: response
-      }));
-
-      await AsyncStorage.setItem('userToken', response.accessToken);
+      // Cập nhật state trước khi lưu vào storage
       setUser(response);
       setIsAuthenticated(true);
+      setIsGuest(false);
 
-      // Cập nhật device token sau khi login thành công
-      await fcmService.updateAccountDeviceToken(true);
+      // Lưu vào storage
+      await Promise.all([
+        AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+          user: response
+        })),
+        AsyncStorage.setItem('userToken', response.accessToken),
+        AsyncStorage.removeItem(GUEST_MODE_KEY) // Xóa guest mode khi đăng nhập
+      ]);
 
-      // Ngắt kết nối SignalR hiện tại và kết nối lại với auth header mới
-      await signalRService.disconnect();
-      await signalRService.connect();
+      // Cập nhật device token và SignalR
+      await Promise.all([
+        fcmService.updateAccountDeviceToken(true),
+        signalRService.disconnect().then(() => signalRService.connect())
+      ]);
 
     } catch (error: any) {
       console.error('Login Error:', error.message);
@@ -207,16 +212,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const response = await googleAuthService.signIn();
       
-      if (!response) {
+      if (!response || !response.data?.data) {
         return null;
-      }
-      
-      if (!response.data?.data) {
-        throw new Error('Không nhận được dữ liệu người dùng');
       }
 
       const apiData = response.data.data;
-      
       const userData: UserInfo = {
         accountId: apiData.accountId,
         fullname: apiData.fullname,
@@ -228,20 +228,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'CUSTOMER'
       };
 
-      await AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
-        user: userData
-      }));
-
-      await AsyncStorage.setItem('userToken', userData.accessToken);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${userData.accessToken}`;
-      
+      // Cập nhật state trước
       setUser(userData);
       setIsAuthenticated(true);
       setIsGuest(false);
 
-      // Ngắt kết nối SignalR hiện tại và kết nối lại với auth header mới
-      await signalRService.disconnect();
-      await signalRService.connect();
+      // Lưu storage và cập nhật các services
+      await Promise.all([
+        AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user: userData })),
+        AsyncStorage.setItem('userToken', userData.accessToken),
+        AsyncStorage.removeItem(GUEST_MODE_KEY),
+        signalRService.disconnect().then(() => signalRService.connect())
+      ]);
 
       return response.data;
     } catch (error: any) {

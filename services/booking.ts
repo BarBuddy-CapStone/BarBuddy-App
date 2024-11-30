@@ -33,6 +33,14 @@ export interface BookingDrink {
   image: string;
 }
 
+export interface BookingExtraDrink {
+  drinkId: string;
+  drinkName: string;
+  actualPrice: number;
+  quantity: number;
+  image: string;
+}
+
 export interface BookingDetail {
   bookingId: string;
   barId: string;
@@ -54,6 +62,7 @@ export interface BookingDetail {
   isRated: boolean | null;
   tableNameList: string[];
   bookingDrinksList: BookingDrink[];
+  bookingDrinkExtraResponses: BookingExtraDrink[];
 }
 
 export interface BookingDetailResponse {

@@ -209,7 +209,7 @@ const OrderSummaryModal = ({
               <>
                 <Ionicons name="cart" size={20} color="black" />
                 <Text className="text-black font-bold ml-2 text-base">
-                  Xác nhận gọi món
+                  Xác nhận đặt món
                 </Text>
               </>
             )}
@@ -541,7 +541,7 @@ export default function OrderDrinkScreen() {
       );
     }
 
-    // 3. Cuối cùng lọc theo search text
+    // 3. Cu��i cùng lọc theo search text
     if (searchText) {
       filtered = filtered.filter(
         drink => drink.drinkName.toLowerCase().includes(searchText.toLowerCase())
@@ -845,7 +845,7 @@ export default function OrderDrinkScreen() {
     setEmotionText('');
   };
 
-  // Thêm state để lưu giá tr input
+  // Thêm state ể lưu giá tr input
   const [emotionText, setEmotionText] = useState('');
   const [isLoadingRecommendation, setIsLoadingRecommendation] = useState(false);
 
@@ -1197,6 +1197,15 @@ export default function OrderDrinkScreen() {
         await new Promise(resolve => setTimeout(resolve, 1500));
         setSelectedDrinks(new Map());
         setIsOrderSummaryVisible(false);
+        
+        // Sử dụng replace thay vì push
+        router.replace({
+          pathname: `/booking-detail/${bookingId}` as any,
+          params: { 
+            reload: 'true',
+            preventBack: 'true'
+          }
+        });
       }
     } catch (error: any) {
       setLoadingStatus('error');
@@ -1491,7 +1500,7 @@ export default function OrderDrinkScreen() {
                       )}
                     </>
                   ) : (
-                    // Hiện danh sách drinks khi không �� emotion mode
+                    // Hiện danh sách drinks khi không  emotion mode
                     displayedDrinks.map((drink, index) => (
                       <Animated.View
                         entering={FadeIn.delay(index * 100)}
@@ -1650,7 +1659,7 @@ export default function OrderDrinkScreen() {
                 >
                   <Ionicons name="cart" size={18} color="black" />
                   <Text className="text-black font-bold ml-2">
-                    Xác nhận
+                    Đặt món
                   </Text>
                 </TouchableOpacity>
               </View>

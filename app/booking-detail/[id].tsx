@@ -5,10 +5,11 @@ import { useState, useEffect, useRef } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { BookingDetail, bookingService, BookingDrink } from '@/services/booking';
+import { BookingDetail, bookingService, BookingDrink, BookingExtraDrink } from '@/services/booking';
 import Animated, { FadeIn, useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate, Extrapolation } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { FeedbackDetail, feedbackService } from '@/services/feedback';
+import { BackHandler } from 'react-native';
 
 const getStatusColor = (status: number): string => {
   switch (status) {
@@ -97,7 +98,37 @@ const BookingDetailSkeleton = () => (
 const DrinksList = ({ drinks }: { drinks: BookingDrink[] }) => (
   <View className="px-6 mb-4">
     <View className="bg-neutral-900 rounded-2xl p-4">
-      <Text className="text-white/80 font-semibold mb-4">Đồ uống đã đặt</Text>
+      <Text className="text-white/80 font-semibold mb-4">Thức uống đã đặt trước</Text>
+      <View className="space-y-4">
+        {drinks.map((drink, index) => (
+          <View key={index} className="flex-row items-center space-x-3">
+            <Image 
+              source={{ uri: drink.image }}
+              className="w-16 h-16 rounded-xl"
+            />
+            <View className="flex-1">
+              <Text className="text-white font-medium text-base">
+                {drink.drinkName}
+              </Text>
+              <Text className="text-white/60 text-sm mt-1">
+                {drink.actualPrice.toLocaleString('vi-VN')}đ x {drink.quantity}
+              </Text>
+            </View>
+            <Text className="text-yellow-500 font-semibold">
+              {(drink.actualPrice * drink.quantity).toLocaleString('vi-VN')}đ
+            </Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  </View>
+);
+
+// Thêm component hiển thị danh sách đồ uống gọi thêm
+const ExtraDrinksList = ({ drinks }: { drinks: BookingExtraDrink[] }) => (
+  <View className="px-6 mb-4">
+    <View className="bg-neutral-900 rounded-2xl p-4">
+      <Text className="text-white/80 font-semibold mb-4">Thức uống gọi tại quán</Text>
       <View className="space-y-4">
         {drinks.map((drink, index) => (
           <View key={index} className="flex-row items-center space-x-3">
@@ -215,7 +246,7 @@ const PaymentInfo = ({ booking }: { booking: BookingDetail }) => {
           {/* Chỉ hiển thị khi có đặt nước */}
           {hasPreOrderDrinks && (
             <View className="flex-row justify-between">
-              <Text className="text-white/60">Tổng tiền đồ uống đặt trước</Text>
+              <Text className="text-white/60">Tổng tiền thức uống đặt trước</Text>
               <Text className="text-white">
                 {totalDrinkPrice.toLocaleString('vi-VN')}đ
               </Text>
@@ -224,7 +255,7 @@ const PaymentInfo = ({ booking }: { booking: BookingDetail }) => {
           
           {/* Luôn hiển thị phí phát sinh */}
           <View className="flex-row justify-between">
-            <Text className="text-white/60">Phí phát sinh tại quán</Text>
+            <Text className="text-white/60">Tổng tiền thức uống đặt thêm</Text>
             <Text className="text-white">
               {booking.status === 3 
                 ? additionalFee > 0
@@ -328,10 +359,14 @@ const canCancelBooking = (booking: BookingDetail) => {
 };
 
 export default function BookingDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, reload, preventBack } = useLocalSearchParams<{ 
+    id: string, 
+    reload?: string,
+    preventBack?: string 
+  }>();
   const router = useRouter();
   const [booking, setBooking] = useState<BookingDetail | null>(null);
-  const [loadingBooking, setLoadingBooking] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
   const scrollY = useSharedValue(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -395,21 +430,23 @@ export default function BookingDetailScreen() {
     };
   });
 
-  useEffect(() => {
-    fetchBookingDetail();
-  }, [id]);
-
-  const fetchBookingDetail = async () => {
+  // Tách logic load booking thành function riêng
+  const loadBookingDetail = async () => {
     try {
-      setLoadingBooking(true);
-      const response = await bookingService.getBookingDetail(id as string);
+      setIsLoading(true);
+      const response = await bookingService.getBookingDetail(id);
       setBooking(response.data);
-    } catch (error) {
-      console.error('Error fetching booking detail:', error);
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể tải thông tin đặt bàn');
     } finally {
-      setLoadingBooking(false);
+      setIsLoading(false);
     }
   };
+
+  // useEffect để load data ban đầu và khi có reload param
+  useEffect(() => {
+    loadBookingDetail();
+  }, [id, reload]); // Thêm reload vào dependencies
 
   // Thêm states để quản lý modal
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -608,6 +645,40 @@ export default function BookingDetailScreen() {
     };
   }, []);
 
+  // Thêm useEffect để xử lý hardware back button
+  useEffect(() => {
+    if (preventBack === 'true') {
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          // Chuyển về trang booking history
+          router.replace({
+            pathname: '/(tabs)/booking-history',
+            params: { reload: 'true' }
+          });
+          return true; // Prevent default back behavior
+        }
+      );
+
+      return () => backHandler.remove();
+    }
+  }, [preventBack]);
+
+  // Cập nhật lại nút back trong header
+  const handleBack = () => {
+    if (preventBack === 'true' || hasRated) {
+      router.replace({
+        pathname: '/(tabs)/booking-history',
+        params: { 
+          reload: 'true',
+          status: hasRated ? '3' : undefined
+        }
+      });
+    } else {
+      router.back();
+    }
+  };
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1" edges={['top']}>
@@ -619,19 +690,7 @@ export default function BookingDetailScreen() {
           <SafeAreaView edges={['top']}>
             <View className="px-4 h-14 flex-row items-center justify-between">
               <TouchableOpacity
-                onPress={() => {
-                  if (hasRated) {
-                    router.push({
-                      pathname: '/(tabs)/booking-history',
-                      params: { 
-                        reload: 'true',
-                        status: '3'
-                      }
-                    });
-                  } else {
-                    router.back();
-                  }
-                }}
+                onPress={handleBack}
                 className="bg-black/20 backdrop-blur-sm p-2 rounded-full w-10 h-10 items-center justify-center"
               >
                 <Ionicons name="arrow-back" size={24} color="white" />
@@ -649,7 +708,7 @@ export default function BookingDetailScreen() {
           </SafeAreaView>
         </Animated.View>
 
-        {loadingBooking ? (
+        {isLoading ? (
           <BookingDetailSkeleton />
         ) : booking ? (
           <>
@@ -698,8 +757,12 @@ export default function BookingDetailScreen() {
                     <QRTicket qrTicket={booking.qrTicket} />
                   )}
 
-                  {booking.bookingDrinksList && booking.bookingDrinksList.length > 0 && (
+                  {booking.bookingDrinksList.length > 0 && (
                     <DrinksList drinks={booking.bookingDrinksList} />
+                  )}
+
+                  {booking.bookingDrinkExtraResponses?.length > 0 && (
+                    <ExtraDrinksList drinks={booking.bookingDrinkExtraResponses} />
                   )}
 
                   {(booking.totalPrice !== null || booking.additionalFee !== null) && (

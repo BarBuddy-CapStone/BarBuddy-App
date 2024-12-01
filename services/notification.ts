@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import messaging from '@react-native-firebase/messaging';
+import PushNotification, { Importance } from 'react-native-push-notification';
 import api from './api';
 import { PermissionsAndroid } from 'react-native';
 import { handleConnectionError } from '@/utils/error-handler';
@@ -21,11 +22,44 @@ export interface Notification {
 }
 
 class NotificationService {
+  constructor() {
+    this.createDefaultChannels();
+    this.configurePushNotification();
+  }
+
+  createDefaultChannels() {
+    // Tạo channel với độ ưu tiên cao nhất để hiển thị pop-up
+    PushNotification.createChannel(
+      {
+        channelId: "default",
+        channelName: "Default",
+        channelDescription: "Default notifications channel",
+        playSound: true,
+        soundName: "default",
+        importance: Importance.HIGH,
+        vibrate: true,
+      },
+      (created: boolean) => {
+        console.log(`Channel 'default' ${created ? 'was created' : 'already exists'}`);
+      }
+    );
+  }
+
+  configurePushNotification() {
+    // Cấu hình cơ bản cho PushNotification
+    PushNotification.configure({
+      onNotification: function (notification) {
+        // Không làm gì khi nhấn vào thông báo
+      },
+      popInitialNotification: false,
+      requestPermissions: true,
+    });
+  }
+
   async registerForPushNotificationsAsync() {
     try {
       if (Platform.OS === 'android') {
-        // Kiểm tra phiên bản Android
-        if (Platform.Version >= 33) { // Android 13 trở lên
+        if (Platform.Version >= 33) {
           const permission = await PermissionsAndroid.request(
             PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
             {
@@ -55,24 +89,46 @@ class NotificationService {
   setupMessageListeners() {
     // Xử lý thông báo khi app đang mở (foreground)
     messaging().onMessage(async remoteMessage => {
-      // Không xử lý gì cả, để Firebase tự động hiển thị thông báo
-      return Promise.resolve();
+      console.log('Received foreground message:', remoteMessage);
+      this.showNotification(remoteMessage);
     });
 
-    // Giữ nguyên phần xử lý deep link khi nhấn vào thông báo
+    // Xử lý khi nhấn vào thông báo khi app ở background
     messaging().onNotificationOpenedApp(remoteMessage => {
+      console.log('Notification opened from background state:', remoteMessage);
       if (remoteMessage.data?.deepLink) {
         router.push(remoteMessage.data.deepLink as any);
       }
     });
 
+    // Xử lý khi nhấn vào thông báo khi app đã đóng
     messaging().getInitialNotification().then(remoteMessage => {
-      if (remoteMessage?.data?.deepLink) {
-        router.push(remoteMessage.data.deepLink as any);
+      if (remoteMessage) {
+        console.log('Notification opened from quit state:', remoteMessage);
+        if (remoteMessage.data?.deepLink) {
+          router.push(remoteMessage.data.deepLink as any);
+        }
       }
     });
   }
 
+  // Hàm chung để hiển thị thông báo
+  showNotification(remoteMessage: any) {
+    PushNotification.localNotification({
+      channelId: 'default',
+      title: remoteMessage.notification?.title,
+      message: remoteMessage.notification?.body || '',
+      playSound: true,
+      soundName: 'default',
+      priority: 'max',
+      importance: 'high',
+      vibrate: true,
+      visibility: 'public',
+      autoCancel: true,
+    });
+  }
+
+  // Các phương thức khác giữ nguyên
   async getNotifications(pageNumber: number = 1) {
     return handleConnectionError(async () => {
       try {
@@ -82,7 +138,6 @@ class NotificationService {
           return [];
         }
 
-        // Lấy auth data từ AsyncStorage
         const authData = await AsyncStorage.getItem('@auth');
         const headers: any = {};
         
@@ -119,7 +174,6 @@ class NotificationService {
           return 0;
         }
 
-        // Lấy auth data từ AsyncStorage
         const authData = await AsyncStorage.getItem('@auth');
         const headers: any = {};
         

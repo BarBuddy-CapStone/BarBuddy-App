@@ -263,7 +263,7 @@ const PaymentInfo = ({ booking }: { booking: BookingDetail }) => {
                   : 'Không có'
                 : additionalFee > 0
                   ? `${additionalFee.toLocaleString('vi-VN')}đ`
-                  : 'Chưa có khoản phí cộng thêm'
+                  : 'Chưa có'
               }
             </Text>
           </View>

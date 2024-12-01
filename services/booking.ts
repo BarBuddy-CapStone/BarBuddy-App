@@ -102,6 +102,7 @@ class BookingService {
         const response = await api.get(
           `/api/Booking/detail/${bookingId}`
         );  
+        console.log(response.data);
         return response.data;
       } catch (error) {
         console.error('Error fetching booking detail:', error);
@@ -183,6 +184,8 @@ class BookingService {
             validateStatus: (status) => true 
           }
         );
+
+        // console.log(response);
   
         // Nếu token hết hạn
         if (response.status === 401) {

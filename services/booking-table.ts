@@ -58,6 +58,29 @@ export interface BookingDrinkRequest {
   drinks: DrinkOrderItem[];
 }
 
+export interface HoldTableRequest {
+  tableId: string;
+  time: string; // Format: HH:mm:ss
+  barId: string;
+  date: string; // Format: yyyy-MM-dd
+}
+
+export interface GetHoldTableParams {
+  barId: string;
+  date: string; // Format: yyyy-MM-dd
+  timeSpan: string; // Format: HH:mm
+}
+
+export interface HoldTableInfo {
+  accountId: string;
+  isHeld: boolean;
+  holdExpiry: string;
+  tableId: string;
+  tableName: string;
+  date: string;
+  time: string;
+}
+
 class BookingTableService {
   private async getAuthHeader() {
     const token = await AsyncStorage.getItem('userToken');
@@ -122,6 +145,55 @@ class BookingTableService {
         throw error;
       }
     }, 'Không thể đặt bàn và đồ uống. Vui lòng thử lại sau.');
+  }
+
+  async getHoldTable(params: GetHoldTableParams): Promise<HoldTableInfo[]> {
+    return handleConnectionError(async () => {
+      try {
+        const headers = await this.getAuthHeader();
+        const response = await api.get(
+          `/api/bookingTable/getHoldTable/${params.barId}`, 
+          {
+            params: {
+              Date: params.date,
+              Time: params.timeSpan
+            },
+            headers
+          }
+        );
+        console.log(response.data.data);
+        return response.data.data;
+      } catch (error) {
+        console.error('Error getting hold tables:', error);
+        return [];
+      }
+    }, 'Không thể lấy thông tin bàn đã giữ. Vui lòng thử lại sau.');
+  }
+
+  async holdTable(request: HoldTableRequest) {
+    return handleConnectionError(async () => {
+      try {
+        const headers = await this.getAuthHeader();
+        const response = await api.post('/api/bookingTable/holdTable', request, { headers });
+        return response.data;
+      } catch (error) {
+        console.error('Error holding table:', error);
+        throw error;
+      }
+    }, 'Không thể giữ bàn. Vui lòng thử lại sau.');
+  }
+
+  async releaseTable(request: HoldTableRequest) {
+    return handleConnectionError(async () => {
+      try {
+        const headers = await this.getAuthHeader();
+        const response = await api.post('/api/bookingTable/releaseTable', request, { headers });
+        return response.data;
+      } catch (error) {
+        console.error('Error releasing table:', error);
+        throw error;
+      }
+    }, 'Không thể hủy giữ bàn. Vui lòng thử lại sau.');
   }
 }
 

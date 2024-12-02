@@ -11,7 +11,7 @@ import { TableType, tableTypeService } from '@/services/table-type';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Account, accountService } from '@/services/account';
 import { useAuth } from '@/contexts/AuthContext';
-import { BookingTableFilter, BookingTableRequest, bookingTableService } from '@/services/booking-table';
+import { BookingTableFilter, BookingTableRequest, bookingTableService, HoldTableRequest, GetHoldTableParams, HoldTableInfo } from '@/services/booking-table';
 import { useFocusEffect } from '@react-navigation/native';
 
 // Thêm interface cho state availableTables
@@ -221,6 +221,12 @@ export default function BookingTableScreen() {
 
   // Thêm state để theo dõi việc cần refresh account info
   const [needRefreshAccount, setNeedRefreshAccount] = useState(false);
+
+  // Thêm state để theo dõi trạng thái loading của từng bàn
+  const [loadingTables, setLoadingTables] = useState<{ [key: string]: boolean }>({});
+
+  // Thêm state để lưu danh sách bàn đã giữ
+  const [heldTables, setHeldTables] = useState<HoldTableInfo[]>([]);
 
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
     if (!barDetail?.barTimeResponses) {
@@ -447,59 +453,162 @@ export default function BookingTableScreen() {
     setIsDatePickerVisible(false);
   };
 
+  // Sửa lại hàm fetchHoldTables
+  const fetchHoldTables = async () => {
+    try {
+      const params: GetHoldTableParams = {
+        barId: id as string,
+        date: selectedTime.includes('(+1 ngày)') 
+          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+          : format(selectedDate, 'yyyy-MM-dd'),
+        timeSpan: selectedTime.replace(' (+1 ngày)', '') + ':00'
+      };
+
+      const holdTables = await bookingTableService.getHoldTable(params);
+      setHeldTables(holdTables);
+
+    } catch (error) {
+      console.error('Error fetching hold tables:', error);
+      setHeldTables([]);
+    }
+  };
+
+  // Sửa lại hàm handleSearchTables để xử lý bàn đã giữ
   const handleSearchTables = async () => {
     setIsSearching(true);
     setHasSearched(true);
-    // Chỉ xóa availableTables, không xóa selectedTables
     setAvailableTables([]);
+    setSelectedTables([]); // Reset selectedTables trước khi tìm kiếm
     
     try {
-      const filter: BookingTableFilter = {
-        barId: id as string,
-        tableTypeId: selectedTableType,
-        date: format(selectedDate, 'yyyy-MM-dd'),
-        timeSpan: selectedTime.replace(' (+1 ngày)', '') + ':00',
-      };
+      // Gọi cả 2 API song song để tối ưu performance
+      const [holdTablesResponse, availableTablesResponse] = await Promise.all([
+        bookingTableService.getHoldTable({
+          barId: id as string,
+          date: selectedTime.includes('(+1 ngày)') 
+            ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+            : format(selectedDate, 'yyyy-MM-dd'),
+          timeSpan: selectedTime.replace(' (+1 ngày)', '') + ':00'
+        }),
+        bookingTableService.findAvailableTables({
+          barId: id as string,
+          tableTypeId: selectedTableType,
+          date: format(selectedDate, 'yyyy-MM-dd'),
+          timeSpan: selectedTime.replace(' (+1 ngày)', '') + ':00',
+        })
+      ]);
 
-      const response = await bookingTableService.findAvailableTables(filter);
-      const tables = response.bookingTables[0]?.tables || [];
+      // Lưu danh sách bàn đã giữ
+      setHeldTables(holdTablesResponse);
+
+      // Lọc ra các bàn do user hiện tại giữ
+      const userHeldTables = holdTablesResponse.filter(ht => ht.accountId === user?.accountId);
       
-      const formattedTables: TableUI[] = tables.map(table => ({
-        id: table.tableId,
-        name: table.tableName,
-        status: table.status === 1 ? 'available' as const : 'booked' as const,
-        typeId: selectedTableType
-      }));
+      // Map thông tin bàn đã giữ vào selectedTables
+      if (userHeldTables.length > 0) {
+        const selectedTablesFromHold = userHeldTables.map(ht => ({
+          id: ht.tableId,
+          name: ht.tableName,
+          typeId: selectedTableType,
+          typeName: tableTypes.find(t => t.tableTypeId === selectedTableType)?.typeName || ''
+        }));
+        setSelectedTables(selectedTablesFromHold);
+      }
+
+      // Xử lý danh sách bàn có sẵn
+      const tables = availableTablesResponse.bookingTables[0]?.tables || [];
+      
+      // Map thông tin bàn có sẵn, kết hợp với thông tin bàn đã giữ
+      const formattedTables: TableUI[] = tables.map(table => {
+        // Tìm thông tin bàn đã giữ tương ứng
+        const heldTable = holdTablesResponse.find(ht => ht.tableId === table.tableId);
+        
+        return {
+          id: table.tableId,
+          name: table.tableName,
+          // Nếu bàn được giữ bởi người khác hoặc đã được đặt -> booked
+          status: (heldTable && heldTable.accountId !== user?.accountId) || table.status !== 1 
+            ? 'booked' as const 
+            : 'available' as const,
+          typeId: selectedTableType
+        };
+      });
 
       setAvailableTables(formattedTables);
-    } catch {
+
+    } catch (error) {
+      console.error('Error searching tables:', error);
       setAvailableTables([]);
+      setSelectedTables([]);
+      setHeldTables([]);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleTableSelection = (table: TableUI) => {
-    setSelectedTables(prev => {
-      const existingIndex = prev.findIndex(t => t.id === table.id);
-      
-      if (existingIndex !== -1) {
-        return prev.filter(t => t.id !== table.id);
-      }
-      
-      if (prev.length >= MAX_TABLES) {
-        setShowMaxTablesModal(true);
-        return prev;
-      }
+  // Sửa lại useEffect để không tự động gọi fetchHoldTables
+  useEffect(() => {
+    if (selectedTime && selectedTableType) {
+      // Chỉ reset các state khi thay đổi thời gian hoặc loại bàn
+      setSelectedTables([]);
+      setAvailableTables([]);
+      setHeldTables([]);
+    }
+  }, [selectedTime, selectedTableType]);
 
-      const tableTypeInfo = tableTypes.find(t => t.tableTypeId === table.typeId);
-      return [...prev, {
-        id: table.id,
-        name: table.name,
-        typeId: table.typeId,
-        typeName: tableTypeInfo?.typeName || ''
-      }];
-    });
+  const handleTableSelection = async (table: TableUI) => {
+    if (loadingTables[table.id]) return; // Nếu đang loading thì không làm gì
+
+    setLoadingTables(prev => ({
+      ...prev,
+      [table.id]: true
+    }));
+
+    try {
+      const existingIndex = selectedTables.findIndex(t => t.id === table.id);
+      const request: HoldTableRequest = {
+        tableId: table.id,
+        time: selectedTime.replace(' (+1 ngày)', '') + ':00',
+        barId: id as string,
+        date: selectedTime.includes('(+1 ngày)') 
+          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+          : format(selectedDate, 'yyyy-MM-dd')
+      };
+
+      if (existingIndex !== -1) {
+        // Release table
+        await bookingTableService.releaseTable(request);
+        setSelectedTables(prev => prev.filter(t => t.id !== table.id));
+      } else {
+        // Check max tables
+        if (selectedTables.length >= MAX_TABLES) {
+          setShowMaxTablesModal(true);
+          return;
+        }
+
+        // Hold table
+        await bookingTableService.holdTable(request);
+        const tableTypeInfo = tableTypes.find(t => t.tableTypeId === table.typeId);
+        setSelectedTables(prev => [...prev, {
+          id: table.id,
+          name: table.name,
+          typeId: table.typeId,
+          typeName: tableTypeInfo?.typeName || ''
+        }]);
+      }
+    } catch (error) {
+      console.error('Error handling table selection:', error);
+      // Hiển thị thông báo lỗi
+      Alert.alert(
+        'Lỗi',
+        error instanceof Error ? error.message : 'Không thể thực hiện thao tác. Vui lòng thử lại.'
+      );
+    } finally {
+      setLoadingTables(prev => ({
+        ...prev,
+        [table.id]: false
+      }));
+    }
   };
 
   const handleRemoveTable = (tableId: string) => {
@@ -1255,7 +1364,7 @@ export default function BookingTableScreen() {
                               <View key={table.id} style={{ width: '50%', padding: 4 }}>
                                 <TouchableOpacity
                                   onPress={() => handleTableSelection(table)}
-                                  disabled={table.status === 'booked'}
+                                  disabled={table.status === 'booked' || loadingTables[table.id]}
                                   className={`flex-row items-center rounded-xl px-3 py-2 ${
                                     table.status === 'booked' 
                                       ? 'bg-white/5' 
@@ -1264,17 +1373,24 @@ export default function BookingTableScreen() {
                                         : 'bg-white/10'
                                   }`}
                                 >
-                                  <MaterialCommunityIcons 
-                                    name="table-furniture" 
-                                    size={20} 
-                                    color={
-                                      table.status === 'booked' 
-                                        ? '#9CA3AF'
-                                        : selectedTables.some(t => t.id === table.id)
-                                          ? '#000'
-                                          : '#fff'
-                                    } 
-                                  />
+                                  {loadingTables[table.id] ? (
+                                    <ActivityIndicator 
+                                      size="small" 
+                                      color={selectedTables.some(t => t.id === table.id) ? '#000' : '#EAB308'} 
+                                    />
+                                  ) : (
+                                    <MaterialCommunityIcons 
+                                      name="table-furniture" 
+                                      size={20} 
+                                      color={
+                                        table.status === 'booked' 
+                                          ? '#9CA3AF'
+                                          : selectedTables.some(t => t.id === table.id)
+                                            ? '#000'
+                                            : '#fff'
+                                      } 
+                                    />
+                                  )}
                                   <Text 
                                     className={`ml-2 font-medium flex-1 ${
                                       table.status === 'booked'
@@ -1291,7 +1407,7 @@ export default function BookingTableScreen() {
 
                                   {table.status === 'booked' ? (
                                     <Text className="text-gray-400 text-xs ml-1">Đã đặt</Text>
-                                  ) : selectedTables.some(t => t.id === table.id) && (
+                                  ) : selectedTables.some(t => t.id === table.id) && !loadingTables[table.id] && (
                                     <Ionicons name="checkmark-circle" size={16} color="#000" className="ml-1" />
                                   )}
                                 </TouchableOpacity>

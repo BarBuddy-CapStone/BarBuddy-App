@@ -172,6 +172,9 @@ class BookingService {
       try {
         // Lấy token hiện tại
         const accessToken = await AsyncStorage.getItem('accessToken');
+
+        console.log(bookingId);
+        console.log(drinks);
   
         const response = await api.post(
           `/api/Booking/extra-drink/${bookingId}`,
@@ -185,7 +188,7 @@ class BookingService {
           }
         );
 
-        // console.log(response);
+        console.log(response);
   
         // Nếu token hết hạn
         if (response.status === 401) {

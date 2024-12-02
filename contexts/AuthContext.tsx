@@ -233,11 +233,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(true);
       setIsGuest(false);
 
-      // Lưu storage và cập nhật các services
+      // Lưu vào storage
       await Promise.all([
-        AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ user: userData })),
+        AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+          user: userData
+        })),
         AsyncStorage.setItem('userToken', userData.accessToken),
-        AsyncStorage.removeItem(GUEST_MODE_KEY),
+        AsyncStorage.removeItem(GUEST_MODE_KEY) // Xóa guest mode khi đăng nhập
+      ]);
+
+      // Cập nhật device token và SignalR
+      await Promise.all([
+        fcmService.updateAccountDeviceToken(true),
         signalRService.disconnect().then(() => signalRService.connect())
       ]);
 

@@ -1,10 +1,10 @@
-import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Image, ActivityIndicator, Alert, Linking, Keyboard, Dimensions, ViewProps } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Platform, Modal, TextInput, Image, ActivityIndicator, Alert, Linking, Keyboard, Dimensions, ViewProps, BackHandler } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { format, addDays } from 'date-fns';
+import { format, addDays, parseISO } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { BarDetail, barService } from '@/services/bar';
 import { TableType, tableTypeService } from '@/services/table-type';
@@ -13,6 +13,8 @@ import { Account, accountService } from '@/services/account';
 import { useAuth } from '@/contexts/AuthContext';
 import { BookingTableFilter, BookingTableRequest, bookingTableService, HoldTableRequest, GetHoldTableParams, HoldTableInfo } from '@/services/booking-table';
 import { useFocusEffect } from '@react-navigation/native';
+import { bookingSignalRService, TableHoldEvent } from '@/services/booking-signalr';
+import { AppState, AppStateStatus } from 'react-native';
 
 // Thêm interface cho state availableTables
 interface TableUI {
@@ -219,7 +221,7 @@ export default function BookingTableScreen() {
   // Thêm state để theo dõi việc redirect từ profile-detail
   const [isRedirectFromProfile, setIsRedirectFromProfile] = useState(false);
 
-  // Thêm state để theo dõi việc cần refresh account info
+  // Thêm state để theo dõi việc c����n refresh account info
   const [needRefreshAccount, setNeedRefreshAccount] = useState(false);
 
   // Thêm state để theo dõi trạng thái loading của từng bàn
@@ -227,6 +229,12 @@ export default function BookingTableScreen() {
 
   // Thêm state để lưu danh sách bàn đã giữ
   const [heldTables, setHeldTables] = useState<HoldTableInfo[]>([]);
+
+  // Thêm ref để lưu giá trị trước đó của selectedTime
+  const prevSelectedTime = useRef(selectedTime);
+
+  // Thêm state để theo dõi trạng thái loading của từng nút xóa
+  const [removingTables, setRemovingTables] = useState<{ [key: string]: boolean }>({});
 
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
     if (!barDetail?.barTimeResponses) {
@@ -302,15 +310,10 @@ export default function BookingTableScreen() {
     }
   };
 
-  const handleTimeChange = (time: string) => {
-    if (time !== selectedTime) { // Chỉ thực hiện khi chọn giờ khác
+  const handleTimeChange = async (time: string) => {
+    if (time !== selectedTime) {
+      await releaseAllTables();
       setSelectedTime(time);
-      // Reset các state liên quan
-      setSelectedTables([]);
-      setAvailableTables([]);
-      setCurrentTableType(null);
-      setHasSearched(false); // Reset state hasSearched khi đổi giờ
-      setShowTypeDescription(false); // Reset hiển thị description nếu có
     }
     setShowTimePicker(false);
   };
@@ -420,7 +423,40 @@ export default function BookingTableScreen() {
     }
   };
 
-  const handleDateChange = useCallback((event: any, date?: Date) => {
+  // Sửa lại hàm releaseAllTables để thêm log và xử lý lỗi tốt hơn
+  const releaseAllTables = async () => {
+    if (selectedTables.length === 0) return;
+
+    console.log('Releasing tables:', selectedTables.map(t => t.id));
+    try {
+      // Gọi API release cho tất cả các bàn đã chọn
+      await Promise.all(selectedTables.map(table => {
+        const request: HoldTableRequest = {
+          tableId: table.id,
+          time: selectedTime.replace(' (+1 ngày)', '') + ':00',
+          barId: id as string,
+          date: selectedTime.includes('(+1 ngày)') 
+            ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+            : format(selectedDate, 'yyyy-MM-dd')
+        };
+        console.log('Releasing table with request:', request);
+        return bookingTableService.releaseTable(request);
+      }));
+
+      console.log('Successfully released all tables');
+      // Reset các state
+      setSelectedTables([]);
+      setAvailableTables(prev => prev.map(table => ({
+        ...table,
+        status: selectedTables.some(st => st.id === table.id) ? 'available' : table.status
+      })));
+    } catch (error) {
+      console.error('Error releasing all tables:', error);
+    }
+  };
+
+  // Sửa lại hàm handleDateChange cho Android
+  const handleDateChange = useCallback(async (event: any, date?: Date) => {
     if (Platform.OS === 'android') {
       setShowDatePicker(false);
       setIsDatePickerVisible(false);
@@ -429,26 +465,27 @@ export default function BookingTableScreen() {
         return;
       }
 
+      console.log('Date changed, releasing all tables...');
+      await releaseAllTables();
       setSelectedDate(date);
       setSelectedTables([]);
       setAvailableTables([]);
-      setCurrentTableType(null);
       setHasSearched(false);
-      setShowTypeDescription(false);
     } else {
       if (date) {
         setTempDate(date);
       }
     }
-  }, []);
+  }, [selectedTables, selectedTime, id]); // Thêm dependencies
 
-  const handleConfirmDate = () => {
+  // Sửa lại hàm handleConfirmDate cho iOS
+  const handleConfirmDate = async () => {
+    console.log('Confirming date change, releasing all tables...');
+    await releaseAllTables();
     setSelectedDate(tempDate);
     setSelectedTables([]);
     setAvailableTables([]);
-    setCurrentTableType(null);
     setHasSearched(false);
-    setShowTypeDescription(false);
     setShowDatePicker(false);
     setIsDatePickerVisible(false);
   };
@@ -549,10 +586,14 @@ export default function BookingTableScreen() {
   // Sửa lại useEffect để không tự động gọi fetchHoldTables
   useEffect(() => {
     if (selectedTime && selectedTableType) {
-      // Chỉ reset các state khi thay đổi thời gian hoặc loại bàn
-      setSelectedTables([]);
-      setAvailableTables([]);
-      setHeldTables([]);
+      // Chỉ reset state khi thay đổi thời gian
+      if (selectedTime !== prevSelectedTime.current) {
+        setSelectedTables([]);
+        setAvailableTables([]);
+        setHeldTables([]);
+        setHasSearched(false);
+      }
+      prevSelectedTime.current = selectedTime;
     }
   }, [selectedTime, selectedTableType]);
 
@@ -611,8 +652,59 @@ export default function BookingTableScreen() {
     }
   };
 
-  const handleRemoveTable = (tableId: string) => {
-    setSelectedTables(prev => prev.filter(t => t.id !== tableId));
+  // Sửa lại hàm handleRemoveTable
+  const handleRemoveTable = async (tableId: string) => {
+    if (removingTables[tableId]) return;
+
+    setRemovingTables(prev => ({
+      ...prev,
+      [tableId]: true
+    }));
+
+    try {
+      const request: HoldTableRequest = {
+        tableId: tableId,
+        time: selectedTime.replace(' (+1 ngày)', '') + ':00',
+        barId: id as string,
+        date: selectedTime.includes('(+1 ngày)') 
+          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+          : format(selectedDate, 'yyyy-MM-dd')
+      };
+
+      await bookingTableService.releaseTable(request);
+      
+      // Cập nhật UI sau khi release thành công
+      setSelectedTables(prev => {
+        const newSelectedTables = prev.filter(t => t.id !== tableId);
+        // Nếu không còn bàn nào, đóng modal
+        if (newSelectedTables.length === 0) {
+          setShowSelectedTablesModal(false);
+        }
+        return newSelectedTables;
+      });
+
+      setAvailableTables(prev => prev.map(table => {
+        if (table.id === tableId) {
+          return {
+            ...table,
+            status: 'available'
+          };
+        }
+        return table;
+      }));
+
+    } catch (error) {
+      console.error('Error releasing table:', error);
+      Alert.alert(
+        'Lỗi',
+        error instanceof Error ? error.message : 'Không thể hủy giữ bàn. Vui lòng thử lại.'
+      );
+    } finally {
+      setRemovingTables(prev => ({
+        ...prev,
+        [tableId]: false
+      }));
+    }
   };
 
   const handleTableTypeSelect = (typeId: string) => {
@@ -622,7 +714,8 @@ export default function BookingTableScreen() {
       id: selectedType.tableTypeId, 
       name: selectedType.typeName 
     } : null);
-    setShowTypeDescription(true); // Hiển thị description khi chọn loại bàn
+    setShowTypeDescription(true);
+    // Không reset các state khác
   };
 
   const isOver18 = (birthDate: string) => {
@@ -995,6 +1088,216 @@ export default function BookingTableScreen() {
     };
   }, []);
 
+  // Thêm useEffect để xử lý SignalR connection
+  useEffect(() => {
+    let appStateSubscription: any;
+    let isSubscribed = true;
+
+    const initializeSignalR = async () => {
+      if (!isSubscribed) return;
+      console.log('Initializing SignalR connection...');
+      await bookingSignalRService.initialize();
+    };
+
+    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
+      console.log('App state changed to:', nextAppState);
+      if (nextAppState === 'active') {
+        console.log('App became active, reconnecting SignalR...');
+        await initializeSignalR();
+      } else if (nextAppState === 'background') {
+        console.log('App went to background, stopping SignalR...');
+        await bookingSignalRService.stop();
+      }
+    };
+
+    // Khởi tạo SignalR khi component mount
+    initializeSignalR();
+
+    // Đăng ký lắng nghe sự kiện thay đổi trạng thái app
+    appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
+
+    // Cleanup khi component unmount
+    return () => {
+      console.log('Component unmounting, cleaning up SignalR...');
+      isSubscribed = false;
+      appStateSubscription.remove();
+      bookingSignalRService.stop();
+    };
+  }, []); // Empty dependency array vì chúng ta chỉ muốn effect này chạy một lần khi mount
+
+  // Thêm useFocusEffect để xử lý khi screen được focus/unfocus
+  useFocusEffect(
+    useCallback(() => {
+      let isSubscribed = true;
+
+      const handleScreenFocus = async () => {
+        if (!isSubscribed) return;
+        console.log('Screen focused, initializing SignalR...');
+        await bookingSignalRService.initialize();
+      };
+
+      // Khởi tạo SignalR khi screen được focus
+      handleScreenFocus();
+
+      return () => {
+        isSubscribed = false;
+        console.log('Screen unfocused, stopping SignalR...');
+        bookingSignalRService.stop();
+      };
+    }, [])
+  );
+
+  // Thêm useEffect để xử lý các events từ SignalR
+  useEffect(() => {
+    if (!id || !selectedTime || !selectedTableType || !user?.accountId) return;
+
+    const getCurrentBookingDate = () => {
+      const date = selectedTime.includes('(+1 ngày)') 
+        ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+        : format(selectedDate, 'yyyy-MM-dd');
+      return date + 'T00:00:00+07:00';
+    };
+
+    const getCurrentBookingTime = () => {
+      return selectedTime.replace(' (+1 ngày)', '') + ':00';
+    };
+
+    // Xử lý khi có bàn được giữ bởi người khác
+    const unsubscribeTableHold = bookingSignalRService.onTableHold((event: TableHoldEvent) => {
+      console.log('Current user:', user.accountId);
+      console.log('Event user:', event.accountId);
+      console.log('Current date:', getCurrentBookingDate());
+      console.log('Current time:', getCurrentBookingTime());
+      console.log('Event date:', event.date);
+      console.log('Event time:', event.time);
+
+      // Chỉ xử lý nếu event từ người khác và liên quan đến thời gian hiện tại
+      if (
+        event.accountId !== user.accountId && // Thêm điều kiện này
+        event.date === getCurrentBookingDate() &&
+        event.time === getCurrentBookingTime()
+      ) {
+        console.log('Updating table status for hold:', event.tableId);
+        setAvailableTables(prev => prev.map(table => {
+          if (table.id === event.tableId) {
+            console.log('Found table to update:', table.name);
+            return {
+              ...table,
+              status: 'booked'
+            };
+          }
+          return table;
+        }));
+
+        // Nếu bàn đang được chọn, xóa khỏi selectedTables
+        setSelectedTables(prev => {
+          const newSelected = prev.filter(table => table.id !== event.tableId);
+          if (prev.length !== newSelected.length) {
+            console.log('Removed table from selection:', event.tableId);
+          }
+          return newSelected;
+        });
+      }
+    });
+
+    // Xử lý khi có bàn được release bởi người khác
+    const unsubscribeTableRelease = bookingSignalRService.onTableRelease((event: TableHoldEvent) => {
+      // Chỉ xử lý nếu event từ người khác và liên quan đến thời gian hiện tại
+      if (
+        event.accountId !== user.accountId && // Thêm điều kiện này
+        event.date === getCurrentBookingDate() &&
+        event.time === getCurrentBookingTime()
+      ) {
+        console.log('Updating table status for release:', event.tableId);
+        setAvailableTables(prev => prev.map(table => {
+          if (table.id === event.tableId) {
+            console.log('Found table to update:', table.name);
+            return {
+              ...table,
+              status: 'available'
+            };
+          }
+          return table;
+        }));
+      }
+    });
+
+    // Cleanup khi unmount hoặc khi thay đổi params
+    return () => {
+      unsubscribeTableHold();
+      unsubscribeTableRelease();
+    };
+  }, [id, selectedTime, selectedTableType, selectedDate, user?.accountId]); // Thêm user?.accountId vào dependencies
+
+  // Sửa lại useFocusEffect để xử lý cleanup tốt hơn
+  useFocusEffect(
+    useCallback(() => {
+      let isSubscribed = true;
+
+      return () => {
+        isSubscribed = false;
+        console.log('Screen losing focus, releasing all tables...');
+        releaseAllTables().then(() => {
+          if (isSubscribed) {
+            setSelectedTables([]);
+            setAvailableTables([]);
+            setHasSearched(false);
+          }
+        });
+      };
+    }, [])
+  );
+
+  // Sửa lại useEffect để xử lý thay đổi thời gian
+  useEffect(() => {
+    if (selectedTime) {
+      if (selectedTime !== prevSelectedTime.current) {
+        console.log('Time changed, releasing all tables...');
+        releaseAllTables().then(() => {
+          setSelectedTables([]);
+          setAvailableTables([]);
+          setHeldTables([]);
+          setHasSearched(false);
+        });
+      }
+      prevSelectedTime.current = selectedTime;
+    }
+  }, [selectedTime, selectedDate]);
+
+  // Thêm hàm xử lý khi nhấn back
+  const handleBack = async () => {
+    console.log('Back button pressed, releasing all tables...');
+    try {
+      await releaseAllTables();
+    } finally {
+      router.back();
+    }
+  };
+
+  // Sửa lại phần xử lý back navigation
+  useEffect(() => {
+    const handleBeforeUnload = async () => {
+      console.log('Before unload, releasing all tables...');
+      await releaseAllTables();
+    };
+
+    // Sửa lại cách xử lý hardware back button
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      console.log('Hardware back pressed, releasing all tables...');
+      // Gọi releaseAllTables và navigate back mà không đợi
+      releaseAllTables().finally(() => {
+        router.back();
+      });
+      // Return true để chặn default back behavior
+      return true;
+    });
+
+    return () => {
+      handleBeforeUnload();
+      backHandler.remove();
+    };
+  }, []);
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1" edges={['top']}>
@@ -1003,14 +1306,14 @@ export default function BookingTableScreen() {
           {/* Phần navigation */}
           <View className="px-4 pt-1.5 pb-2 flex-row items-center">
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={handleBack}
               className="h-9 w-9 bg-neutral-800 rounded-full items-center justify-center mr-3"
             >
               <Ionicons name="arrow-back" size={20} color="white" />
             </TouchableOpacity>
             <Text className="text-yellow-500 text-lg font-bold">
               Đặt bàn
-              </Text>
+            </Text>
           </View>
 
           {/* Thông tin quán */}
@@ -1331,7 +1634,7 @@ export default function BookingTableScreen() {
                       )}
                     </View>
 
-                    {/* Nút tìm bàn */}
+                    {/* N��t tìm bàn */}
                     <TouchableOpacity
                       onPress={handleSearchTables}
                       disabled={!selectedTime || !selectedTableType || isSearching}
@@ -1656,9 +1959,14 @@ export default function BookingTableScreen() {
                       </View>
                       <TouchableOpacity 
                         onPress={() => handleRemoveTable(table.id)}
+                        disabled={removingTables[table.id]}
                         className="bg-white/20 rounded-full p-2"
                       >
-                        <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                        {removingTables[table.id] ? (
+                          <ActivityIndicator size="small" color="#ff4444" />
+                        ) : (
+                          <Ionicons name="trash-outline" size={20} color="#ff4444" />
+                        )}
                       </TouchableOpacity>
                     </View>
                   </View>

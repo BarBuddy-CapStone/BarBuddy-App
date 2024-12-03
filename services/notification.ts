@@ -13,7 +13,8 @@ export interface Notification {
   message: string;
   type: number;
   imageUrl: string | null;
-  deepLink: string;
+  mobileDeepLink: string;
+  webDeepLink: string;
   barName: string | null;
   isPublic: boolean;
   isRead: boolean;
@@ -132,12 +133,6 @@ class NotificationService {
   async getNotifications(pageNumber: number = 1) {
     return handleConnectionError(async () => {
       try {
-        const fcmToken = await messaging().getToken();
-        if (!fcmToken) {
-          console.error('Không thể lấy FCM token');
-          return [];
-        }
-
         const authData = await AsyncStorage.getItem('@auth');
         const headers: any = {};
         
@@ -149,12 +144,16 @@ class NotificationService {
         }
 
         const response = await api.get(
-          `/api/Fcm/notifications?deviceToken=${fcmToken}&page=${pageNumber}`,
+          `/api/Fcm/notifications?page=${pageNumber}`,
           { headers }
         );
         
         if (response.data.statusCode === 200) {
-          return response.data.data;
+          const notifications = response.data.data.map((notification: any) => ({
+            ...notification,
+            deepLink: notification.mobileDeepLink
+          }));
+          return notifications;
         }
         return [];
       } catch (error) {
@@ -164,33 +163,42 @@ class NotificationService {
     }, 'Không thể tải thông báo. Vui lòng thử lại sau.');
   }
 
+  async resetBadgeCount() {
+    if (Platform.OS === 'ios') {
+      PushNotification.setApplicationIconBadgeNumber(0);
+    }
+    // Có thể thêm logic reset badge cho Android nếu cần
+  }
+
   async getUnreadCount(): Promise<number> {
     return handleConnectionError(async () => {
       try {
-        const fcmToken = await messaging().getToken();
-        
-        if (!fcmToken) {
-          console.log('Không thể lấy FCM token');
-          return 0;
-        }
-
         const authData = await AsyncStorage.getItem('@auth');
         const headers: any = {};
         
-        if (authData) {
-          const userData = JSON.parse(authData);
-          if (userData?.user?.accessToken) {
-            headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
-          }
+        if (!authData) {
+          return 0;
+        }
+        
+        const userData = JSON.parse(authData);
+        if (!userData?.user?.accessToken) {
+          return 0;
         }
 
+        headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
+
         const response = await api.get(
-          `/api/Fcm/unread-count?deviceToken=${fcmToken}`,
+          `/api/Fcm/unread-count`,
           { headers }
         );
         
         if (response.data.statusCode === 200) {
-          return response.data.data;
+          const count = response.data.data;
+          // Cập nhật badge number
+          if (Platform.OS === 'ios') {
+            PushNotification.setApplicationIconBadgeNumber(count);
+          }
+          return count;
         }
         return 0;
       } catch (error) {

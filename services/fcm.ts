@@ -18,7 +18,7 @@ class FCMService {
         }
 
         const response = await axios.post(
-          `${API_CONFIG.BASE_URL}/api/Fcm/sign-device-token`,
+          `${API_CONFIG.BASE_URL}/api/Fcm/device-token`,
           {
             deviceToken: fcmToken,
             platform: Platform.OS
@@ -26,7 +26,6 @@ class FCMService {
         );
 
         if (response.data.statusCode === 200) {
-          await signalRService.connect();
           return response.data;
         }
 
@@ -48,15 +47,16 @@ class FCMService {
           return null;
         }
 
-        // Kiểm tra authorization header
         const authHeader = await getAuthHeader();
         if (!authHeader?.headers?.Authorization) {
           console.log('Bỏ qua update device token vì chưa có authorization header');
           return null;
         }
 
-        const url = `${API_CONFIG.BASE_URL}/api/Fcm/update-account-device-token`;
-        console.log('Update device token URL:', url);
+        const endpoint = isLoginOrLogout ? 'link' : 'unlink';
+        const url = `${API_CONFIG.BASE_URL}/api/Fcm/device-token/${endpoint}`;
+        
+        console.log(`Update device token URL (${isLoginOrLogout ? 'link' : 'unlink'}):`, url);
         console.log('Request payload:', { deviceToken: fcmToken, isLoginOrLogout });
         
         const response = await axios.patch(
@@ -69,6 +69,9 @@ class FCMService {
         );
 
         if (response.data.statusCode === 200) {
+          if (isLoginOrLogout) {
+            await signalRService.connect();
+          }
           return response.data;
         }
 

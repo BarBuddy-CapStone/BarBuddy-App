@@ -65,6 +65,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Thêm useEffect để quản lý kết nối SignalR dựa trên trạng thái đăng nhập
+  useEffect(() => {
+    let isMounted = true;
+
+    const setupSignalR = async () => {
+      if (isAuthenticated && user?.accountId && !isGuest) {
+        console.log('Global SignalR: Bắt đầu kết nối SignalR...');
+        await signalRService.connect();
+      } else {
+        // Ngắt kết nối nếu không đăng nhập hoặc là guest
+        console.log('Global SignalR: Ngắt kết nối do chưa đăng nhập...');
+        await signalRService.disconnect();
+      }
+    };
+
+    setupSignalR();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, isGuest, user?.accountId]);
+
   const loadStoredAuth = async () => {
     try {
       const [authValue, guestValue] = await Promise.all([
@@ -137,6 +159,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Ngắt kết nối SignalR hiện tại
       await signalRService.disconnect();
+
+      // Reset badge count về 0
+      await notificationService.resetBadgeCount();
 
       // Gọi API logout để hủy refresh token
       await tokenService.logout();

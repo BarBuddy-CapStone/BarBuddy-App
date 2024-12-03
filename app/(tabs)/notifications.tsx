@@ -7,6 +7,8 @@ import { format, isToday, isYesterday } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { GuestView } from '@/components/GuestView';
 import Animated, { 
   FadeIn, 
   useAnimatedStyle, 
@@ -121,6 +123,7 @@ const NotificationSkeleton = () => {
 
 export default function NotificationsScreen() {
   const { notifications, setNotifications, fetchNotifications } = useContext(NotificationContext);
+  const { isGuest, user } = useAuth();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -145,8 +148,8 @@ export default function NotificationsScreen() {
       <TouchableOpacity
         className={`flex-row p-4 space-x-3 ${!item.isRead ? 'bg-neutral-900' : 'bg-black'} border-b border-neutral-800/50`}
         onPress={async () => {
-          if (item.deepLink) {
-            router.push(item.deepLink as any);
+          if (item.mobileDeepLink) {
+            router.push(item.mobileDeepLink as any);
           }
           if (!item.isRead) {
             await notificationService.markAsRead(item.id);
@@ -218,76 +221,86 @@ export default function NotificationsScreen() {
     setIsMarkingRead(false);
   };
 
-  return (
-    <SafeAreaView className="flex-1 bg-black" edges={['top']}>
-      <View className="border-b border-neutral-800">
-        <View className="px-4 py-3 flex-row items-center justify-between">
-          <View className="flex-row items-center flex-1">
-            <View className="w-8 h-8 rounded-full bg-neutral-800/80 items-center justify-center mr-3">
-              <Ionicons name="notifications" size={18} color="#EAB308" />
-            </View>
-            <Text className="text-white text-lg font-semibold">Thông báo</Text>
-          </View>
-          
-          <TouchableOpacity
-            className={`h-8 px-3 rounded-full flex-row items-center justify-center space-x-1.5 ${isMarkingRead ? 'bg-yellow-500/20' : 'bg-neutral-800'}`}
-            onPress={handleMarkAllAsRead}
-            disabled={isMarkingRead}
-          >
-            <Ionicons 
-              name={isMarkingRead ? "checkmark-circle" : "checkmark-circle-outline"} 
-              size={16} 
-              color={isMarkingRead ? "#EAB308" : "#FFF"} 
-            />
-            <Text className={`text-sm font-medium ${isMarkingRead ? 'text-yellow-500' : 'text-white'}`}>
-              {isMarkingRead ? 'Đang đánh dấu...' : 'Đánh dấu đã đọc'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+  const renderContent = () => {
+    if (isGuest || !user?.accountId) {
+      return <GuestView screenName="notifications" />;
+    }
 
-      {loading ? (
-        <View className="flex-1">
-          {[1, 2, 3, 4, 5].map((item) => (
-            <NotificationSkeleton key={item} />
-          ))}
-        </View>
-      ) : (
-        <FlatList
-          data={notifications}
-          renderItem={renderNotification}
-          keyExtractor={item => item.id}
-          refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={onRefresh}
-              tintColor="#EAB308"
-              colors={['#EAB308']}
-            />
-          }
-          onEndReached={() => {
-            const nextPage = page + 1;
-            setPage(nextPage);
-            fetchNotifications(nextPage);
-          }}
-          onEndReachedThreshold={0.5}
-          ListEmptyComponent={() => (
-            <Animated.View 
-              entering={FadeIn}
-              className="flex-1 items-center justify-center py-20"
-            >
-              <View className="w-16 h-16 rounded-full bg-white/5 items-center justify-center mb-4">
-                <Ionicons name="notifications-off" size={32} color="#9CA3AF" />
+    return (
+      <View className="flex-1 bg-black">
+        <SafeAreaView className="flex-1">
+          <View className="border-b border-neutral-800">
+            <View className="px-4 py-3 flex-row items-center justify-between">
+              <View className="flex-row items-center flex-1">
+                <View className="w-8 h-8 rounded-full bg-neutral-800/80 items-center justify-center mr-3">
+                  <Ionicons name="notifications" size={18} color="#EAB308" />
+                </View>
+                <Text className="text-white text-lg font-semibold">Thông báo</Text>
               </View>
-              <Text className="text-white/60 text-base">Chưa có thông báo nào</Text>
-            </Animated.View>
+              
+              <TouchableOpacity
+                className={`h-8 px-3 rounded-full flex-row items-center justify-center space-x-1.5 ${isMarkingRead ? 'bg-yellow-500/20' : 'bg-neutral-800'}`}
+                onPress={handleMarkAllAsRead}
+                disabled={isMarkingRead}
+              >
+                <Ionicons 
+                  name={isMarkingRead ? "checkmark-circle" : "checkmark-circle-outline"} 
+                  size={16} 
+                  color={isMarkingRead ? "#EAB308" : "#FFF"} 
+                />
+                <Text className={`text-sm font-medium ${isMarkingRead ? 'text-yellow-500' : 'text-white'}`}>
+                  {isMarkingRead ? 'Đang đánh dấu...' : 'Đánh dấu đã đọc'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {loading ? (
+            <View className="flex-1">
+              {[1, 2, 3, 4, 5].map((item) => (
+                <NotificationSkeleton key={item} />
+              ))}
+            </View>
+          ) : (
+            <FlatList
+              data={notifications}
+              renderItem={renderNotification}
+              keyExtractor={item => item.id}
+              refreshControl={
+                <RefreshControl 
+                  refreshing={refreshing} 
+                  onRefresh={onRefresh}
+                  tintColor="#EAB308"
+                  colors={['#EAB308']}
+                />
+              }
+              onEndReached={() => {
+                const nextPage = page + 1;
+                setPage(nextPage);
+                fetchNotifications(nextPage);
+              }}
+              onEndReachedThreshold={0.5}
+              ListEmptyComponent={() => (
+                <Animated.View 
+                  entering={FadeIn}
+                  className="flex-1 items-center justify-center py-20"
+                >
+                  <View className="w-16 h-16 rounded-full bg-white/5 items-center justify-center mb-4">
+                    <Ionicons name="notifications-off" size={32} color="#9CA3AF" />
+                  </View>
+                  <Text className="text-white/60 text-base">Chưa có thông báo nào</Text>
+                </Animated.View>
+              )}
+              contentContainerStyle={{ 
+                paddingBottom: Platform.OS === 'android' ? 60 : 80,
+                flexGrow: 1
+              }}
+            />
           )}
-          contentContainerStyle={{ 
-            paddingBottom: Platform.OS === 'android' ? 60 : 80,
-            flexGrow: 1
-          }}
-        />
-      )}
-    </SafeAreaView>
-  );
+        </SafeAreaView>
+      </View>
+    );
+  };
+
+  return renderContent();
 }

@@ -1,6 +1,7 @@
 import React, { createContext, useEffect, useState } from 'react';
 import { Notification, notificationService } from '@/services/notification';
 import { signalRService } from '@/services/signalr';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface NotificationContextData {
   notifications: Notification[];
@@ -16,41 +17,58 @@ export const NotificationContext = createContext<NotificationContextData>({
 
 export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { isGuest, user } = useAuth();
 
   useEffect(() => {
-    const setupSignalR = async () => {
-      console.log('Global SignalR: Bắt đầu kết nối SignalR...');
-      await signalRService.connect();
+    if (!isGuest && user?.accountId) {
+      fetchNotifications();
+    }
+  }, [isGuest, user?.accountId]);
 
-      signalRService.setNotificationCallback((newNotification: Notification) => {
-        console.log('Global SignalR: Nhận notification mới:', newNotification);
-        setNotifications(prevNotifications => {
-          const exists = prevNotifications.some(n => n.id === newNotification.id);
-          if (exists) {
-            // Cập nhật thông báo đã tồn tại
-            return prevNotifications.map(notification => 
-              notification.id === newNotification.id ? newNotification : notification
-            );
-          } else {
-            // Thêm thông báo mới vào đầu danh sách
-            return [newNotification, ...prevNotifications];
+  useEffect(() => {
+    let isMounted = true;
+
+    const setupSignalR = async () => {
+      if (!isGuest && user?.accountId) {
+        console.log('Global SignalR: Bắt đầu kết nối SignalR...');
+        await signalRService.connect();
+
+        signalRService.setNotificationCallback((newNotification: Notification) => {
+          if (isMounted) {
+            console.log('Global SignalR: Nhận notification mới:', newNotification);
+            setNotifications(prevNotifications => {
+              const exists = prevNotifications.some(n => n.id === newNotification.id);
+              if (exists) {
+                return prevNotifications.map(notification => 
+                  notification.id === newNotification.id ? newNotification : notification
+                );
+              } else {
+                return [newNotification, ...prevNotifications];
+              }
+            });
           }
         });
-      });
+
+        await notificationService.getUnreadCount();
+      }
     };
 
     setupSignalR();
-    
-    // Reset unread count khi vào ứng dụng
-    notificationService.getUnreadCount();
 
     return () => {
-      console.log('Global SignalR: Cleanup SignalR connection...');
-      signalRService.disconnect();
+      isMounted = false;
+      if (!isGuest && user?.accountId) {
+        console.log('Global SignalR: Cleanup SignalR connection...');
+        signalRService.disconnect();
+      }
     };
-  }, []);
+  }, [isGuest, user?.accountId]);
 
   const fetchNotifications = async (pageNumber: number = 1) => {
+    if (isGuest || !user?.accountId) {
+      return [];
+    }
+
     try {
       const data = await notificationService.getNotifications(pageNumber);
       

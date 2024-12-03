@@ -82,6 +82,9 @@ export default function LoginScreen() {
           case 'bar-detail':
             router.back();
             break;
+          case 'notifications':
+            router.replace('/(tabs)/notifications');
+            break;
           default:
             router.replace('/(tabs)');
         }

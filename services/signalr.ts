@@ -5,6 +5,21 @@ import { Notification } from '@/services/notification';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppState, AppStateStatus } from 'react-native';
 
+interface SignalRNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: number;
+  imageUrl: string | null;
+  mobileDeepLink: string;
+  webDeepLink: string;
+  barId: string | null;
+  isPublic: boolean;
+  isRead: boolean;
+  readAt: string | null;
+  timestamp: string; // Thay vì createdAt
+}
+
 class SignalRService {
   private connection: HubConnection | null = null;
   private notificationCallback: ((notification: Notification) => void) | null = null;
@@ -81,21 +96,26 @@ class SignalRService {
     this.isConnecting = true;
 
     try {
-      const fcmToken = await messaging().getToken();
-      
-      if (!fcmToken) {
-        throw new Error('Không thể lấy FCM token để kết nối SignalR');
-      }
-
       let accountId = null;
       try {
         const authData = await AsyncStorage.getItem('@auth');
         if (authData) {
           const userData = JSON.parse(authData);
-          accountId = userData?.user?.accountId || null;
+          accountId = userData?.user?.accountId;
+          
+          // Nếu không có accountId, không kết nối
+          if (!accountId) {
+            console.log('Không có accountId, bỏ qua kết nối SignalR');
+            return;
+          }
+        } else {
+          // Nếu không có auth data, không kết nối
+          console.log('Chưa đăng nhập, bỏ qua kết nối SignalR');
+          return;
         }
       } catch (error) {
         console.log('Lỗi khi lấy accountId:', error);
+        return;
       }
 
       // Ngắt kết nối cũ nếu có
@@ -103,7 +123,7 @@ class SignalRService {
         await this.disconnect();
       }
 
-      const hubUrl = `${API_CONFIG.BASE_URL}/notificationHub?deviceToken=${fcmToken}&accountId=${accountId || ''}`;
+      const hubUrl = `${API_CONFIG.BASE_URL}/notificationHub?accountId=${accountId}`;
       console.log('Connecting to SignalR hub:', hubUrl);
 
       this.connection = new HubConnectionBuilder()
@@ -164,12 +184,24 @@ class SignalRService {
       }
     });
 
-    this.connection.on('ReceiveNotification', (notification: Notification) => {
-      console.log('Nhận notification mới');
+    this.connection.on('ReceiveNotification', (notification: SignalRNotification) => {
+      console.log('Nhận notification mới', notification);
       
+      // Chuyển đổi từ SignalRNotification sang Notification
       const normalizedNotification = {
-        ...notification,
-        createdAt: notification.createdAt || new Date().toISOString()
+        id: notification.id,
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        imageUrl: notification.imageUrl,
+        mobileDeepLink: notification.mobileDeepLink,
+        webDeepLink: notification.webDeepLink,
+        barName: null, // Vì API mới không có trường này
+        isPublic: notification.isPublic,
+        isRead: notification.isRead,
+        readAt: notification.readAt,
+        createdAt: notification.timestamp,
+        deepLink: notification.mobileDeepLink // Thêm để tương thích với code cũ
       };
 
       if (this.notificationCallback) {

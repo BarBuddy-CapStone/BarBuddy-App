@@ -34,7 +34,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
               "com.googleusercontent.apps.294668771815-0oslkkj1gg5sov5o7npbbf6beo7aknni"
             ]
           }
-        ]
+        ],
+        NSPhotoLibraryAddUsageDescription: "Ứng dụng cần quyền lưu ảnh vào thư viện của bạn.",
       }
     },
     android: {
@@ -58,7 +59,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
           category: ["BROWSABLE", "DEFAULT"]
         }
       ],
-      googleServicesFile: "./google-services.json"
+      googleServicesFile: "./google-services.json",
+      permissions: [
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+      ],
     },
     web: {
       bundler: "metro",

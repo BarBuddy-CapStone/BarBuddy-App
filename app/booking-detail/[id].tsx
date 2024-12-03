@@ -10,6 +10,10 @@ import Animated, { FadeIn, useSharedValue, useAnimatedScrollHandler, useAnimated
 import { LinearGradient } from 'expo-linear-gradient';
 import { FeedbackDetail, feedbackService } from '@/services/feedback';
 import { BackHandler } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
+import { toastConfig, showToast } from '@/components/CustomToast';
+import Toast from 'react-native-toast-message';
 
 const getStatusColor = (status: number): string => {
   switch (status) {
@@ -283,8 +287,43 @@ const PaymentInfo = ({ booking }: { booking: BookingDetail }) => {
   );
 };
 
-const QRTicket = ({ qrTicket }: { qrTicket: string }) => {
+const QRTicket = ({ qrTicket, bookingCode }: { qrTicket: string, bookingCode: string }) => {
   const [showFullQR, setShowFullQR] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const downloadImage = async () => {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Lỗi', 'Ứng dụng cần quyền truy cập thư viện ảnh để lưu hình ảnh.');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const fileUri = FileSystem.cacheDirectory + `qr-code-${bookingCode}.jpg`;
+      const { uri } = await FileSystem.downloadAsync(qrTicket, fileUri);
+
+      const asset = await MediaLibrary.createAssetAsync(uri);
+      await MediaLibrary.createAlbumAsync('BarBuddy', asset, false);
+
+      //Alert.alert('Thành công', 'Đã lưu ảnh QR vào thư viện của bạn.');
+      showToast(
+        'success',
+        'Đã lưu mã QR',
+        'Mã QR đã được lưu vào thư viện'
+      );
+    } catch (error) {
+      console.error(error);
+      //Alert.alert('Lỗi', 'Không thể lưu ảnh. Vui lòng thử lại sau.');
+      showToast(
+        'error',
+        'Lỗi',
+        'Không thể lưu ảnh. Vui lòng thử lại sau.'
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <>
@@ -304,6 +343,15 @@ const QRTicket = ({ qrTicket }: { qrTicket: string }) => {
           <Text className="text-white/60 text-center mt-4 text-sm">
             Nhấn vào mã QR để phóng to
           </Text>
+          <TouchableOpacity
+            onPress={downloadImage}
+            className="bg-yellow-500 px-4 py-2 rounded-full mt-4"
+            disabled={isSaving}
+          >
+            <Text className="text-black font-semibold">
+              {isSaving ? 'Đang lưu...' : 'Lưu ảnh QR'}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -754,7 +802,7 @@ export default function BookingDetailScreen() {
                   <BookingInfo booking={booking} />
                   
                   {(booking.status === 0 || booking.status === 2) && booking.qrTicket && (
-                    <QRTicket qrTicket={booking.qrTicket} />
+                    <QRTicket qrTicket={booking.qrTicket} bookingCode={booking.bookingCode} />
                   )}
 
                   {booking.bookingDrinksList.length > 0 && (
@@ -846,6 +894,9 @@ export default function BookingDetailScreen() {
                 )}
               </View>
             )}
+
+            {/* Cập nhật Toast Container với config */}
+            <Toast config={toastConfig} />
 
             <Modal
               visible={showCancelModal}

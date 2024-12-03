@@ -199,6 +199,76 @@ class NotificationService {
       }
     }, 'Không thể tải số thông báo chưa đọc');
   }
+
+  async markAsRead(notificationId: string): Promise<boolean> {
+    return handleConnectionError(async () => {
+      try {
+        const fcmToken = await messaging().getToken();
+        if (!fcmToken) {
+          console.error('Không thể lấy FCM token');
+          return false;
+        }
+
+        const authData = await AsyncStorage.getItem('@auth');
+        const headers: any = {};
+        if (authData) {
+          const userData = JSON.parse(authData);
+          if (userData?.user?.accessToken) {
+            headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
+          }
+        }
+
+        const response = await api.patch(
+          `/api/Fcm/notification/${notificationId}/mark-as-read?deviceToken=${fcmToken}`,
+          null,
+          { headers }
+        );
+
+        if (response.data.statusCode === 200) {
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Lỗi khi đánh dấu thông báo đã đọc:', error);
+        return false;
+      }
+    }, 'Không thể đánh dấu thông báo đã đọc. Vui lòng thử lại sau.');
+  }
+
+  async markAllAsRead(): Promise<boolean> {
+    return handleConnectionError(async () => {
+      try {
+        const fcmToken = await messaging().getToken();
+        if (!fcmToken) {
+          console.error('Không thể lấy FCM token');
+          return false;
+        }
+
+        const authData = await AsyncStorage.getItem('@auth');
+        const headers: any = {};
+        if (authData) {
+          const userData = JSON.parse(authData);
+          if (userData?.user?.accessToken) {
+            headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
+          }
+        }
+
+        const response = await api.patch(
+          `/api/Fcm/notifications/mark-all-as-read?deviceToken=${fcmToken}`,
+          null,
+          { headers }
+        );
+
+        if (response.data.statusCode === 200) {
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('Lỗi khi đánh dấu tất cả thông báo đã đọc:', error);
+        return false;
+      }
+    }, 'Không thể đánh dấu tất cả thông báo đã đọc. Vui lòng thử lại sau.');
+  }
 }
 
 export const notificationService = new NotificationService(); 

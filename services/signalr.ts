@@ -24,9 +24,7 @@ class SignalRService {
       // Khi app trở lại foreground
       await this.reconnect();
     } else if (nextAppState === 'background') {
-      // Khi app vào background
-      this.clearReconnectTimer();
-      await this.disconnect();
+      // Giữ kết nối khi app vào background
     }
   };
 

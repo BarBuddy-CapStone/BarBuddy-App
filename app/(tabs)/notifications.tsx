@@ -1,11 +1,12 @@
 import { View, Text, FlatList, RefreshControl, Image, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useContext } from 'react';
+import { NotificationContext } from '@/contexts/NotificationContext';
 import { notificationService, type Notification } from '@/services/notification';
 import { format, isToday, isYesterday } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import Animated, { 
   FadeIn, 
   useAnimatedStyle, 
@@ -15,7 +16,6 @@ import Animated, {
   withTiming,
   useSharedValue
 } from 'react-native-reanimated';
-import { signalRService } from '@/services/signalr';
 
 // Cập nhật enum cho các loại thông báo
 enum NotificationType {
@@ -120,61 +120,12 @@ const NotificationSkeleton = () => {
 };
 
 export default function NotificationsScreen() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const { notifications, setNotifications, fetchNotifications } = useContext(NotificationContext);
+  const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [isMarkingRead, setIsMarkingRead] = useState(false);
-
-  useEffect(() => {
-    const setupSignalR = async () => {
-      console.log('Bắt đầu kết nối SignalR...');
-      await signalRService.connect();
-
-      signalRService.setNotificationCallback((newNotification: Notification) => {
-        console.log('Nhận notification mới trong component:', newNotification);
-        setNotifications(prev => {
-          const exists = prev.some(n => n.id === newNotification.id);
-          if (exists) return prev;
-          return [newNotification, ...prev];
-        });
-      });
-    };
-
-    setupSignalR();
-    
-    // Reset unread count khi vào màn hình notifications
-    notificationService.getUnreadCount();
-
-    return () => {
-      console.log('Cleanup SignalR connection...');
-      signalRService.disconnect();
-    };
-  }, []);
-
-  const fetchNotifications = async (pageNumber: number = 1) => {
-    try {
-      const data = await notificationService.getNotifications(pageNumber);
-      
-      if (pageNumber === 1) {
-        setNotifications(data);
-      } else {
-        setNotifications(prev => {
-          const newNotifications = [...prev];
-          data.forEach((notification: Notification) => {
-            if (!newNotifications.some(n => n.id === notification.id)) {
-              newNotifications.push(notification);
-            }
-          });
-          return newNotifications;
-        });
-      }
-      return data;
-    } catch (error) {
-      console.error('Lỗi khi lấy notifications:', error);
-      return [];
-    }
-  };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -183,7 +134,7 @@ export default function NotificationsScreen() {
   }, []);
 
   useEffect(() => {
-    fetchNotifications().finally(() => setLoading(false));
+    fetchNotifications().then(() => setLoading(false));
   }, []);
 
   const renderNotification = ({ item }: { item: Notification }) => (
@@ -193,9 +144,17 @@ export default function NotificationsScreen() {
     >
       <TouchableOpacity
         className={`flex-row p-4 space-x-3 ${!item.isRead ? 'bg-neutral-900' : 'bg-black'} border-b border-neutral-800/50`}
-        onPress={() => {
+        onPress={async () => {
           if (item.deepLink) {
             router.push(item.deepLink as any);
+          }
+          if (!item.isRead) {
+            await notificationService.markAsRead(item.id);
+            setNotifications(prevNotifications =>
+              prevNotifications.map(n =>
+                n.id === item.id ? { ...n, isRead: true } : n
+              )
+            );
           }
         }}
       >
@@ -250,8 +209,12 @@ export default function NotificationsScreen() {
 
   const handleMarkAllAsRead = async () => {
     setIsMarkingRead(true);
-    // TODO: Implement mark all as read
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Giả lập delay
+    const success = await notificationService.markAllAsRead();
+    if (success) {
+      setNotifications(prevNotifications =>
+        prevNotifications.map(n => ({ ...n, isRead: true }))
+      );
+    }
     setIsMarkingRead(false);
   };
 

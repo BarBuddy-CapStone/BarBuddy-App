@@ -1,39 +1,12 @@
-import { Tabs } from 'expo-router';
+import React, { useEffect, useState, useContext } from 'react';
+import { NotificationContext } from '@/contexts/NotificationContext';
 import { Ionicons } from '@expo/vector-icons';
+import { Tabs } from 'expo-router';
 import { Platform, View, Text } from 'react-native';
-import React, { useEffect, useState } from 'react';
-import { notificationService } from '@/services/notification';
-import { signalRService } from '@/services/signalr';
 
 export default function TabLayout() {
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const setupNotifications = async () => {
-      await signalRService.connect();
-      
-      // Lắng nghe cập nhật số lượng thông báo chưa đọc
-      signalRService.setUnreadCountCallback((count) => {
-        setUnreadCount(count);
-      });
-
-      // Lắng nghe thông báo mới
-      signalRService.setNotificationCallback((notification) => {
-        setUnreadCount(prev => prev + 1);
-      });
-
-      // Lấy số lượng ban đầu
-      const initialCount = await notificationService.getUnreadCount();
-      setUnreadCount(initialCount);
-    };
-
-    setupNotifications();
-
-    return () => {
-      signalRService.setUnreadCountCallback(() => {});
-      signalRService.setNotificationCallback(() => {});
-    };
-  }, []);
+  const { notifications } = useContext(NotificationContext);
+  const unreadCount = notifications.filter(n => !n.isRead).length;
 
   return (
     <Tabs

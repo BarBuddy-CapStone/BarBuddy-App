@@ -5,6 +5,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuth, AuthProvider } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { View, Linking } from 'react-native';
 import '@/services/background-messaging';
 import { tokenService } from '@/services/token';
@@ -143,7 +144,9 @@ export default function RootLayout() {
     <View style={{ flex: 1, backgroundColor: 'black' }}>
       <AuthProvider>
         <LocationProvider>
-          <LoadingLayout loaded={loaded} />
+          <NotificationProvider>
+            <LoadingLayout loaded={loaded} />
+          </NotificationProvider>
         </LocationProvider>
       </AuthProvider>
     </View>

@@ -127,7 +127,11 @@ export default function PaymentDetailScreen() {
       );
 
       const response = await bookingTableService.bookTableWithDrinks(
-        bookingRequestState
+        bookingRequestState,
+        () => {
+          setIsProcessing(false);
+          setShowLoadingPopup(false);
+        }
       );
 
       if (response.data?.paymentUrl) {

@@ -287,7 +287,7 @@ export default function BookingDrinkScreen() {
   // Thêm state để theo dõi source data hiện tại
   const [currentSource, setCurrentSource] = useState<'all' | 'emotion'>('all');
 
-  // Sử dụng useMemo để tính toán danh sách drinks được filter
+  // Sử dụng useMemo để tính to��n danh sách drinks đư���c filter
   const displayedDrinks = useMemo(() => {
     // Xác định source data ban đầu
     let sourceData = currentSource === 'emotion' ? recommendedDrinks : drinks;
@@ -1011,21 +1011,15 @@ export default function BookingDrinkScreen() {
     setSelectedEmotion('');
     
     try {
-      // Thêm timeout để tránh trường hợp API bị treo
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Request timeout'));
-        }, 30000);
-      });
-
-      // Race giữa API call và timeout
-      const response = await Promise.race([
-        emotionService.getDrinkRecommendations(
-          emotionText,
-          params.id as string
-        ),
-        timeoutPromise
-      ]);
+      const response = await emotionService.getDrinkRecommendations(
+        emotionText,
+        params.id as string,
+        // Thêm callback để tắt animation khi nhấn Đóng
+        () => {
+          setIsLoadingRecommendation(false);
+          setIsAnalyzing(false);
+        }
+      );
       
       if (response && Array.isArray(response)) {
         const recommendedDrinksList = response.map((item: EmotionResponseItem) => item.drink);
@@ -1042,21 +1036,11 @@ export default function BookingDrinkScreen() {
       }
     } catch (error) {
       console.error('Error:', error);
-      // Đảm bảo tắt GlassOverlay trước khi hiển thị Alert
       setIsAnalyzing(false);
       setIsLoadingRecommendation(false);
-      
-      // Hin thị thông báo lỗi sau khi đã tắt GlassOverlay
-      setTimeout(() => {
-        Alert.alert(
-          'Lỗi',
-          'Không thể lấy được gợi ý thức uống. Vui lòng thử lại sau.'
-        );
-      }, 100);
-      return; // Thoát sớm để không chạy vào finally
+      return;
     }
     
-    // Chỉ chạy khi thành công
     setIsAnalyzing(false);
     setIsLoadingRecommendation(false);
   };

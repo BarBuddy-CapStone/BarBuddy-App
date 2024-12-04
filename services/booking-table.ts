@@ -121,7 +121,7 @@ class BookingTableService {
     }, 'Không thể tìm bàn trống. Vui lòng thử lại sau.');
   }
 
-  async bookTable(request: BookingTableRequest) {
+  async bookTable(request: BookingTableRequest, onCancel?: () => void) {
     return handleConnectionError(async () => {
       try {
         const headers = await this.getAuthHeader();
@@ -131,10 +131,10 @@ class BookingTableService {
         console.error('Error booking table:', error);
         throw error;
       }
-    }, 'Không thể đặt bàn. Vui lòng thử lại sau.');
+    }, 'Không thể đặt bàn. Vui lòng thử lại sau.', onCancel);
   }
 
-  async bookTableWithDrinks(request: BookingDrinkRequest) {
+  async bookTableWithDrinks(request: BookingDrinkRequest, onCancel?: () => void) {
     return handleConnectionError(async () => {
       try {
         const headers = await this.getAuthHeader();
@@ -144,7 +144,7 @@ class BookingTableService {
         console.error('Error booking table with drinks:', error);
         throw error;
       }
-    }, 'Không thể đặt bàn và đồ uống. Vui lòng thử lại sau.');
+    }, 'Không thể đặt bàn và đồ uống. Vui lòng thử lại sau.', onCancel);
   }
 
   async getHoldTable(params: GetHoldTableParams): Promise<HoldTableInfo[]> {

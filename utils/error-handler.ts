@@ -3,7 +3,8 @@ import NetInfo from '@react-native-community/netinfo';
 
 export const handleConnectionError = async (
   callback: () => Promise<any>,
-  errorMessage: string = 'Không thể kết nối đến máy chủ'
+  errorMessage: string = 'Không thể kết nối đến máy chủ',
+  onCancel?: () => void
 ) => {
   try {
     const netInfo = await NetInfo.fetch();
@@ -13,11 +14,18 @@ export const handleConnectionError = async (
           'Lỗi kết nối',
           'Không có kết nối internet. Vui lòng kiểm tra lại kết nối của bạn.',
           [
-            { text: 'Đóng', style: 'cancel' },
+            { 
+              text: 'Đóng', 
+              style: 'cancel',
+              onPress: () => {
+                onCancel?.();
+                resolve(null);
+              }
+            },
             {
               text: 'Thử lại',
               onPress: async () => {
-                resolve(await handleConnectionError(callback, errorMessage));
+                resolve(await handleConnectionError(callback, errorMessage, onCancel));
               },
             },
           ]
@@ -32,11 +40,18 @@ export const handleConnectionError = async (
         'Lỗi kết nối',
         errorMessage,
         [
-          { text: 'Đóng', style: 'cancel' },
+          { 
+            text: 'Đóng', 
+            style: 'cancel',
+            onPress: () => {
+              onCancel?.();
+              resolve(null);
+            }
+          },
           {
             text: 'Thử lại',
             onPress: async () => {
-              resolve(await handleConnectionError(callback, errorMessage));
+              resolve(await handleConnectionError(callback, errorMessage, onCancel));
             },
           },
         ]

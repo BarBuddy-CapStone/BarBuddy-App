@@ -563,7 +563,7 @@ export default function BookingTableScreen() {
         return {
           id: table.tableId,
           name: table.tableName,
-          // Nếu bàn được giữ bởi người khác hoặc đã được đặt -> booked
+          // Nếu bàn đ��ợc giữ bởi người khác hoặc đã được đặt -> booked
           status: (heldTable && heldTable.accountId !== user?.accountId) || table.status !== 1 
             ? 'booked' as const 
             : 'available' as const,
@@ -642,7 +642,7 @@ export default function BookingTableScreen() {
       // Hiển thị thông báo lỗi
       Alert.alert(
         'Lỗi',
-        error instanceof Error ? error.message : 'Không thể thực hiện thao tác. Vui lòng thử lại.'
+        error instanceof Error ? error.message : 'Không thể thực hiện thao tác. Vui lòng thử l��i.'
       );
     } finally {
       setLoadingTables(prev => ({
@@ -831,18 +831,25 @@ export default function BookingTableScreen() {
         tableIds: selectedTables.map(table => table.id)
       };
 
-      await bookingTableService.bookTable(bookingRequest);
+      await bookingTableService.bookTable(
+        bookingRequest,
+        // Thêm callback để tắt animation khi nhấn Đóng
+        () => {
+          setIsBooking(false);
+          setShowProcessingModal(false);
+          setBookingStatus('processing');
+        }
+      );
+      
       setBookingStatus('success');
       
-      // Thay đổi cách navigation
       setTimeout(() => {
         setShowProcessingModal(false);
-        // Replace thay vì push để không thể back lại
         router.replace({
           pathname: '/(tabs)/booking-history',
           params: { 
             reload: 'true',
-            fromBooking: 'true' // Thêm param để biết là từ booking
+            fromBooking: 'true'
           }
         });
       }, 1500);
@@ -1070,7 +1077,7 @@ export default function BookingTableScreen() {
       'keyboardDidShow',
       () => {
         setKeyboardVisible(true);
-        // Đợi một chút để bàn phím hiện lên hoàn toàn
+        // Đợi một chút để bàn phím hi���n lên hoàn toàn
         setTimeout(scrollToNoteInput, 250);
       }
     );

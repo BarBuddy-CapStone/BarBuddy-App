@@ -220,17 +220,19 @@ const OrderSummaryModal = ({
   );
 };
 
-// Cập nhật LoadingPopup component
+// Cập nhật LoadingPopup component để có width nhỏ hơn
 const LoadingPopup = ({ 
   visible, 
-  status = 'loading' 
+  status = 'loading',
+  errorMessage = '' 
 }: { 
   visible: boolean;
   status?: LoadingStatus;
+  errorMessage?: string;
 }) => (
   <Modal transparent visible={visible}>
     <View className="flex-1 bg-black/50 items-center justify-center">
-      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
         {status === 'loading' && (
           <>
             <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
@@ -266,7 +268,7 @@ const LoadingPopup = ({
               Đặt món thất bại
             </Text>
             <Text className="text-white/60 text-center text-sm mt-2">
-              Vui lòng thử lại sau
+              {errorMessage || 'Vui lòng thử lại sau'}
             </Text>
           </>
         )}
@@ -541,7 +543,7 @@ export default function OrderDrinkScreen() {
       );
     }
 
-    // 3. Cu��i cùng lọc theo search text
+    // 3. Cuối cùng lọc theo search text
     if (searchText) {
       filtered = filtered.filter(
         drink => drink.drinkName.toLowerCase().includes(searchText.toLowerCase())
@@ -1156,6 +1158,9 @@ export default function OrderDrinkScreen() {
   const [showConfirmPopup, setShowConfirmPopup] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Thêm state để lưu error message
+  const [errorMessage, setErrorMessage] = useState('');
+
   // Cập nhật hàm handleConfirmOrder
   const handleConfirmOrder = useCallback(async () => {
     if (selectedDrinks.size === 0) return;
@@ -1166,6 +1171,8 @@ export default function OrderDrinkScreen() {
   const handleProcessOrder = async () => {
     try {
       setIsProcessing(true);
+      // Tắt popup xác nhận trước khi hiển thị loading popup
+      setShowConfirmPopup(false);
       setLoadingStatus('loading');
       setShowLoadingPopup(true);
       
@@ -1174,32 +1181,43 @@ export default function OrderDrinkScreen() {
         quantity
       }));
 
-      const success = await bookingService.orderExtraDrinks(bookingId as string, orderRequest);
+      const result = await bookingService.orderExtraDrinks(bookingId as string, orderRequest);
       
-      if (success) {
+      if (result.success) {
         setLoadingStatus('success');
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        setSelectedDrinks(new Map());
-        setIsOrderSummaryVisible(false);
-        
-        // Sử dụng replace thay vì push
-        router.replace({
-          pathname: `/booking-detail/${bookingId}` as any,
-          params: { 
-            reload: 'true',
-            preventBack: 'true'
-          }
-        });
+        setTimeout(() => {
+          setSelectedDrinks(new Map());
+          setIsOrderSummaryVisible(false);
+          
+          router.replace({
+            pathname: `/booking-detail/${bookingId}` as any,
+            params: { 
+              reload: 'true',
+              preventBack: 'true'
+            }
+          });
+        }, 1500);
+      } else {
+        setLoadingStatus('error');
+        setErrorMessage(result.message || 'Không thể đặt thêm đồ uống');
+        // Không tắt loading popup ngay, để hiển thị trạng thái lỗi
+        setTimeout(() => {
+          setShowLoadingPopup(false);
+          setLoadingStatus('loading');
+          setErrorMessage('');
+        }, 1500);
       }
     } catch (error: any) {
       setLoadingStatus('error');
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      Alert.alert('Lỗi', error.message || 'Không thể đặt thêm đồ uống');
+      setErrorMessage('Không thể đặt thêm đồ uống');
+      // Không tắt loading popup ngay, để hiển thị trạng thái lỗi
+      setTimeout(() => {
+        setShowLoadingPopup(false);
+        setLoadingStatus('loading');
+        setErrorMessage('');
+      }, 1500);
     } finally {
-      setShowConfirmPopup(false);
       setIsProcessing(false);
-      setShowLoadingPopup(false);
-      setLoadingStatus('loading');
     }
   };
 
@@ -1798,6 +1816,7 @@ export default function OrderDrinkScreen() {
       <LoadingPopup 
         visible={showLoadingPopup} 
         status={loadingStatus}
+        errorMessage={errorMessage}
       />
       <ConfirmationPopup
         visible={showConfirmPopup}

@@ -167,15 +167,11 @@ class BookingService {
     }, 'Không thể hủy đặt bàn. Vui lòng thử lại sau.');
   }
 
-  async orderExtraDrinks(bookingId: string, drinks: ExtraDrinkRequest[]): Promise<boolean> {
+  async orderExtraDrinks(bookingId: string, drinks: ExtraDrinkRequest[]): Promise<{success: boolean; message?: string}> {
     return handleConnectionError(async () => {
       try {
-        // Lấy token hiện tại
         const accessToken = await AsyncStorage.getItem('accessToken');
 
-        console.log(bookingId);
-        console.log(drinks);
-  
         const response = await api.post(
           `/api/Booking/extra-drink/${bookingId}`,
           drinks,
@@ -188,11 +184,15 @@ class BookingService {
           }
         );
 
-        console.log(response);
-  
-        // Nếu token hết hạn
+        // Kiểm tra các trường hợp lỗi
+        if (response.status === 400) {
+          return {
+            success: false,
+            message: response.data.message || 'Không thể đặt thêm đồ uống'
+          };
+        }
+
         if (response.status === 401) {
-          // Đợi kết quả của request mới sau khi refresh token
           const retryResponse = await api.post(
             `/api/Booking/extra-drink/${bookingId}`,
             drinks,
@@ -203,21 +203,27 @@ class BookingService {
             }
           );
           
-          return retryResponse.status === 200;
+          if (retryResponse.status !== 200) {
+            return {
+              success: false,
+              message: retryResponse.data.message || 'Không thể đặt thêm đồ uống'
+            };
+          }
         }
-  
-        if (response.status === 404) {
-          throw new Error('Không tìm thấy booking');
+
+        if (response.status !== 200) {
+          return {
+            success: false,
+            message: response.data.message || 'Không thể đặt thêm đồ uống'
+          };
         }
-  
-        if (response.status === 500) {
-          throw new Error('Lỗi server');
-        }
-  
-        return response.status === 200;
+
+        return { success: true };
       } catch (error: any) {
-        console.error('Error ordering extra drinks:', error);
-        throw error;
+        return {
+          success: false,
+          message: error.response?.data?.message || 'Không thể đặt thêm đồ uống'
+        };
       }
     }, 'Không thể đặt thêm đồ uống. Vui lòng thử lại sau.');
   }

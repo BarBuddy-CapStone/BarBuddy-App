@@ -242,7 +242,7 @@ const ExtraDrinksList = ({ drinks }: { drinks: BookingExtraDrink[] }) => (
                       color="#9CA3AF" 
                     />
                     <Text className="text-gray-400 text-xs ml-1">
-                      Nhân viên phục vụ: #{drink.staffId.slice(-6)}
+                      Nhân viên phục vụ: {drink.staffName}
                     </Text>
                   </View>
                 </View>
@@ -288,6 +288,15 @@ const BookingInfo = ({ booking }: { booking: BookingDetail }) => (
           </View>
           <Text className="text-white ml-3">
             {booking.bookingTime.slice(0, 5)}
+          </Text>
+        </View>
+
+        <View className="flex-row items-center">
+          <View className="w-8 h-8 rounded-full bg-white/10 items-center justify-center">
+            <Ionicons name="people-outline" size={18} color="#ffffff" />
+          </View>
+          <Text className="text-white ml-3">
+            {booking.numOfPeople} khách hàng
           </Text>
         </View>
       </View>
@@ -739,7 +748,7 @@ export default function BookingDetailScreen() {
         setShowRatingModal(false);
         setRatingStatus('idle');
         
-        // Cập nhật lại booking để hiển thị n��t xem đánh giá
+        // Cập nhật lại booking để hiển thị nội dung xem đánh giá
         if (booking) {
           setBooking({
             ...booking,
@@ -1042,7 +1051,7 @@ export default function BookingDetailScreen() {
                             setErrorMessage('');
                           }}
                         >
-                          <Text className="text-black font-semibold text-center">Th��� lại</Text>
+                          <Text className="text-black font-semibold text-center">Thử lại</Text>
                         </TouchableOpacity>
                       </View>
                     </>

@@ -241,6 +241,17 @@ export default function BookingTableScreen() {
   const [selectedTableDetails, setSelectedTableDetails] = useState<TableDetail[]>([]);
   const [isLoadingTableDetails, setIsLoadingTableDetails] = useState(false);
 
+  // Thêm state mới
+  const [numOfPeople, setNumOfPeople] = useState<number>(1);
+
+  // Thêm state để quản lý modal chọn số khách hàng
+  const [showPeoplePickerModal, setShowPeoplePickerModal] = useState(false);
+
+  // Thêm hàm tạo danh sách số khách hàng từ 1-100
+  const generatePeopleOptions = () => {
+    return Array.from({ length: 30 }, (_, i) => i + 1);
+  };
+
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
     if (!barDetail?.barTimeResponses) {
       return [];
@@ -568,7 +579,7 @@ export default function BookingTableScreen() {
         return {
           id: table.tableId,
           name: table.tableName,
-          // Nếu bàn đ��ợc giữ bởi người khác hoặc đã được đặt -> booked
+          // Nếu bàn đ��ợc giữ bởi khách hàng khác hoặc đã được đặt -> booked
           status: (heldTable && heldTable.accountId !== user?.accountId) || table.status !== 1 
             ? 'booked' as const 
             : 'available' as const,
@@ -602,8 +613,12 @@ export default function BookingTableScreen() {
     }
   }, [selectedTime, selectedTableType]);
 
+  // Thêm state để lưu cache thông tin bàn
+  const [tableDetailsCache, setTableDetailsCache] = useState<{ [key: string]: TableDetail }>({});
+
+  // Sửa lại hàm handleTableSelection
   const handleTableSelection = async (table: TableUI) => {
-    if (loadingTables[table.id]) return; // Nếu đang loading thì không làm gì
+    if (loadingTables[table.id]) return;
 
     setLoadingTables(prev => ({
       ...prev,
@@ -625,6 +640,12 @@ export default function BookingTableScreen() {
         // Release table
         await bookingTableService.releaseTable(request);
         setSelectedTables(prev => prev.filter(t => t.id !== table.id));
+        // Xóa cache khi release bàn
+        setTableDetailsCache(prev => {
+          const newCache = { ...prev };
+          delete newCache[table.id];
+          return newCache;
+        });
       } else {
         // Check max tables
         if (selectedTables.length >= MAX_TABLES) {
@@ -632,8 +653,23 @@ export default function BookingTableScreen() {
           return;
         }
 
-        // Hold table
-        await bookingTableService.holdTable(request);
+        // Hold table và fetch thông tin chi tiết
+        await Promise.all([
+          bookingTableService.holdTable(request),
+          (async () => {
+            // Chỉ fetch nếu chưa có trong cache
+            if (!tableDetailsCache[table.id]) {
+              const details = await tableService.getTableDetails([table.id]);
+              if (details.length > 0) {
+                setTableDetailsCache(prev => ({
+                  ...prev,
+                  [table.id]: details[0]
+                }));
+              }
+            }
+          })()
+        ]);
+
         const tableTypeInfo = tableTypes.find(t => t.tableTypeId === table.typeId);
         setSelectedTables(prev => [...prev, {
           id: table.id,
@@ -644,10 +680,9 @@ export default function BookingTableScreen() {
       }
     } catch (error) {
       console.error('Error handling table selection:', error);
-      // Hiển thị thông báo lỗi
       Alert.alert(
         'Lỗi',
-        error instanceof Error ? error.message : 'Không thể thực hiện thao tác. Vui lòng thử l��i.'
+        error instanceof Error ? error.message : 'Không thể thực hiện thao tác. Vui lòng thử lại.'
       );
     } finally {
       setLoadingTables(prev => ({
@@ -678,14 +713,19 @@ export default function BookingTableScreen() {
 
       await bookingTableService.releaseTable(request);
       
-      // Cập nhật UI sau khi release thành công
+      // Cập nhật UI và xóa cache
       setSelectedTables(prev => {
         const newSelectedTables = prev.filter(t => t.id !== tableId);
-        // Nếu không còn bàn nào, đóng modal
         if (newSelectedTables.length === 0) {
           setShowSelectedTablesModal(false);
         }
         return newSelectedTables;
+      });
+
+      setTableDetailsCache(prev => {
+        const newCache = { ...prev };
+        delete newCache[tableId];
+        return newCache;
       });
 
       setAvailableTables(prev => prev.map(table => {
@@ -793,7 +833,6 @@ export default function BookingTableScreen() {
       ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
       : format(selectedDate, 'yyyy-MM-dd');
 
-    // Tạo thông tin chi tiết bàn
     const selectedTablesInfo: SelectedTableInfo[] = selectedTables.map(table => ({
       id: table.id,
       name: table.name,
@@ -806,11 +845,12 @@ export default function BookingTableScreen() {
       params: {
         id: id as string,
         tableIds: JSON.stringify(selectedTables.map(table => table.id)),
-        selectedTables: JSON.stringify(selectedTablesInfo), // Truyền thông tin chi tiết bàn
+        selectedTables: JSON.stringify(selectedTablesInfo),
         bookingDate: bookingDate,
         bookingTime: selectedTime.replace(' (+1 ngày)', '') + ':00',
         note: note,
-        discount: barDetail?.discount || 0
+        discount: barDetail?.discount || 0,
+        numOfPeople: numOfPeople // Thêm số người vào params
       }
     });
   };
@@ -833,7 +873,8 @@ export default function BookingTableScreen() {
         bookingDate,
         bookingTime: selectedTime.replace(' (+1 ngày)', '') + ':00',
         note: note,
-        tableIds: selectedTables.map(table => table.id)
+        tableIds: selectedTables.map(table => table.id),
+        numOfPeople: numOfPeople // Thêm số khách hàng
       };
 
       await bookingTableService.bookTable(
@@ -1174,7 +1215,7 @@ export default function BookingTableScreen() {
       return selectedTime.replace(' (+1 ngày)', '') + ':00';
     };
 
-    // Xử lý khi có bàn được giữ bởi người khác
+    // Xử lý khi có bàn được giữ bởi khách hàng khác
     const unsubscribeTableHold = bookingSignalRService.onTableHold((event: TableHoldEvent) => {
       console.log('Current user:', user.accountId);
       console.log('Event user:', event.accountId);
@@ -1183,7 +1224,7 @@ export default function BookingTableScreen() {
       console.log('Event date:', event.date);
       console.log('Event time:', event.time);
 
-      // Chỉ xử lý nếu event từ người khác và liên quan đến thời gian hiện tại
+      // Chỉ xử lý nếu event từ khách hàng khác và liên quan đến thời gian hiện tại
       if (
         event.accountId !== user.accountId && // Thêm điều kiện này
         event.date === getCurrentBookingDate() &&
@@ -1212,9 +1253,9 @@ export default function BookingTableScreen() {
       }
     });
 
-    // Xử lý khi có bàn được release bởi người khác
+    // Xử lý khi có bàn được release bởi khách hàng khác
     const unsubscribeTableRelease = bookingSignalRService.onTableRelease((event: TableHoldEvent) => {
-      // Chỉ xử lý nếu event từ người khác và liên quan đến thời gian hiện tại
+      // Chỉ xử lý nếu event từ khách hàng khác và liên quan đến thời gian hiện tại
       if (
         event.accountId !== user.accountId && // Thêm điều kiện này
         event.date === getCurrentBookingDate() &&
@@ -1316,8 +1357,24 @@ export default function BookingTableScreen() {
       if (showSelectedTablesModal && selectedTables.length > 0) {
         setIsLoadingTableDetails(true);
         try {
-          const details = await tableService.getTableDetails(selectedTables.map(t => t.id));
-          setSelectedTableDetails(details);
+          // Lọc ra các bàn chưa có trong cache
+          const uncachedTableIds = selectedTables
+            .filter(table => !tableDetailsCache[table.id])
+            .map(table => table.id);
+
+          if (uncachedTableIds.length > 0) {
+            const details = await tableService.getTableDetails(uncachedTableIds);
+            // Cập nhật cache với thông tin mới
+            const newCache = { ...tableDetailsCache };
+            details.forEach(detail => {
+              newCache[detail.tableId] = detail;
+            });
+            setTableDetailsCache(newCache);
+          }
+
+          // Lấy thông tin chi tiết từ cache
+          const allDetails = selectedTables.map(table => tableDetailsCache[table.id]).filter(Boolean);
+          setSelectedTableDetails(allDetails);
         } catch (error) {
           console.error('Error loading table details:', error);
         } finally {
@@ -1327,7 +1384,7 @@ export default function BookingTableScreen() {
     };
 
     loadTableDetails();
-  }, [showSelectedTablesModal, selectedTables]);
+  }, [showSelectedTablesModal, selectedTables, tableDetailsCache]);
 
   return (
     <View className="flex-1 bg-black">
@@ -1518,7 +1575,7 @@ export default function BookingTableScreen() {
                 </View>
               ) : (
                 <View className="items-center py-4">
-                  <Text className="text-white/60">Không thể tải thông tin người dùng</Text>
+                  <Text className="text-white/60">Không thể tải thông tin khách hàng dùng</Text>
                 </View>
               )}
             </View>
@@ -1602,6 +1659,46 @@ export default function BookingTableScreen() {
                           <Ionicons name="time-outline" size={20} color="#9CA3AF" />
                         </TouchableOpacity>
                       </View>
+                    </View>
+
+                    {/* Thêm phần chọn số khách hàng */}
+                    <View className="mt-6">
+                      <Text className="text-white text-base font-bold mb-3">Số khách hàng</Text>
+                      <TouchableOpacity
+                        onPress={() => setShowPeoplePickerModal(true)}
+                        className="bg-white/10 p-4 rounded-xl flex-row items-center justify-between"
+                      >
+                        <View className="flex-row items-center">
+                          <Ionicons name="people-outline" size={20} color="#9CA3AF" />
+                          <Text className="text-white ml-2">
+                            {numOfPeople} khách hàng
+                          </Text>
+                        </View>
+                        <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
+                      </TouchableOpacity>
+
+                      {/* Gợi ý về số khách hàng */}
+                      {selectedTables.length > 0 && (
+                        <View className="mt-2 bg-yellow-500/10 rounded-lg p-3">
+                          <View className="flex-row items-start">
+                            <Ionicons name="information-circle" size={18} color="#EAB308" />
+                            <Text className="text-yellow-500/80 text-sm ml-2 flex-1">
+                              {selectedTables.length === 1 
+                                ? `Bàn đã chọn phù hợp cho ${
+                                    tableDetailsCache[selectedTables[0].id]?.minimumGuest || 0
+                                  } - ${
+                                    tableDetailsCache[selectedTables[0].id]?.maximumGuest || 0
+                                  } khách hàng`
+                                : `Các bàn đã chọn có thể phục vụ tối đa ${
+                                    selectedTables.reduce((sum, table) => 
+                                      sum + (tableDetailsCache[table.id]?.maximumGuest || 0)
+                                    , 0)
+                                  } khách hàng`
+                              }
+                            </Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
 
                     {/* Chọn loại bàn */}
@@ -1692,7 +1789,7 @@ export default function BookingTableScreen() {
                                 </View>
                                 <View className="bg-white/10 rounded-lg py-2 px-3">
                                   <Text className="text-white font-medium">
-                                    {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.minimumGuest || 0} người
+                                    {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.minimumGuest || 0} khách hàng
                                   </Text>
                                 </View>
                               </View>
@@ -1704,7 +1801,7 @@ export default function BookingTableScreen() {
                                 </View>
                                 <View className="bg-white/10 rounded-lg py-2 px-3">
                                   <Text className="text-white font-medium">
-                                    {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.maximumGuest || 0} người
+                                    {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.maximumGuest || 0} khách hàng
                                   </Text>
                                 </View>
                               </View>
@@ -1949,6 +2046,58 @@ export default function BookingTableScreen() {
           </View>
         </Modal>
 
+        {/* Thêm Modal chọn số khách hàng */}
+        <Modal
+          visible={showPeoplePickerModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowPeoplePickerModal(false)}
+        >
+          <View className="flex-1 justify-end bg-black/50">
+            <View className="bg-neutral-800 rounded-t-3xl">
+              {/* Header */}
+              <View className="flex-row justify-between items-center p-4 border-b border-white/10">
+                <TouchableOpacity onPress={() => setShowPeoplePickerModal(false)}>
+                  <Text className="text-white">Hủy</Text>
+                </TouchableOpacity>
+                <Text className="text-white font-bold">Chọn số lượng khách hàng</Text>
+                <TouchableOpacity onPress={() => setShowPeoplePickerModal(false)}>
+                  <Text className="text-yellow-500 font-bold">Xong</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Content */}
+              <ScrollView 
+                className="max-h-96"
+                showsVerticalScrollIndicator={false}
+              >
+                <View className="p-4">
+                  {generatePeopleOptions().map((number) => (
+                    <TouchableOpacity
+                      key={number}
+                      onPress={() => {
+                        setNumOfPeople(number);
+                        setShowPeoplePickerModal(false);
+                      }}
+                      className={`p-4 rounded-xl mb-2 ${
+                        numOfPeople === number ? 'bg-yellow-500' : 'bg-white/10'
+                      }`}
+                    >
+                      <Text 
+                        className={`text-center ${
+                          numOfPeople === number ? 'text-black font-medium' : 'text-white'
+                        }`}
+                      >
+                        {number} khách hàng
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
         {/* Footer hiển thị bàn đã chọn */}
         {selectedTables.length > 0 && !keyboardVisible && (
           <Animated.View 
@@ -2147,7 +2296,7 @@ export default function BookingTableScreen() {
                             <View className="ml-3">
                               <Text className="text-white/60 text-xs">Số khách</Text>
                               <Text className="text-white">
-                                {table.minimumGuest} - {table.maximumGuest} người
+                                {table.minimumGuest} - {table.maximumGuest} khách hàng
                               </Text>
                             </View>
                           </View>
@@ -2239,6 +2388,13 @@ export default function BookingTableScreen() {
                       <Ionicons name="time-outline" size={20} color="#ffffff" />
                       <Text className="text-white ml-2">
                         {selectedTime.replace(' (+1 ngày)', '')}
+                      </Text>
+                    </View>
+
+                    <View className="flex-row items-center mb-3">
+                      <Ionicons name="people-outline" size={20} color="#ffffff" />
+                      <Text className="text-white ml-2">
+                        {numOfPeople} khách hàng
                       </Text>
                     </View>
 

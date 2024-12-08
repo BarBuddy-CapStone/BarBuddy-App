@@ -184,6 +184,14 @@ export default function PaymentDetailScreen() {
             </Text>
           </View>
 
+          {/* Thêm số người */}
+          <View className="flex-row items-center">
+            <Ionicons name="people-outline" size={20} color="#ffffff" />
+            <Text className="text-white ml-2">
+              {bookingRequestState.numOfPeople} khách hàng
+            </Text>
+          </View>
+
           {/* Số bàn */}
           <View className="flex-row items-center">
             <MaterialCommunityIcons
@@ -410,7 +418,7 @@ export default function PaymentDetailScreen() {
   );
 
   const PaymentMethods = () => {
-    const [selectedMethod, setSelectedMethod] = useState<"MOMO" | "VNPAY">("VNPAY");
+    const [selectedMethod, setSelectedMethod] = useState<"VNPAY">("VNPAY");
 
     return (
       <View className="px-4 mb-4">
@@ -419,64 +427,29 @@ export default function PaymentDetailScreen() {
             Phương thức thanh toán
           </Text>
 
-          <View className="space-y-3">
-            {/* VNPAY */}
-            <TouchableOpacity
-              onPress={() => {
-                setSelectedMethod("VNPAY");
-                bookingRequestState.paymentDestination = "VNPAY";
-              }}
-              className={`flex-row items-center p-3 rounded-xl ${
-                selectedMethod === "VNPAY"
-                  ? "bg-white/10"
-                  : "border border-white/10"
-              }`}
-            >
-              <Image
-                source={require("@/assets/images/vnpay-logo.png")}
-                className="w-8 h-8"
-                resizeMode="contain"
-              />
-              <View className="flex-1 ml-3">
-                <Text className="text-white font-medium">VNPAY</Text>
-                <Text className="text-white/60 text-xs">
-                  Thanh toán qua VNPAY QR
-                </Text>
-              </View>
-              <View
-                className={`w-6 h-6 rounded-full border-2 items-center justify-center ${
-                  selectedMethod === "VNPAY"
-                    ? "border-yellow-500 bg-yellow-500"
-                    : "border-white/30"
-                }`}
-              >
-                {selectedMethod === "VNPAY" && (
-                  <Ionicons name="checkmark" size={14} color="black" />
-                )}
-              </View>
-            </TouchableOpacity>
-
-            {/* MOMO */}
-            <TouchableOpacity
-              disabled={true}
-              className="flex-row items-center p-3 rounded-xl border border-white/5 opacity-50"
-            >
-              <Image
-                source={require("@/assets/images/momo-logo.png")}
-                className="w-8 h-8"
-                resizeMode="contain"
-              />
-              <View className="flex-1 ml-3">
-                <Text className="text-white/60 font-medium">
-                  MoMo (Chưa khả dụng)
-                </Text>
-                <Text className="text-white/40 text-xs">
-                  Thanh toán qua ví MoMo
-                </Text>
-              </View>
-              <View className="w-6 h-6 rounded-full border-2 border-white/10 items-center justify-center" />
-            </TouchableOpacity>
-          </View>
+          {/* VNPAY */}
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedMethod("VNPAY");
+              bookingRequestState.paymentDestination = "VNPAY";
+            }}
+            className="flex-row items-center p-3 rounded-xl bg-white/10"
+          >
+            <Image
+              source={require("@/assets/images/vnpay-logo.png")}
+              className="w-8 h-8"
+              resizeMode="contain"
+            />
+            <View className="flex-1 ml-3">
+              <Text className="text-white font-medium">VNPAY</Text>
+              <Text className="text-white/60 text-xs">
+                Thanh toán qua VNPAY QR
+              </Text>
+            </View>
+            <View className="w-6 h-6 rounded-full border-2 border-yellow-500 bg-yellow-500 items-center justify-center">
+              <Ionicons name="checkmark" size={14} color="black" />
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -664,8 +637,7 @@ export default function PaymentDetailScreen() {
 
           {/* Điều khoản */}
           <Text className="text-white/60 text-sm px-4 mb-6 text-center">
-            Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản đặt bàn của
-            chúng tôi
+            Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản đặt bàn của chúng tôi
           </Text>
         </ScrollView>
 

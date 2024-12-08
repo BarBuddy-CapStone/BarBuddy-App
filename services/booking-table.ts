@@ -32,6 +32,7 @@ export interface BookingTableRequest {
     bookingTime: string; // Format: HH:mm
     note: string;
     tableIds: string[];
+    numOfPeople: number;
 }
 
 export interface DrinkOrderItem {
@@ -51,6 +52,7 @@ export interface BookingDrinkRequest {
   bookingDate: string;
   bookingTime: string;
   note: string;
+  numOfPeople: number;
   voucherCode: string | null;
   tableIds: string[];
   selectedTables: SelectedTableInfo[];

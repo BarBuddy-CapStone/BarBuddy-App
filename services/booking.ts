@@ -44,6 +44,7 @@ export interface BookingExtraDrink {
   updatedDate: string | null;
   customerId: string | null;
   staffId: string | null;
+  staffName: string | null;
   bookingExtraDrinkId: string;
 }
 
@@ -66,6 +67,7 @@ export interface BookingDetail {
   images: string[];
   status: number;
   isRated: boolean | null;
+  numOfPeople: number;
   tableNameList: string[];
   bookingDrinksList: BookingDrink[];
   bookingDrinkExtraResponses: BookingExtraDrink[];

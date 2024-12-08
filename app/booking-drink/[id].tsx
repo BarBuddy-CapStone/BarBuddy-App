@@ -70,7 +70,8 @@ const OrderSummaryModal = ({
   originalPrice,
   discount,
   handleBooking,
-  isBooking
+  isBooking,
+  checkDrinkQuantity
 }: {
   isVisible: boolean;
   onClose: () => void;
@@ -83,6 +84,7 @@ const OrderSummaryModal = ({
   discount: number;
   handleBooking: () => void;
   isBooking: boolean;
+  checkDrinkQuantity: () => Promise<boolean>;
 }) => {
   const selectedDrinksList = useMemo(() => 
     Array.from(selectedDrinks.entries())
@@ -103,10 +105,8 @@ const OrderSummaryModal = ({
   const handleConfirmBooking = useCallback(async () => {
     try {
       await handleBooking();
-      // Đóng modal sau khi đặt hàng thành công
       onClose();
     } catch (error) {
-      // Xử lý lỗi nếu cần
       console.error('Booking error:', error);
     }
   }, [handleBooking, onClose]);
@@ -243,6 +243,73 @@ const OrderSummaryModal = ({
   );
 };
 
+// Cập nhật DrinkQuantityModal để giống với ConfirmationPopup
+const DrinkQuantityModal = ({
+  isVisible,
+  onClose,
+  totalDrinks,
+  numOfPeople,
+  onContinue,
+  onAddMore
+}: {
+  isVisible: boolean;
+  onClose: () => void;
+  totalDrinks: number;
+  numOfPeople: number;
+  onContinue: () => void;
+  onAddMore: () => void;
+}) => {
+  const fadeAnim = useSharedValue(0);
+
+  useEffect(() => {
+    if (isVisible) {
+      fadeAnim.value = withTiming(1, { duration: 200 });
+    } else {
+      fadeAnim.value = withTiming(0, { duration: 200 });
+    }
+  }, [isVisible]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: fadeAnim.value
+  }));
+
+  if (!isVisible && fadeAnim.value === 0) return null;
+
+  return (
+    <Modal transparent visible={isVisible}>
+      <Animated.View 
+        style={[{ flex: 1 }, animatedStyle]} 
+        className="bg-black/50 items-center justify-center"
+      >
+        <View className="bg-neutral-900 rounded-2xl p-6 mx-4 w-[90%] max-w-sm">
+          <Text className="text-white text-lg font-bold text-center mb-2">
+            Xác nhận số lượng
+          </Text>
+          <Text className="text-white/60 text-center mb-6">
+            Bạn đang đặt {totalDrinks} thức uống cho {numOfPeople} người. Bạn có muốn đặt thêm đồ uống không?
+          </Text>
+
+          <View className="flex-row space-x-3">
+            <TouchableOpacity
+              onPress={onAddMore}
+              className="flex-1 bg-white/10 py-3 rounded-xl"
+            >
+              <Text className="text-white text-center font-bold">Đặt thêm</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={onContinue}
+              className="flex-1 bg-yellow-500 py-3 rounded-xl"
+            >
+              <Text className="text-black text-center font-bold">Tiếp tục</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Animated.View>
+    </Modal>
+  );
+};
+
 export default function BookingDrinkScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -287,7 +354,7 @@ export default function BookingDrinkScreen() {
   // Thêm state để theo dõi source data hiện tại
   const [currentSource, setCurrentSource] = useState<'all' | 'emotion'>('all');
 
-  // Sử dụng useMemo để tính to��n danh sách drinks đư���c filter
+  // Sử dụng useMemo để tính toán danh sách drinks được filter
   const displayedDrinks = useMemo(() => {
     // Xác định source data ban đầu
     let sourceData = currentSource === 'emotion' ? recommendedDrinks : drinks;
@@ -389,7 +456,43 @@ export default function BookingDrinkScreen() {
     setSelectedDrinks(new Map(selectedDrinks.set(drinkId, quantity)));
   };
 
-  const handleBooking = () => {
+  // Thêm state để kiểm soát DrinkQuantityModal
+  const [isQuantityModalVisible, setIsQuantityModalVisible] = useState(false);
+  const [quantityModalResolver, setQuantityModalResolver] = useState<((value: boolean) => void) | null>(null);
+
+  // Cập nhật lại hàm checkDrinkQuantity
+  const checkDrinkQuantity = useCallback((): Promise<boolean> => {
+    const numOfPeople = Number(params.numOfPeople);
+    const totalDrinks = Array.from(selectedDrinks.values()).reduce((a, b) => a + b, 0);
+    
+    if (totalDrinks < numOfPeople) {
+      return new Promise<boolean>((resolve) => {
+        setQuantityModalResolver(() => resolve);
+        setIsQuantityModalVisible(true);
+      });
+    }
+    return Promise.resolve(true);
+  }, [selectedDrinks, params.numOfPeople]);
+
+  // Thêm handlers cho modal
+  const handleContinue = useCallback(() => {
+    if (quantityModalResolver) {
+      quantityModalResolver(true);
+      setQuantityModalResolver(null);
+    }
+    setIsQuantityModalVisible(false);
+  }, [quantityModalResolver]);
+
+  const handleAddMore = useCallback(() => {
+    if (quantityModalResolver) {
+      quantityModalResolver(false);
+      setQuantityModalResolver(null);
+    }
+    setIsQuantityModalVisible(false);
+  }, [quantityModalResolver]);
+
+  // Cập nhật lại hàm handleBooking
+  const handleBooking = async () => {
     if (isBooking) return;
     
     const drinks: DrinkOrderItem[] = Array.from(selectedDrinks.entries())
@@ -415,7 +518,8 @@ export default function BookingDrinkScreen() {
       selectedTables: selectedTablesInfo,
       paymentDestination: "VNPAY",
       drinks,
-      voucherCode: params.voucherCode as string || ''
+      voucherCode: params.voucherCode as string || '',
+      numOfPeople: Number(params.numOfPeople)
     };
 
     router.push({
@@ -424,7 +528,8 @@ export default function BookingDrinkScreen() {
         bookingRequest: JSON.stringify(bookingRequest),
         discount: params.discount,
         originalPrice: originalPrice.toString(),
-        totalPrice: totalPrice.toString()
+        totalPrice: totalPrice.toString(),
+        numOfPeople: params.numOfPeople
       }
     });
   };
@@ -933,15 +1038,9 @@ export default function BookingDrinkScreen() {
               'rgba(148, 184, 255, 0.1)',   // Sky blue
               'rgba(41, 171, 255, 0.1)'     // Back to light blue (để tạo gradient liền mạch)
             ]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{ flex: 1 }}
           />
           
           {/* Glass effect overlay */}
@@ -1098,13 +1197,19 @@ export default function BookingDrinkScreen() {
   // Thêm hàm handleConfirmBooking vào component chính
   const handleConfirmBooking = useCallback(async () => {
     try {
+      // Kiểm tra số lượng đồ uống
+      const shouldContinue = await checkDrinkQuantity();
+      if (!shouldContinue) {
+        return;
+      }
+
       await handleBooking();
       setIsOrderSummaryVisible(false);
     } catch (error) {
       console.error('Booking error:', error);
       Alert.alert('Lỗi', 'Không thể đặt món. Vui lòng thử lại.');
     }
-  }, [handleBooking]);
+  }, [handleBooking, checkDrinkQuantity]);
 
   return (
     <View className="flex-1 bg-black">
@@ -1711,6 +1816,15 @@ export default function BookingDrinkScreen() {
         discount={discount}
         handleBooking={handleConfirmBooking}
         isBooking={isBooking}
+        checkDrinkQuantity={checkDrinkQuantity}
+      />
+      <DrinkQuantityModal 
+        isVisible={isQuantityModalVisible}
+        onClose={handleAddMore}
+        totalDrinks={Array.from(selectedDrinks.values()).reduce((a, b) => a + b, 0)}
+        numOfPeople={Number(params.numOfPeople)}
+        onContinue={handleContinue}
+        onAddMore={handleAddMore}
       />
     </View>
   );

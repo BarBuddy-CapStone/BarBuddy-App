@@ -14,21 +14,15 @@ export interface TableType {
 export interface TableTypeResponse {
   statusCode: number;
   message: string;
-  data: {
-    tableTypeResponses: TableType[];
-    totalPages: number;
-    pageIndex: number;
-    pageSize: number;
-    totalItems: number;
-  };
+  data: TableType[];
 }
 
 class TableTypeService {
   async getTableTypesOfBar(barId: string): Promise<TableType[]> {
     return handleConnectionError(async () => {
       try {
-        const response = await api.get<TableTypeResponse>(`/api/TableType/getTTOfBar/${barId}`);
-        return response.data.data.tableTypeResponses;
+        const response = await api.get<TableTypeResponse>(`/api/TableType/Bar?barId=${barId}`);
+        return response.data.data;
       } catch (error) {
         console.error('Error fetching table types of bar:', error);
         return [];

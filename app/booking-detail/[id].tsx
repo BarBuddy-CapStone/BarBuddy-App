@@ -35,6 +35,24 @@ const getStatusText = (status: number): string => {
   }
 };
 
+const getExtraDrinkStatusColor = (status: number): string => {
+  switch (status) {
+    case 0: return 'bg-yellow-500';  // Pending
+    case 1: return 'bg-blue-500';    // Preparing
+    case 2: return 'bg-green-500';   // Delivered
+    default: return 'bg-gray-500';   // Mặc định
+  }
+};
+
+const getExtraDrinkStatusText = (status: number): string => {
+  switch (status) {
+    case 0: return 'Đang chờ';
+    case 1: return 'Đang pha chế';
+    case 2: return 'Đã phục vụ';
+    default: return 'Không xác định';
+  }
+};
+
 const BookingDetailSkeleton = () => (
   <ScrollView className="flex-1">
     <View className="animate-pulse">
@@ -102,25 +120,37 @@ const BookingDetailSkeleton = () => (
 const DrinksList = ({ drinks }: { drinks: BookingDrink[] }) => (
   <View className="px-6 mb-4">
     <View className="bg-neutral-900 rounded-2xl p-4">
-      <Text className="text-white/80 font-semibold mb-4">Thức uống đã đặt trước</Text>
+      {/* Header với icon */}
+      <View className="flex-row items-center mb-4">
+        <View className="w-8 h-8 rounded-full bg-yellow-500/20 items-center justify-center mr-3">
+          <MaterialCommunityIcons name="glass-wine" size={18} color="#EAB308" />
+        </View>
+        <Text className="text-white/80 font-semibold flex-1">
+          Thức uống đã đặt trước
+        </Text>
+      </View>
+
       <View className="space-y-4">
         {drinks.map((drink, index) => (
-          <View key={index} className="flex-row items-center space-x-3">
-            <Image 
-              source={{ uri: drink.image }}
-              className="w-16 h-16 rounded-xl"
-            />
-            <View className="flex-1">
-              <Text className="text-white font-medium text-base">
-                {drink.drinkName}
-              </Text>
-              <Text className="text-white/60 text-sm mt-1">
-                {drink.actualPrice.toLocaleString('vi-VN')}đ x {drink.quantity}
-              </Text>
+          <View key={index} className="bg-white/5 rounded-xl p-3">
+            <View className="flex-row">
+              <Image 
+                source={{ uri: drink.image }}
+                className="w-16 h-16 rounded-xl"
+              />
+              <View className="flex-1 ml-3">
+                <Text 
+                  numberOfLines={2}
+                  ellipsizeMode="tail"
+                  className="text-white font-medium text-base mb-1"
+                >
+                  {drink.drinkName}
+                </Text>
+                <Text className="text-yellow-500 font-semibold">
+                  {drink.actualPrice.toLocaleString('vi-VN')}đ × {drink.quantity}
+                </Text>
+              </View>
             </View>
-            <Text className="text-yellow-500 font-semibold">
-              {(drink.actualPrice * drink.quantity).toLocaleString('vi-VN')}đ
-            </Text>
           </View>
         ))}
       </View>
@@ -132,25 +162,92 @@ const DrinksList = ({ drinks }: { drinks: BookingDrink[] }) => (
 const ExtraDrinksList = ({ drinks }: { drinks: BookingExtraDrink[] }) => (
   <View className="px-6 mb-4">
     <View className="bg-neutral-900 rounded-2xl p-4">
-      <Text className="text-white/80 font-semibold mb-4">Thức uống gọi tại quán</Text>
+      {/* Header với icon */}
+      <View className="flex-row items-center mb-4">
+        <View className="w-8 h-8 rounded-full bg-yellow-500/20 items-center justify-center mr-3">
+          <MaterialCommunityIcons name="glass-cocktail" size={18} color="#EAB308" />
+        </View>
+        <Text className="text-white/80 font-semibold flex-1">
+          Thức uống gọi tại quán
+        </Text>
+      </View>
+
       <View className="space-y-4">
         {drinks.map((drink, index) => (
-          <View key={index} className="flex-row items-center space-x-3">
-            <Image 
-              source={{ uri: drink.image }}
-              className="w-16 h-16 rounded-xl"
-            />
-            <View className="flex-1">
-              <Text className="text-white font-medium text-base">
-                {drink.drinkName}
-              </Text>
-              <Text className="text-white/60 text-sm mt-1">
-                {drink.actualPrice.toLocaleString('vi-VN')}đ x {drink.quantity}
-              </Text>
+          <View 
+            key={index} 
+            className="bg-white/5 rounded-xl overflow-hidden"
+          >
+            {/* Phần trạng thái ở trên cùng */}
+            <View className={`${getExtraDrinkStatusColor(drink.status)} px-3 py-1.5 items-center`}>
+              <View className="flex-row items-center">
+                <MaterialCommunityIcons 
+                  name={
+                    drink.status === 0 ? "timer-sand" : 
+                    drink.status === 1 ? "coffee-outline" : 
+                    "check-circle-outline"
+                  } 
+                  size={14} 
+                  color="black" 
+                />
+                <Text className="text-black font-medium text-xs ml-1">
+                  {getExtraDrinkStatusText(drink.status)}
+                </Text>
+              </View>
             </View>
-            <Text className="text-yellow-500 font-semibold">
-              {(drink.actualPrice * drink.quantity).toLocaleString('vi-VN')}đ
-            </Text>
+
+            {/* Phần thông tin đồ uống */}
+            <View className="p-3">
+              <View className="flex-row">
+                <Image 
+                  source={{ uri: drink.image }}
+                  className="mt-2 w-20 h-20 rounded-xl"
+                />
+                
+                <View className="flex-1 ml-3">
+                  <Text 
+                    numberOfLines={2}
+                    ellipsizeMode="tail"
+                    className="text-white font-medium text-base mb-1"
+                  >
+                    {drink.drinkName}
+                  </Text>
+                  <Text className="text-yellow-500 font-semibold mb-2">
+                    {drink.actualPrice.toLocaleString('vi-VN')}đ × {drink.quantity}
+                  </Text>
+
+                  {/* Thời gian đặt */}
+                  {drink.createdDate && (
+                    <View className="flex-row items-center">
+                      <MaterialCommunityIcons 
+                        name="clock-outline" 
+                        size={14} 
+                        color="#9CA3AF" 
+                      />
+                      <Text className="text-gray-400 text-xs ml-1">
+                        {format(parseISO(drink.createdDate), 'HH:mm - dd/MM/yyyy')}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Thông tin nhân viên phục vụ */}
+              {drink.staffId && drink.status > 0 && (
+                <View className="mt-3 pt-3 border-t border-white/10">
+                  <View className="flex-row items-center">
+                    <MaterialCommunityIcons 
+                      name="account-tie-outline" 
+                      size={14} 
+                      color="#9CA3AF" 
+                    />
+                    <Text className="text-gray-400 text-xs ml-1">
+                      Nhân viên phục vụ: #{drink.staffId.slice(-6)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
           </View>
         ))}
       </View>
@@ -642,7 +739,7 @@ export default function BookingDetailScreen() {
         setShowRatingModal(false);
         setRatingStatus('idle');
         
-        // Cập nhật lại booking để hiển thị nút xem đánh giá
+        // Cập nhật lại booking để hiển thị n��t xem đánh giá
         if (booking) {
           setBooking({
             ...booking,
@@ -945,7 +1042,7 @@ export default function BookingDetailScreen() {
                             setErrorMessage('');
                           }}
                         >
-                          <Text className="text-black font-semibold text-center">Thử lại</Text>
+                          <Text className="text-black font-semibold text-center">Th��� lại</Text>
                         </TouchableOpacity>
                       </View>
                     </>

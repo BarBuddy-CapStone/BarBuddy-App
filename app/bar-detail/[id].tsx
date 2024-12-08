@@ -1589,46 +1589,17 @@ export default function BarDetailScreen() {
                 className="relative"
                 style={[
                   { height: screenWidth / ASPECT_RATIO },
-                  imageAnimatedStyle, // Thêm animation style
+                  imageAnimatedStyle,
                 ]}
               >
-                <FlatList
-                  ref={imageSliderRef}
-                  data={images}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  onMomentumScrollEnd={(event) => {
-                    const newIndex = Math.round(
-                      event.nativeEvent.contentOffset.x / screenWidth
-                    );
-                    setCurrentImageIndex(newIndex);
+                <Image
+                  source={{ uri: images[0] }}
+                  style={{
+                    width: screenWidth,
+                    height: screenWidth / ASPECT_RATIO,
                   }}
-                  renderItem={({ item }) => (
-                    <Image
-                      source={{ uri: item }}
-                      style={{
-                        width: screenWidth,
-                        height: screenWidth / ASPECT_RATIO,
-                      }}
-                      resizeMode="cover"
-                    />
-                  )}
+                  resizeMode="cover"
                 />
-
-                {/* Image Pagination */}
-                <View className="absolute bottom-4 w-full flex-row justify-center space-x-2">
-                  {images.map((_, index) => (
-                    <View
-                      key={index}
-                      className={`w-2 h-2 rounded-full ${
-                        index === currentImageIndex
-                          ? "bg-yellow-500"
-                          : "bg-white/50"
-                      }`}
-                    />
-                  ))}
-                </View>
 
                 {/* Gradient Overlay */}
                 <LinearGradient

@@ -39,6 +39,12 @@ export interface BookingExtraDrink {
   actualPrice: number;
   quantity: number;
   image: string;
+  status: number;
+  createdDate: string | null;
+  updatedDate: string | null;
+  customerId: string | null;
+  staffId: string | null;
+  bookingExtraDrinkId: string;
 }
 
 export interface BookingDetail {

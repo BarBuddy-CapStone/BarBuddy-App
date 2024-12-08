@@ -15,6 +15,7 @@ import { BookingTableFilter, BookingTableRequest, bookingTableService, HoldTable
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingSignalRService, TableHoldEvent } from '@/services/booking-signalr';
 import { AppState, AppStateStatus } from 'react-native';
+import { TableDetail, tableService } from '@/services/table';
 
 // Thêm interface cho state availableTables
 interface TableUI {
@@ -235,6 +236,10 @@ export default function BookingTableScreen() {
 
   // Thêm state để theo dõi trạng thái loading của từng nút xóa
   const [removingTables, setRemovingTables] = useState<{ [key: string]: boolean }>({});
+
+  // Thêm state mới
+  const [selectedTableDetails, setSelectedTableDetails] = useState<TableDetail[]>([]);
+  const [isLoadingTableDetails, setIsLoadingTableDetails] = useState(false);
 
   const generateAvailableTimeSlots = (selectedDate: Date, barDetail: BarDetail) => {
     if (!barDetail?.barTimeResponses) {
@@ -1305,6 +1310,25 @@ export default function BookingTableScreen() {
     };
   }, []);
 
+  // Thêm useEffect để load thông tin chi tiết khi mở modal
+  useEffect(() => {
+    const loadTableDetails = async () => {
+      if (showSelectedTablesModal && selectedTables.length > 0) {
+        setIsLoadingTableDetails(true);
+        try {
+          const details = await tableService.getTableDetails(selectedTables.map(t => t.id));
+          setSelectedTableDetails(details);
+        } catch (error) {
+          console.error('Error loading table details:', error);
+        } finally {
+          setIsLoadingTableDetails(false);
+        }
+      }
+    };
+
+    loadTableDetails();
+  }, [showSelectedTablesModal, selectedTables]);
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1" edges={['top']}>
@@ -1630,18 +1654,78 @@ export default function BookingTableScreen() {
 
                       {/* Mô tả loại bàn */}
                       {showTypeDescription && currentTableType && (
-                        <View className="bg-white/5 rounded-xl mt-4 p-4">
-                          <Text className="text-white font-medium mb-1">
-                            {currentTableType.name}
-                          </Text>
-                          <Text className="text-white/60 text-sm">
-                            {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.description || 'Không có mô tả'}
-                          </Text>
-                        </View>
+                        <Animated.View 
+                          entering={FadeIn}
+                          className="bg-white/5 rounded-xl mt-4 overflow-hidden"
+                        >
+                          {/* Header */}
+                          <View className="bg-white/10 px-4 py-3 flex-row items-center justify-between">
+                            <View className="flex-row items-center">
+                              <MaterialCommunityIcons name="table-furniture" size={20} color="#EAB308" />
+                              <Text className="text-white font-medium ml-2">
+                                {currentTableType.name}
+                              </Text>
+                            </View>
+                            <View className="bg-yellow-500/20 px-2 py-1 rounded">
+                              <Text className="text-yellow-500 text-xs font-medium">
+                                Tối thiểu {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.minimumPrice?.toLocaleString('vi-VN')}đ
+                              </Text>
+                            </View>
+                          </View>
+
+                          {/* Content */}
+                          <View className="p-4 space-y-4">
+                            {/* Mô tả */}
+                            <View>
+                              <Text className="text-white/60 text-sm mb-1">Mô tả</Text>
+                              <Text className="text-white">
+                                {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.description || 'Không có mô tả'}
+                              </Text>
+                            </View>
+
+                            {/* Thông tin khách */}
+                            <View className="flex-row space-x-4">
+                              <View className="flex-1">
+                                <View className="flex-row items-center mb-1">
+                                  <Ionicons name="people-outline" size={14} color="#9CA3AF" />
+                                  <Text className="text-white/60 text-sm ml-1">Số khách tối thiểu</Text>
+                                </View>
+                                <View className="bg-white/10 rounded-lg py-2 px-3">
+                                  <Text className="text-white font-medium">
+                                    {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.minimumGuest || 0} người
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <View className="flex-1">
+                                <View className="flex-row items-center mb-1">
+                                  <Ionicons name="people" size={14} color="#9CA3AF" />
+                                  <Text className="text-white/60 text-sm ml-1">Số khách tối đa</Text>
+                                </View>
+                                <View className="bg-white/10 rounded-lg py-2 px-3">
+                                  <Text className="text-white font-medium">
+                                    {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.maximumGuest || 0} người
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+
+                            {/* Lưu ý về giá tối thiểu */}
+                            <View className="bg-yellow-500/10 rounded-lg p-3">
+                              <View className="flex-row items-start">
+                                <Ionicons name="information-circle" size={18} color="#EAB308" />
+                                <Text className="text-yellow-500/80 text-sm ml-2 flex-1">
+                                  Đây là loại bàn có giá tiêu thụ tối thiểu {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.minimumPrice?.toLocaleString('vi-VN')}đ. 
+                                  Quý khách vui lòng đặt thức uống đạt mức tối thiểu này.
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </Animated.View>
                       )}
                     </View>
 
-                    {/* N��t tìm bàn */}
+                    {/* Nt tìm bàn */}
                     <TouchableOpacity
                       onPress={handleSearchTables}
                       disabled={!selectedTime || !selectedTableType || isSearching}
@@ -1930,67 +2014,185 @@ export default function BookingTableScreen() {
           onRequestClose={() => setShowSelectedTablesModal(false)}
         >
           <View className="flex-1 justify-end bg-black/50">
-            <View className="bg-neutral-900 rounded-t-3xl">
+            <Animated.View 
+              entering={FadeIn}
+              className="bg-neutral-900 rounded-t-3xl"
+            >
+              {/* Header */}
               <View className="px-6 pt-6 pb-4 border-b border-white/10">
                 <View className="flex-row justify-between items-center">
-                  <Text className="text-white text-xl font-bold">
-                    Danh sách bàn đã chọn
-                  </Text>
+                  <View>
+                    <Text className="text-white text-xl font-bold">
+                      Bàn đã chọn
+                    </Text>
+                    <Text className="text-white/60 text-sm mt-1">
+                      {selectedTables.length} {selectedTables.length === 1 ? 'bàn' : 'bàn'}
+                    </Text>
+                  </View>
                   <TouchableOpacity 
                     onPress={() => setShowSelectedTablesModal(false)}
-                    className="p-2"
+                    className="h-10 w-10 bg-white/10 rounded-full items-center justify-center"
                   >
-                    <Ionicons name="close" size={24} color="white" />
+                    <Ionicons name="close" size={20} color="white" />
                   </TouchableOpacity>
                 </View>
               </View>
 
+              {/* Content */}
               <ScrollView 
                 className="px-6 py-4"
-                style={{ maxHeight: 400 }}
+                style={{ maxHeight: Dimensions.get('window').height * 0.6 }}
                 showsVerticalScrollIndicator={false}
               >
-                {selectedTables.map((table) => (
-                  <View 
-                    key={table.id}
-                    className="bg-white/10 rounded-xl p-4 mb-3"
-                  >
-                    <View className="flex-row justify-between items-center">
-                      <View>
-                        <Text className="text-white text-lg font-bold">
-                          {table.name}
-                        </Text>
-                        <Text className="text-white/60">
-                          Loại bàn: {table.typeName}
-                        </Text>
+                {isLoadingTableDetails ? (
+                  <View className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <View key={i} className="bg-white/10 rounded-xl overflow-hidden">
+                        {/* Header skeleton */}
+                        <View className="bg-white/10 px-4 py-3 flex-row items-center justify-between">
+                          <View className="flex-row items-center space-x-2">
+                            <View className="w-5 h-5 rounded-full bg-white/10 animate-pulse" />
+                            <View className="h-5 w-32 bg-white/10 rounded animate-pulse" />
+                          </View>
+                          <View className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+                        </View>
+
+                        {/* Content skeleton */}
+                        <View className="p-4 space-y-3">
+                          {/* Type info skeleton */}
+                          <View className="flex-row items-center">
+                            <View className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+                            <View className="ml-3 flex-1">
+                              <View className="h-3 w-16 bg-white/10 rounded animate-pulse mb-1" />
+                              <View className="h-4 w-24 bg-white/10 rounded animate-pulse" />
+                            </View>
+                          </View>
+
+                          {/* Guest info skeleton */}
+                          <View className="flex-row items-center">
+                            <View className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+                            <View className="ml-3 flex-1">
+                              <View className="h-3 w-16 bg-white/10 rounded animate-pulse mb-1" />
+                              <View className="h-4 w-28 bg-white/10 rounded animate-pulse" />
+                            </View>
+                          </View>
+
+                          {/* Price info skeleton */}
+                          <View className="flex-row items-center">
+                            <View className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
+                            <View className="ml-3 flex-1">
+                              <View className="h-3 w-16 bg-white/10 rounded animate-pulse mb-1" />
+                              <View className="h-4 w-32 bg-white/10 rounded animate-pulse" />
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* Note skeleton */}
+                        <View className="bg-yellow-500/10 p-3 mx-4 mb-4 rounded-lg">
+                          <View className="flex-row items-start space-x-2">
+                            <View className="w-[18px] h-[18px] rounded-full bg-white/10 animate-pulse" />
+                            <View className="h-8 flex-1 bg-white/10 rounded animate-pulse" />
+                          </View>
+                        </View>
                       </View>
-                      <TouchableOpacity 
-                        onPress={() => handleRemoveTable(table.id)}
-                        disabled={removingTables[table.id]}
-                        className="bg-white/20 rounded-full p-2"
-                      >
-                        {removingTables[table.id] ? (
-                          <ActivityIndicator size="small" color="#ff4444" />
-                        ) : (
-                          <Ionicons name="trash-outline" size={20} color="#ff4444" />
-                        )}
-                      </TouchableOpacity>
-                    </View>
+                    ))}
                   </View>
-                ))}
+                ) : (
+                  <View className="space-y-4 pb-10">
+                    {selectedTableDetails.map((table) => (
+                      <Animated.View
+                        key={table.tableId}
+                        entering={FadeIn}
+                        className="bg-white/10 rounded-xl overflow-hidden"
+                      >
+                        {/* Table header */}
+                        <View className="bg-white/10 px-4 py-3 flex-row items-center justify-between">
+                          <View className="flex-row items-center">
+                            <MaterialCommunityIcons name="table-furniture" size={20} color="#EAB308" />
+                            <Text className="text-white font-medium ml-2">
+                              {table.tableName}
+                            </Text>
+                          </View>
+                          <TouchableOpacity 
+                            onPress={() => handleRemoveTable(table.tableId)}
+                            disabled={removingTables[table.tableId]}
+                            className="h-8 w-8 bg-white/10 rounded-full items-center justify-center"
+                          >
+                            {removingTables[table.tableId] ? (
+                              <ActivityIndicator size="small" color="#EF4444" />
+                            ) : (
+                              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                            )}
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Table details */}
+                        <View className="p-4 space-y-3">
+                          {/* Type info */}
+                          <View className="flex-row items-center">
+                            <View className="w-8 h-8 bg-white/10 rounded-full items-center justify-center">
+                              <MaterialCommunityIcons name="format-list-text" size={16} color="#9CA3AF" />
+                            </View>
+                            <View className="ml-3">
+                              <Text className="text-white/60 text-xs">Loại bàn</Text>
+                              <Text className="text-white">{table.tableTypeName}</Text>
+                            </View>
+                          </View>
+
+                          {/* Guest info */}
+                          <View className="flex-row items-center">
+                            <View className="w-8 h-8 bg-white/10 rounded-full items-center justify-center">
+                              <Ionicons name="people-outline" size={16} color="#9CA3AF" />
+                            </View>
+                            <View className="ml-3">
+                              <Text className="text-white/60 text-xs">Số khách</Text>
+                              <Text className="text-white">
+                                {table.minimumGuest} - {table.maximumGuest} người
+                              </Text>
+                            </View>
+                          </View>
+
+                          {/* Price info */}
+                          <View className="flex-row items-center">
+                            <View className="w-8 h-8 bg-white/10 rounded-full items-center justify-center">
+                              <Ionicons name="wallet-outline" size={16} color="#9CA3AF" />
+                            </View>
+                            <View className="ml-3">
+                              <Text className="text-white/60 text-xs">Giá tối thiểu</Text>
+                              <Text className="text-white">
+                                {table.minimumPrice.toLocaleString('vi-VN')}đ
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* Total minimum price note */}
+                        <View className="bg-yellow-500/10 p-3 mx-4 mb-4 rounded-lg">
+                          <View className="flex-row items-start">
+                            <Ionicons name="information-circle" size={18} color="#EAB308" />
+                            <Text className="text-yellow-500/80 text-xs ml-2 flex-1">
+                              Bạn cần đặt thức uống tối thiểu {table.minimumPrice.toLocaleString('vi-VN')}đ cho bàn này
+                            </Text>
+                          </View>
+                        </View>
+                      </Animated.View>
+                    ))}
+                  </View>
+                )}
               </ScrollView>
 
+              {/* Footer */}
               <View className="px-6 py-4 border-t border-white/10">
                 <TouchableOpacity 
                   onPress={() => setShowSelectedTablesModal(false)}
                   className="bg-yellow-500 rounded-xl py-4"
                 >
                   <Text className="text-black text-center font-bold">
-                    Đóng
+                    Xong
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </Animated.View>
           </View>
         </Modal>
 

@@ -184,16 +184,21 @@ class BookingTableService {
   }
 
   async releaseTable(request: HoldTableRequest) {
-    return handleConnectionError(async () => {
-      try {
-        const headers = await this.getAuthHeader();
-        const response = await api.post('/api/bookingTable/releaseTable', request, { headers });
-        return response.data;
-      } catch (error) {
-        console.error('Error releasing table:', error);
-        throw error;
+    try {
+      const headers = await this.getAuthHeader();
+      const response = await api.post('/api/bookingTable/releaseTable', request, { headers });
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 500) {
+        console.log('Ignored 500 error when releasing table:', error);
+        return null;
       }
-    }, 'Không thể hủy giữ bàn. Vui lòng thử lại sau.');
+      
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể hủy giữ bàn. Vui lòng thử lại sau.'
+      );
+    }
   }
 }
 

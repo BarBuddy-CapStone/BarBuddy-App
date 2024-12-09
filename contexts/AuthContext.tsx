@@ -134,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user: response
         })),
         AsyncStorage.setItem('userToken', response.accessToken),
-        AsyncStorage.removeItem(GUEST_MODE_KEY) // Xóa guest mode khi đăng nhập
+        AsyncStorage.removeItem(GUEST_MODE_KEY)
       ]);
 
       // Cập nhật device token và SignalR
@@ -144,7 +144,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ]);
 
     } catch (error: any) {
-      console.error('Login Error:', error.message);
       setError(error.message);
       throw error;
     }
@@ -253,21 +252,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'CUSTOMER'
       };
 
-      // Cập nhật state trước
+      // Cập nhật state và storage
       setUser(userData);
       setIsAuthenticated(true);
       setIsGuest(false);
 
-      // Lưu vào storage
       await Promise.all([
         AsyncStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
           user: userData
         })),
         AsyncStorage.setItem('userToken', userData.accessToken),
-        AsyncStorage.removeItem(GUEST_MODE_KEY) // Xóa guest mode khi đăng nhập
+        AsyncStorage.removeItem(GUEST_MODE_KEY)
       ]);
 
-      // Cập nhật device token và SignalR
       await Promise.all([
         fcmService.updateAccountDeviceToken(true),
         signalRService.disconnect().then(() => signalRService.connect())

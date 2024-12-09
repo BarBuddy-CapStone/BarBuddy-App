@@ -214,9 +214,31 @@ export default function LoginScreen() {
       );
 
       const response = await loginWithGoogle();
-      if (response) {
-        await handleLoginSuccess();
+      
+      if (!response) {
+        // Reset animation và hiển thị thông báo khi hủy
+        googleProgressWidth.value = withTiming(0, undefined, (finished) => {
+          if (finished) {
+            runOnJS(setError)('Đăng nhập đã bị hủy');
+          }
+        });
+        googleButtonScale.value = withSpring(1);
+        googleLoadingRotate.value = 0;
+        setIsGoogleLoading(false);
+        return;
       }
+
+      // Animation hoàn thành và chuyển trang
+      googleProgressWidth.value = withTiming(0);
+      googleButtonScale.value = withSequence(
+        withSpring(1.05),
+        withSpring(1)
+      );
+
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 500);
+
     } catch (error: any) {
       // Reset animation khi có lỗi
       googleProgressWidth.value = withTiming(0);

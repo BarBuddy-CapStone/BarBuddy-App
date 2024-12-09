@@ -29,55 +29,52 @@ class GoogleAuthService {
   }
 
   async signIn(): Promise<AxiosResponse<LoginResponse> | null> {
-    return handleConnectionError(async () => {
-      try {
-        await GoogleSignin.hasPlayServices();
-        
-        const userInfo = await GoogleSignin.signIn();
-        
-        if (!userInfo || userInfo.type === 'cancelled') {
-          return null;
-        }
-
-        const tokens = await GoogleSignin.getTokens();
-        if (!tokens || !tokens.idToken) {
-          throw new Error('Không thể lấy token đăng nhập');
-        }
-        
-        const response = await api.post<LoginResponse>(`${API_CONFIG.BASE_URL}/api/authen/google-login`, {
-          idToken: tokens.idToken
-        });
-
-        if (response.data.statusCode === 200 && response.data.data) {
-          const { accessToken, refreshToken } = response.data.data;
-          await tokenService.saveTokens(accessToken, refreshToken);
-        }
-
-        return response;
-      } catch (error: any) {
-        if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-          return null;
-        }
-        
-        console.error('Google Sign In Error:', error);
-        if (error.code === statusCodes.IN_PROGRESS) {
-          throw {
-            message: 'Đang trong quá trình đăng nhập',
-            code: 'IN_PROGRESS'
-          };
-        } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-          throw {
-            message: 'Google Play Services không khả dụng',
-            code: 'PLAY_SERVICES_ERROR'
-          };
-        } else {
-          throw {
-            message: error.message || 'Có lỗi xảy ra khi đăng nhập với Google',
-            code: 'UNKNOWN_ERROR'
-          };
-        }
+    try {
+      await GoogleSignin.hasPlayServices();
+      
+      const userInfo = await GoogleSignin.signIn();
+      
+      if (!userInfo || userInfo.type === 'cancelled') {
+        return null;
       }
-    }, 'Không thể đăng nhập bằng Google. Vui lòng thử lại sau.');
+
+      const tokens = await GoogleSignin.getTokens();
+      if (!tokens || !tokens.idToken) {
+        throw new Error('Không thể lấy token đăng nhập');
+      }
+      
+      const response = await api.post<LoginResponse>(`${API_CONFIG.BASE_URL}/api/authen/google-login`, {
+        idToken: tokens.idToken
+      });
+
+      if (response.data.statusCode === 200 && response.data.data) {
+        const { accessToken, refreshToken } = response.data.data;
+        await tokenService.saveTokens(accessToken, refreshToken);
+      }
+
+      return response;
+    } catch (error: any) {
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        return null;
+      }
+      
+      if (error.code === statusCodes.IN_PROGRESS) {
+        throw new Error('Đang trong quá trình đăng nhập');
+      }
+      
+      if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        throw new Error('Google Play Services không khả dụng');
+      }
+
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể đăng nhập bằng Google. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async signOut() {

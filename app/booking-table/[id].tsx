@@ -526,14 +526,15 @@ export default function BookingTableScreen() {
     }
   };
 
-  // Sửa lại hàm handleSearchTables để xử lý bàn đã giữ
+  // Sửa lại hàm handleSearchTables
   const handleSearchTables = async () => {
     setIsSearching(true);
     setHasSearched(true);
-    setAvailableTables([]);
-    setSelectedTables([]); // Reset selectedTables trước khi tìm kiếm
     
     try {
+      // Lưu lại danh sách bàn đã chọn hiện tại
+      const currentSelectedTableIds = selectedTables.map(t => t.id);
+
       // Gọi cả 2 API song song để tối ưu performance
       const [holdTablesResponse, availableTablesResponse] = await Promise.all([
         bookingTableService.getHoldTable({
@@ -554,20 +555,6 @@ export default function BookingTableScreen() {
       // Lưu danh sách bàn đã giữ
       setHeldTables(holdTablesResponse);
 
-      // Lọc ra các bàn do user hiện tại giữ
-      const userHeldTables = holdTablesResponse.filter(ht => ht.accountId === user?.accountId);
-      
-      // Map thông tin bàn đã giữ vào selectedTables
-      if (userHeldTables.length > 0) {
-        const selectedTablesFromHold = userHeldTables.map(ht => ({
-          id: ht.tableId,
-          name: ht.tableName,
-          typeId: selectedTableType,
-          typeName: tableTypes.find(t => t.tableTypeId === selectedTableType)?.typeName || ''
-        }));
-        setSelectedTables(selectedTablesFromHold);
-      }
-
       // Xử lý danh sách bàn có sẵn
       const tables = availableTablesResponse.bookingTables[0]?.tables || [];
       
@@ -576,13 +563,17 @@ export default function BookingTableScreen() {
         // Tìm thông tin bàn đã giữ tương ứng
         const heldTable = holdTablesResponse.find(ht => ht.tableId === table.tableId);
         
+        // Kiểm tra xem bàn có trong danh sách đã chọn không
+        const isCurrentlySelected = currentSelectedTableIds.includes(table.tableId);
+        
         return {
           id: table.tableId,
           name: table.tableName,
-          // Nếu bàn đ��ợc giữ bởi khách hàng khác hoặc đã được đặt -> booked
-          status: (heldTable && heldTable.accountId !== user?.accountId) || table.status !== 1 
-            ? 'booked' as const 
-            : 'available' as const,
+          status: isCurrentlySelected 
+            ? 'held'  // Nếu bàn đang được chọn, giữ trạng thái 'held'
+            : (heldTable && heldTable.accountId !== user?.accountId) || table.status !== 1
+              ? 'booked' 
+              : 'available',
           typeId: selectedTableType
         };
       });
@@ -592,7 +583,6 @@ export default function BookingTableScreen() {
     } catch (error) {
       console.error('Error searching tables:', error);
       setAvailableTables([]);
-      setSelectedTables([]);
       setHeldTables([]);
     } finally {
       setIsSearching(false);
@@ -1694,29 +1684,6 @@ export default function BookingTableScreen() {
                         </View>
                         <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
                       </TouchableOpacity>
-
-                      {/* Gợi ý về số khách hàng */}
-                      {selectedTables.length > 0 && (
-                        <View className="mt-2 bg-yellow-500/10 rounded-lg p-3">
-                          <View className="flex-row items-start">
-                            <Ionicons name="information-circle" size={18} color="#EAB308" />
-                            <Text className="text-yellow-500/80 text-sm ml-2 flex-1">
-                              {selectedTables.length === 1 
-                                ? `Bàn đã chọn phù hợp cho ${
-                                    tableDetailsCache[selectedTables[0].id]?.minimumGuest || 0
-                                  } - ${
-                                    tableDetailsCache[selectedTables[0].id]?.maximumGuest || 0
-                                  } khách hàng`
-                                : `Các bàn đã chọn có thể phục vụ tối đa ${
-                                    selectedTables.reduce((sum, table) => 
-                                      sum + (tableDetailsCache[table.id]?.maximumGuest || 0)
-                                    , 0)
-                                  } khách hàng`
-                              }
-                            </Text>
-                          </View>
-                        </View>
-                      )}
                     </View>
 
                     {/* Chọn loại bàn */}

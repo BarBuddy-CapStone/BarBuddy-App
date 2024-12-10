@@ -1,35 +1,47 @@
 import React, { createContext, useEffect, useState } from 'react';
 import { Notification, notificationService } from '@/services/notification';
-import { signalRService } from '@/services/signalr';
-import { useAuth } from '@/contexts/AuthContext';
+import { signalRService } from '@/services/notification-signalr';
 
 interface NotificationContextData {
   notifications: Notification[];
   setNotifications: React.Dispatch<React.SetStateAction<Notification[]>>;
   fetchNotifications: (pageNumber?: number) => Promise<Notification[]>;
+  clearNotifications: () => void;
 }
 
 export const NotificationContext = createContext<NotificationContextData>({
   notifications: [],
   setNotifications: () => {},
   fetchNotifications: async () => [],
+  clearNotifications: () => {},
 });
 
-export const NotificationProvider = ({ children }: { children: React.ReactNode }) => {
+interface NotificationProviderProps {
+  children: React.ReactNode;
+  isGuest: boolean;
+  userId?: string;
+}
+
+export const NotificationProvider = ({ children, isGuest, userId }: NotificationProviderProps) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const { isGuest, user } = useAuth();
+
+  const clearNotifications = () => {
+    setNotifications([]);
+  };
 
   useEffect(() => {
-    if (!isGuest && user?.accountId) {
+    if (!isGuest && userId) {
       fetchNotifications();
+    } else {
+      clearNotifications();
     }
-  }, [isGuest, user?.accountId]);
+  }, [isGuest, userId]);
 
   useEffect(() => {
     let isMounted = true;
 
     const setupSignalR = async () => {
-      if (!isGuest && user?.accountId) {
+      if (!isGuest && userId) {
         console.log('Global SignalR: Bắt đầu kết nối SignalR...');
         await signalRService.connect();
 
@@ -57,15 +69,15 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
 
     return () => {
       isMounted = false;
-      if (!isGuest && user?.accountId) {
+      if (!isGuest && userId) {
         console.log('Global SignalR: Cleanup SignalR connection...');
         signalRService.disconnect();
       }
     };
-  }, [isGuest, user?.accountId]);
+  }, [isGuest, userId]);
 
   const fetchNotifications = async (pageNumber: number = 1) => {
-    if (isGuest || !user?.accountId) {
+    if (isGuest || !userId) {
       return [];
     }
 
@@ -93,7 +105,12 @@ export const NotificationProvider = ({ children }: { children: React.ReactNode }
   };
 
   return (
-    <NotificationContext.Provider value={{ notifications, setNotifications, fetchNotifications }}>
+    <NotificationContext.Provider value={{ 
+      notifications, 
+      setNotifications, 
+      fetchNotifications,
+      clearNotifications 
+    }}>
       {children}
     </NotificationContext.Provider>
   );

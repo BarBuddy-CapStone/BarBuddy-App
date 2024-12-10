@@ -612,7 +612,7 @@ export default function BookingDetailScreen() {
   const handleCancelBooking = async () => {
     if (!booking) return;
     
-    // Kiểm tra lại một lần nữa trước khi hủy
+    // Kiểm tra lại một lần nữa trư���c khi hủy
     if (!canCancelBooking(booking)) {
       setCancelStatus('error');
       setErrorMessage('Bạn chỉ có thể hủy đặt bàn trước 2 tiếng.');
@@ -677,10 +677,10 @@ export default function BookingDetailScreen() {
     try {
       setLoadingFeedback(true);
       const response = await feedbackService.getFeedbackByBooking(booking.bookingId);
-      setFeedback(response.data.data);
+      setFeedback(response);
       setShowFeedbackModal(true);
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể tải đánh giá. Vui lòng thử lại sau.');
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể tải đánh giá. Vui lòng thử lại sau.');
     } finally {
       setLoadingFeedback(false);
     }

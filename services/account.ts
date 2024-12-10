@@ -22,21 +22,31 @@ export type UpdateAccountData = {
 
 class AccountService {
   async getAccountInfo(accountId: string): Promise<Account> {
-    return handleConnectionError(async () => {
-      try {
-        const response = await api.get(
-          `/api/v1/customer/${accountId}`
-        );
+    try {
+      const response = await api.get(`/api/v1/customer/${accountId}`);
+      
+      if (response.data.statusCode === 200) {
         return response.data.data;
-      } catch (error) {
-        console.error('Error fetching account info:', error);
-        throw error;
       }
-    }, 'Không thể tải thông tin tài khoản. Vui lòng thử lại sau.');
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API (có status code)
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải thông tin tài khoản. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async updateAccountInfo(accountId: string, data: UpdateAccountData): Promise<Account> {
-    return handleConnectionError(async () => {
+    try {
+      // Validate input data
       if (data.fullname) {
         const fullnameError = validateFullname(data.fullname);
         if (fullnameError) throw new Error(fullnameError);
@@ -53,79 +63,103 @@ class AccountService {
         if (dobError) throw new Error(dobError);
       }
 
-      try {
-        const currentAccount = await this.getAccountInfo(accountId);
+      const currentAccount = await this.getAccountInfo(accountId);
 
-        const payload = {
-          email: currentAccount.email,
-          image: currentAccount.image,
-          status: 1,
-          accountId: currentAccount.accountId,
-          ...data
-        };
+      const payload = {
+        email: currentAccount.email,
+        image: currentAccount.image,
+        status: 1,
+        accountId: currentAccount.accountId,
+        ...data
+      };
 
-        const response = await api.patch(
-          `/api/v1/customer-account?accountId=${accountId}`,
-          payload
-        );
+      const response = await api.patch(
+        `/api/v1/customer-account?accountId=${accountId}`,
+        payload
+      );
+
+      if (response.data.statusCode === 200) {
         return response.data.data;
-      } catch (error) {
-        console.error('Error updating account info:', error);
+      }
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi validation, throw trực tiếp
+      if (error.message && !error.response) {
         throw error;
       }
-    }, 'Không thể cập nhật thông tin tài khoản. Vui lòng thử lại sau.');
+      
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể cập nhật thông tin tài khoản. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async uploadAvatar(accountId: string, imageUri: string): Promise<{ url: string }> {
-    return handleConnectionError(async () => {
-      try {
-        const formData = new FormData();
-        
-        // Xử lý mime type
-        let mimeType = 'image/jpeg'; // default
-        const extension = imageUri.split('.').pop()?.toLowerCase();
-        if (extension) {
-          switch (extension) {
-            case 'png':
-              mimeType = 'image/png';
-              break;
-            case 'jpg':
-            case 'jpeg':
-              mimeType = 'image/jpeg';
-              break;
-            case 'gif':
-              mimeType = 'image/gif';
-              break;
+    try {
+      const formData = new FormData();
+      
+      // Xử lý mime type
+      let mimeType = 'image/jpeg';
+      const extension = imageUri.split('.').pop()?.toLowerCase();
+      if (extension) {
+        switch (extension) {
+          case 'png':
+            mimeType = 'image/png';
+            break;
+          case 'jpg':
+          case 'jpeg':
+            mimeType = 'image/jpeg';
+            break;
+          case 'gif':
+            mimeType = 'image/gif';
+            break;
+        }
+      }
+
+      const uri = Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri;
+
+      formData.append('Image', {
+        uri,
+        type: mimeType,
+        name: `avatar.${extension || 'jpg'}`
+      } as any);
+
+      const response = await api.patch(
+        `/api/v1/customer/avatar/${accountId}`,
+        formData,
+        {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'multipart/form-data',
           }
         }
+      );
 
-        // Chuẩn hóa uri cho iOS
-        const uri = Platform.OS === 'ios' ? imageUri.replace('file://', '') : imageUri;
-
-        // Thêm file vào form data với key là 'Image' theo yêu cầu của API
-        formData.append('Image', {
-          uri,
-          type: mimeType,
-          name: `avatar.${extension || 'jpg'}`
-        } as any);
-
-        const response = await api.patch(
-          `/api/v1/customer/avatar/${accountId}`,
-          formData,
-          {
-            headers: {
-              'Accept': 'application/json',
-              'Content-Type': 'multipart/form-data',
-            }
-          }
-        );
-
+      if (response.data.statusCode === 200) {
         return response.data.data;
-      } catch (error) {
-        console.error('Error uploading avatar:', error);
-        throw error;
       }
-    }, 'Không thể tải lên ảnh đại diện. Vui lòng thử lại sau.');
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải lên ảnh đại diện. Vui lòng thử lại sau.'
+      );
+    }
   }
 }
 

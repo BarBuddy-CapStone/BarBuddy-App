@@ -1,5 +1,6 @@
 import api from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export interface VoucherResponse {
   eventVoucherId: string;
@@ -44,9 +45,25 @@ class VoucherService {
           headers
         }
       );
-      return response.data;
-    } catch (error) {
-      throw error;
+
+      if (response.data.statusCode === 200) {
+        return response.data;
+      }
+
+      throw new Error(response.data.message || 'Không thể áp dụng voucher');
+    } catch (error: any) {
+      // Nếu là lỗi authentication
+      if (error.message === 'No authentication token found') {
+        throw error;
+      }
+
+      // Nếu là lỗi từ API
+      if (error.response?.data) {
+        throw new Error(error.response.data.message || 'Không thể áp dụng voucher');
+      }
+      
+      // Nếu là lỗi kết nối
+      throw new Error('Không thể kiểm tra mã giảm giá. Vui lòng thử lại sau.');
     }
   }
 }

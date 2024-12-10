@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_CONFIG } from '@/config/api';
 import { GoongLocation, goongService } from './goong';
+import { handleConnectionError } from '@/utils/error-handler';
 
 export type Bar = {
   barId: string;
@@ -123,12 +124,23 @@ class BarService implements IBarService {
       }
       
       const response = await axios.get(url);
-      const bars = response.data.data || [];
-
-      return bars;
-    } catch (error) {
-      console.error('Error fetching bars:', error);
-      return [];
+      
+      if (response.data.statusCode === 200) {
+        return response.data.data || [];
+      }
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải danh sách quán. Vui lòng thử lại sau.'
+      );
     }
   }
 
@@ -137,10 +149,23 @@ class BarService implements IBarService {
       const response = await axios.get(
         `${API_CONFIG.BASE_URL}/api/v1/bar-detail/${barId}`
       );
-      return response.data.data;
-    } catch (error) {
-      console.error('Error fetching bar detail:', error);
-      return null;
+      
+      if (response.data.statusCode === 200) {
+        return response.data.data;
+      }
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải thông tin chi tiết quán. Vui lòng thử lại sau.'
+      );
     }
   }
 
@@ -148,10 +173,23 @@ class BarService implements IBarService {
     try {
       const url = `${API_CONFIG.BASE_URL}/api/v1/Bar/customer/getBar?PageIndex=1&PageSize=100`;
       const response = await axios.get<CustomerBarResponse>(url);
-      return response.data.data || [];
-    } catch (error) {
-      console.error('Error fetching customer bars:', error);
-      return [];
+      
+      if (response.data.statusCode === 200) {
+        return response.data.data || [];
+      }
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải danh sách quán. Vui lòng thử lại sau.'
+      );
     }
   }
 

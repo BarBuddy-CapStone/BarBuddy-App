@@ -51,15 +51,20 @@ class TokenService {
       if (response.data.statusCode === 200 && response.data.data) {
         const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.data;
         await this.saveTokens(newAccessToken, newRefreshToken);
-        console.log('newAccessToken', newAccessToken);
         return newAccessToken;
       }
 
-      throw new Error('REFRESH_FAILED');
-    } catch (error) {
+      throw new Error(response.data.message || 'REFRESH_FAILED');
+    } catch (error: any) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         throw new Error('TOKEN_INVALID');
       }
+      
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
       throw error;
     }
   }
@@ -118,7 +123,7 @@ class TokenService {
         throw new Error('Không tìm thấy token');
       }
 
-      await api.post(
+      const response = await api.post(
         '/api/authen/logout',
         refreshToken,
         {
@@ -129,68 +134,71 @@ class TokenService {
         }
       );
 
-      // Xóa tokens khỏi storage
-      await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+      if (response.data.statusCode === 200) {
+        await AsyncStorage.multiRemove(['accessToken', 'refreshToken']);
+        return true;
+      }
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
       
-    } catch (error) {
-      console.error('Error logging out:', error);
-      throw error;
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể đăng xuất. Vui lòng thử lại sau.'
+      );
     }
   }
 
   async checkAndSetupAuth() {
-    return handleConnectionError(async () => {
-      try {
-        const { accessToken, refreshToken } = await this.getTokens();
-        
-        if (!accessToken || !refreshToken) {
-          if (this.authContext) {
-            await fcmService.updateAccountDeviceToken(false);
-            // Alert.alert(
-            //   'Phiên đăng nhập hết hạn',
-            //   'Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.',
-            //   [{ text: 'OK' }]
-            // );
-            await this.authContext.resetAllStorage();
-          }
-          return false;
-        }
-
-        this.setupAxiosInterceptors();
-
-        try {
-          await this.refreshToken();
-          return true;
-        } catch (error) {
-          if (error instanceof Error) {
-            if (['TOKEN_NOT_FOUND', 'TOKEN_INVALID', 'REFRESH_FAILED'].includes(error.message)) {
-              if (this.authContext) {
-                await fcmService.updateAccountDeviceToken(false);
-                Alert.alert(
-                  'Phiên đăng nhập hết hạn',
-                  'Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.',
-                  [{ text: 'OK' }]
-                );
-                await this.authContext.resetAllStorage();
-              }
-            }
-          }
-          return false;
-        }
-      } catch (error) {
-        console.error('Error checking auth:', error);
+    try {
+      const { accessToken, refreshToken } = await this.getTokens();
+      
+      if (!accessToken || !refreshToken) {
         if (this.authContext) {
           await fcmService.updateAccountDeviceToken(false);
-          Alert.alert(
-            'Phiên đăng nhập hết hạn',
-            'Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.',
-            [{ text: 'OK' }]
-          );
           await this.authContext.resetAllStorage();
         }
         return false;
       }
-    }, 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
+
+      this.setupAxiosInterceptors();
+
+      try {
+        await this.refreshToken();
+        return true;
+      } catch (error: any) {
+        if (error instanceof Error) {
+          if (['TOKEN_NOT_FOUND', 'TOKEN_INVALID', 'REFRESH_FAILED'].includes(error.message)) {
+            if (this.authContext) {
+              await fcmService.updateAccountDeviceToken(false);
+              Alert.alert(
+                'Phiên đăng nhập hết hạn',
+                'Vui lòng đăng nhập lại để tiếp tục sử dụng ứng dụng.',
+                [{ text: 'OK' }]
+              );
+              await this.authContext.resetAllStorage();
+            }
+          }
+        }
+        return false;
+      }
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.'
+      );
+    }
   }
 }
 

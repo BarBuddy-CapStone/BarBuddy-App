@@ -9,7 +9,7 @@ import { notificationService } from '@/services/notification';
 import { Platform } from 'react-native';
 import { fcmService } from '@/services/fcm';
 import { tokenService } from '@/services/token';
-import { signalRService } from '@/services/signalr';
+import { signalRService } from '@/services/notification-signalr';
 
 // Định nghĩa kiểu dữ liệu cho user
 type User = UserInfo;
@@ -330,3 +330,13 @@ export function useAuth() {
   }
   return context;
 }
+
+export const AuthConsumer = ({ children }: { 
+  children: (context: AuthContextType) => React.ReactNode 
+}) => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('AuthConsumer must be used within an AuthProvider');
+  }
+  return children(context);
+};

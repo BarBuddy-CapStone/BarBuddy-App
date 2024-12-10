@@ -53,28 +53,48 @@ interface PaymentHistoryResponse {
 
 export const paymentService = {
   getPaymentDetail: async (paymentId: string): Promise<PaymentDetail> => {
-    return handleConnectionError(async () => {
-      try {
-        const response = await api.get(`/api/v1/Payment/payment-detail/${paymentId}`);
+    try {
+      const response = await api.get(`/api/v1/Payment/payment-detail/${paymentId}`);
+      
+      if (response.data.statusCode === 200) {
         return response.data.data;
-      } catch (error) {
-        console.error('=== Payment Service Error ===');
-        throw error;
       }
-    }, 'Không thể tải chi tiết thanh toán. Vui lòng thử lại sau.');
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải chi tiết thanh toán. Vui lòng thử lại sau.'
+      );
+    }
   },
 
   getPaymentHistory: async (accountId: string, pageIndex: number = 1): Promise<PaymentHistoryResponse> => {
-    return handleConnectionError(async () => {
-      try {
-        const response = await api.get(
-          `/api/PaymentHistory/${accountId}?PageIndex=${pageIndex}&PageSize=1000`
-        );
-        return response.data;
-      } catch (error) {
-        console.error('=== Payment History Service Error ===');
-        throw error;
+    try {
+      const response = await api.get(
+        `/api/PaymentHistory/${accountId}?PageIndex=${pageIndex}&PageSize=1000`
+      );
+      
+      // Trả về trực tiếp data vì API này không có statusCode
+      return response.data;
+
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Có lỗi xảy ra');
       }
-    }, 'Không thể tải lịch sử thanh toán. Vui lòng thử lại sau.');
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải lịch sử thanh toán. Vui lòng thử lại sau.'
+      );
+    }
   }
 }; 

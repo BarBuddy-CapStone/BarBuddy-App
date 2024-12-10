@@ -3,7 +3,7 @@ import { router, Stack, useRouter, useSegments } from 'expo-router';
 import { ThemeProvider, DarkTheme } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useAuth, AuthProvider } from '@/contexts/AuthContext';
+import { useAuth, AuthProvider, AuthConsumer } from '@/contexts/AuthContext';
 import { LocationProvider } from '@/contexts/LocationContext';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import { View, Linking } from 'react-native';
@@ -144,9 +144,13 @@ export default function RootLayout() {
     <View style={{ flex: 1, backgroundColor: 'black' }}>
       <AuthProvider>
         <LocationProvider>
-          <NotificationProvider>
-            <LoadingLayout loaded={loaded} />
-          </NotificationProvider>
+          <AuthConsumer>
+            {({ isGuest, user }) => (
+              <NotificationProvider isGuest={isGuest} userId={user?.accountId}>
+                <LoadingLayout loaded={loaded} />
+              </NotificationProvider>
+            )}
+          </AuthConsumer>
         </LocationProvider>
       </AuthProvider>
     </View>

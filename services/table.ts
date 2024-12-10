@@ -19,16 +19,27 @@ export interface TableResponse {
 
 class TableService {
   async getTableDetails(tableIds: string[]): Promise<TableDetail[]> {
-    return handleConnectionError(async () => {
-      try {
-        const queryParams = tableIds.map(id => `TableIdList=${id}`).join('&');
-        const response = await api.get<TableResponse>(`/api/Table/tableList?${queryParams}`);
+    try {
+      const queryParams = tableIds.map(id => `TableIdList=${id}`).join('&');
+      const response = await api.get<TableResponse>(`/api/Table/tableList?${queryParams}`);
+      
+      if (response.data.statusCode === 200) {
         return response.data.data;
-      } catch (error) {
-        console.error('Error fetching table details:', error);
-        return [];
       }
-    }, 'Không thể tải thông tin bàn. Vui lòng thử lại sau.');
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải thông tin bàn. Vui lòng thử lại sau.'
+      );
+    }
   }
 }
 

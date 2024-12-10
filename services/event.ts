@@ -79,36 +79,49 @@ class EventService {
     pageIndex = 1,
     pageSize = 8
   }: GetEventsParams = {}): Promise<PaginatedEvents> {
-    return handleConnectionError(async () => {
-      try {
-        let url = `/api/Event?PageIndex=${pageIndex}&PageSize=${pageSize}`;
-        
-        if (barId) url += `&BarId=${barId}`;
-        if (isStill !== null) url += `&IsStill=${isStill}`;
-        if (search) url += `&Search=${encodeURIComponent(search)}`;
-        if (isEveryWeekEvent !== null) url += `&IsEveryWeekEvent=${isEveryWeekEvent}`;
+    try {
+      let url = `/api/Event?PageIndex=${pageIndex}&PageSize=${pageSize}`;
+      
+      if (barId) url += `&BarId=${barId}`;
+      if (isStill !== null) url += `&IsStill=${isStill}`;
+      if (search) url += `&Search=${encodeURIComponent(search)}`;
+      if (isEveryWeekEvent !== null) url += `&IsEveryWeekEvent=${isEveryWeekEvent}`;
 
-        const response = await api.get<EventResponse>(url);
+      const response = await api.get<EventResponse>(url);
+      
+      if (response.data.statusCode === 200) {
         const { eventResponses, totalPages, currentPage, totalItems } = response.data.data;
-        
         return {
           events: eventResponses || [],
           totalPages,
           currentPage,
           totalItems
         };
-      } catch (error: any) {
-        if (error.response?.status === 404) {
-          return {
-            events: [],
-            totalPages: 0,
-            currentPage: 1,
-            totalItems: 0
-          };
-        }
-        throw error;
       }
-    }, 'Không thể tải danh sách sự kiện. Vui lòng thử lại sau.');
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Xử lý trường hợp 404 đặc biệt
+      if (error.response?.status === 404) {
+        return {
+          events: [],
+          totalPages: 0,
+          currentPage: 1,
+          totalItems: 0
+        };
+      }
+      
+      // Nếu là lỗi từ response của API khác
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải danh sách sự kiện. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async getCurrentEvents(): Promise<Event[]> {
@@ -122,26 +135,47 @@ class EventService {
       
       return currentEvents.events;
     } catch (error: any) {
+      // Xử lý trường hợp 404 đặc biệt
       if (error.response?.status === 404) {
         return [];
       }
-      console.error('Error fetching current events:', error);
-      return [];
+      
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải danh sách sự kiện hiện tại. Vui lòng thử lại sau.'
+      );
     }
   }
 
   async getEventDetail(eventId: string): Promise<EventDetail> {
-    return handleConnectionError(async () => {
-      try {
-        const response = await api.get<EventDetailResponse>(
-          `/api/Event/getOne/${eventId}`
-        );
+    try {
+      const response = await api.get<EventDetailResponse>(
+        `/api/Event/getOne/${eventId}`
+      );
+      
+      if (response.data.statusCode === 200) {
         return response.data.data;
-      } catch (error) {
-        console.error('Error fetching event detail:', error);
-        throw error;
       }
-    }, 'Không thể tải chi tiết sự kiện. Vui lòng thử lại sau.');
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải chi tiết sự kiện. Vui lòng thử lại sau.'
+      );
+    }
   }
 }
 

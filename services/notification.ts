@@ -131,36 +131,42 @@ class NotificationService {
 
   // Các phương thức khác giữ nguyên
   async getNotifications(pageNumber: number = 1) {
-    return handleConnectionError(async () => {
-      try {
-        const authData = await AsyncStorage.getItem('@auth');
-        const headers: any = {};
-        
-        if (authData) {
-          const userData = JSON.parse(authData);
-          if (userData?.user?.accessToken) {
-            headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
-          }
+    try {
+      const authData = await AsyncStorage.getItem('@auth');
+      const headers: any = {};
+      
+      if (authData) {
+        const userData = JSON.parse(authData);
+        if (userData?.user?.accessToken) {
+          headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
         }
-
-        const response = await api.get(
-          `/api/Fcm/notifications?page=${pageNumber}`,
-          { headers }
-        );
-        
-        if (response.data.statusCode === 200) {
-          const notifications = response.data.data.map((notification: any) => ({
-            ...notification,
-            deepLink: notification.mobileDeepLink
-          }));
-          return notifications;
-        }
-        return [];
-      } catch (error) {
-        console.error('Lỗi khi lấy thông báo:', error);
-        return [];
       }
-    }, 'Không thể tải thông báo. Vui lòng thử lại sau.');
+
+      const response = await api.get(
+        `/api/Fcm/notifications?page=${pageNumber}`,
+        { headers }
+      );
+      
+      if (response.data.statusCode === 200) {
+        return response.data.data.map((notification: any) => ({
+          ...notification,
+          deepLink: notification.mobileDeepLink
+        }));
+      }
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải thông báo. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async resetBadgeCount() {
@@ -171,111 +177,125 @@ class NotificationService {
   }
 
   async getUnreadCount(): Promise<number> {
-    return handleConnectionError(async () => {
-      try {
-        const authData = await AsyncStorage.getItem('@auth');
-        const headers: any = {};
-        
-        if (!authData) {
-          return 0;
-        }
-        
-        const userData = JSON.parse(authData);
-        if (!userData?.user?.accessToken) {
-          return 0;
-        }
+    try {
+      const authData = await AsyncStorage.getItem('@auth');
+      if (!authData) return 0;
+      
+      const userData = JSON.parse(authData);
+      if (!userData?.user?.accessToken) return 0;
 
-        headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
-
-        const response = await api.get(
-          `/api/Fcm/unread-count`,
-          { headers }
-        );
-        
-        if (response.data.statusCode === 200) {
-          const count = response.data.data;
-          // Cập nhật badge number
-          if (Platform.OS === 'ios') {
-            PushNotification.setApplicationIconBadgeNumber(count);
+      const response = await api.get(
+        `/api/Fcm/unread-count`,
+        { 
+          headers: {
+            'Authorization': `Bearer ${userData.user.accessToken}`
           }
-          return count;
         }
-        return 0;
-      } catch (error) {
-        console.log('Lỗi khi lấy số thông báo chưa đọc:', error);
-        return 0;
+      );
+      
+      if (response.data.statusCode === 200) {
+        const count = response.data.data;
+        if (Platform.OS === 'ios') {
+          PushNotification.setApplicationIconBadgeNumber(count);
+        }
+        return count;
       }
-    }, 'Không thể tải số thông báo chưa đọc');
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải số thông báo chưa đọc'
+      );
+    }
   }
 
   async markAsRead(notificationId: string): Promise<boolean> {
-    return handleConnectionError(async () => {
-      try {
-        const fcmToken = await messaging().getToken();
-        if (!fcmToken) {
-          console.error('Không thể lấy FCM token');
-          return false;
-        }
-
-        const authData = await AsyncStorage.getItem('@auth');
-        const headers: any = {};
-        if (authData) {
-          const userData = JSON.parse(authData);
-          if (userData?.user?.accessToken) {
-            headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
-          }
-        }
-
-        const response = await api.patch(
-          `/api/Fcm/notification/${notificationId}/mark-as-read?deviceToken=${fcmToken}`,
-          null,
-          { headers }
-        );
-
-        if (response.data.statusCode === 200) {
-          return true;
-        }
-        return false;
-      } catch (error) {
-        console.error('Lỗi khi đánh dấu thông báo đã đọc:', error);
-        return false;
+    try {
+      const fcmToken = await messaging().getToken();
+      if (!fcmToken) {
+        throw new Error('Không thể lấy FCM token');
       }
-    }, 'Không thể đánh dấu thông báo đã đọc. Vui lòng thử lại sau.');
+
+      const authData = await AsyncStorage.getItem('@auth');
+      const headers: any = {};
+      if (authData) {
+        const userData = JSON.parse(authData);
+        if (userData?.user?.accessToken) {
+          headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
+        }
+      }
+
+      const response = await api.patch(
+        `/api/Fcm/notification/${notificationId}/mark-as-read?deviceToken=${fcmToken}`,
+        null,
+        { headers }
+      );
+
+      if (response.data.statusCode === 200) {
+        return true;
+      }
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể đánh dấu thông báo đã đọc. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async markAllAsRead(): Promise<boolean> {
-    return handleConnectionError(async () => {
-      try {
-        const fcmToken = await messaging().getToken();
-        if (!fcmToken) {
-          console.error('Không thể lấy FCM token');
-          return false;
-        }
-
-        const authData = await AsyncStorage.getItem('@auth');
-        const headers: any = {};
-        if (authData) {
-          const userData = JSON.parse(authData);
-          if (userData?.user?.accessToken) {
-            headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
-          }
-        }
-
-        const response = await api.patch(
-          `/api/Fcm/notifications/mark-all-as-read?deviceToken=${fcmToken}`,
-          null,
-          { headers }
-        );
-
-        if (response.data.statusCode === 200) {
-          return true;
-        }
-        return false;
-      } catch (error) {
-        console.error('Lỗi khi đánh dấu tất cả thông báo đã đọc:', error);
-        return false;
+    try {
+      const fcmToken = await messaging().getToken();
+      if (!fcmToken) {
+        throw new Error('Không thể lấy FCM token');
       }
-    }, 'Không thể đánh dấu tất cả thông báo đã đọc. Vui lòng thử lại sau.');
+
+      const authData = await AsyncStorage.getItem('@auth');
+      const headers: any = {};
+      if (authData) {
+        const userData = JSON.parse(authData);
+        if (userData?.user?.accessToken) {
+          headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
+        }
+      }
+
+      const response = await api.patch(
+        `/api/Fcm/notifications/mark-all-as-read?deviceToken=${fcmToken}`,
+        null,
+        { headers }
+      );
+
+      if (response.data.statusCode === 200) {
+        return true;
+      }
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể đánh dấu tất cả thông báo đã đọc. Vui lòng thử lại sau.'
+      );
+    }
   }
 }
 

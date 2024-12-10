@@ -18,38 +18,42 @@ class EmotionService {
    * Get drink recommendations based on emotion
    * @param emotion - User's emotion text
    * @param barId - ID of the bar
-   * @returns Promise<Drink[]> - Array of recommended drinks
+   * @returns Promise<EmotionResponseItem[]> - Array of recommended drinks
    */
   async getDrinkRecommendations(
     emotion: string, 
     barId: string,
     onCancel?: () => void
   ): Promise<EmotionResponseItem[]> {
-    return handleConnectionError(
-      async () => {
-        try {
-          const response = await api.get<EmotionApiResponse>(
-            `/api/DrinkRecommendation/drink-recommendation-v2`, 
-            {
-              params: {
-                emotion,
-                barId
-              }
-            }
-          );
-          
-          if (response?.data?.data) {
-            return response.data.data;
+    try {
+      const response = await api.get<EmotionApiResponse>(
+        `/api/DrinkRecommendation/drink-recommendation-v2`, 
+        {
+          params: {
+            emotion,
+            barId
           }
-          throw new Error('Invalid response format');
-        } catch (error) {
-          console.error('Error getting drink recommendations:', error);
-          throw error;
         }
-      }, 
-      'Không thể lấy gợi ý đồ uống. Vui lòng thử lại sau.',
-      onCancel
-    );
+      );
+      
+      if (response.data.statusCode === 200) {
+        return response.data.data;
+      }
+      
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể lấy gợi ý đồ uống. Vui lòng thử lại sau.',
+        onCancel
+      );
+    }
   }
 }
 

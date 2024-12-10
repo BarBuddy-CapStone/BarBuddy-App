@@ -1,4 +1,4 @@
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Modal, Image, Animated as RNAnimated, PanResponder, Dimensions } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Modal, Image, Animated as RNAnimated, PanResponder, Dimensions, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useState, useEffect, useCallback, memo, useMemo, useRef } from 'react';
@@ -228,8 +228,6 @@ const PaymentDetailModal = memo(({
     switch (provider.toUpperCase()) {
       case 'VNPAY':
         return require('@/assets/images/vnpay-logo.png');
-      case 'MOMO':
-        return require('@/assets/images/momo-logo.png');
       default:
         return null;
     }
@@ -478,10 +476,14 @@ export default function PaymentHistoryScreen() {
 
   const fetchPayments = useCallback(async () => {
     try {
+      setLoading(true);
       const data = await paymentService.getPaymentHistory(id as string);
       setPayments(data.response);
-    } catch (error) {
-      console.error('Error fetching payments:', error);
+    } catch (error: any) {
+      Alert.alert(
+        'Lỗi',
+        error.message || 'Không thể tải lịch sử thanh toán. Vui lòng thử lại sau.'
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);

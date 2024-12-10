@@ -529,11 +529,7 @@ export default function PaymentDetailScreen() {
           setCurrentTotalPrice(finalPrice);
         }
       } catch (error: any) {
-        if (axios.isAxiosError(error)) {
-          setError(error.response?.data?.message || "Có lỗi xảy ra");
-        } else {
-          setError("Có lỗi xảy ra");
-        }
+        setError(error.message || 'Có lỗi xảy ra khi áp dụng voucher');
       } finally {
         setIsApplying(false);
       }

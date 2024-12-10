@@ -24,13 +24,61 @@ interface CreateFeedbackRequest {
 
 export const feedbackService = {
   getFeedbackByBooking: async (bookingId: string) => {
-    return handleConnectionError(async () => {
-      return await api.get<{ data: FeedbackDetail }>(`/api/feedback/booking/${bookingId}`);
-    }, 'Không thể tải đánh giá. Vui lòng thử lại sau.');
+    try {
+      const response = await api.get<{ 
+        statusCode: number;
+        message: string;
+        data: FeedbackDetail 
+      }>(`/api/feedback/booking/${bookingId}`);
+      
+      console.log("response", response);
+
+      if (response.data.statusCode === 200) {
+        return response.data.data;
+      }
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+
+      console.log("error", error);
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        
+        async () => { throw error; },
+        'Không thể tải đánh giá. Vui lòng thử lại sau.'
+      );
+    }
   },
+
   createFeedback: async (data: CreateFeedbackRequest) => {
-    return handleConnectionError(async () => {
-      return await api.post(`/api/feedback/createFeedBack`, data);
-    }, 'Không thể tạo đánh giá. Vui lòng thử lại sau.');
+    try {
+      const response = await api.post<{
+        statusCode: number;
+        message: string;
+        data: any;
+      }>(`/api/feedback/createFeedBack`, data);
+
+      if (response.data.statusCode === 200) {
+        return response.data.data;
+      }
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tạo đánh giá. Vui lòng thử lại sau.'
+      );
+    }
   }
 }; 

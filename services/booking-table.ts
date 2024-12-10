@@ -95,107 +95,167 @@ class BookingTableService {
   }
 
   async findAvailableTables(filter: BookingTableFilter): Promise<BookingTableResponse> {
-    return handleConnectionError(async () => {
-      try {
-        const headers = await this.getAuthHeader();
-        const response = await api.get('/api/bookingTable/filter', {
-          params: {
-            BarId: filter.barId,
-            TableTypeId: filter.tableTypeId,
-            Date: filter.date,
-            Time: filter.timeSpan
-          },
-          headers
-        });
+    try {
+      const headers = await this.getAuthHeader();
+      const response = await api.get('/api/bookingTable/filter', {
+        params: {
+          BarId: filter.barId,
+          TableTypeId: filter.tableTypeId,
+          Date: filter.date,
+          Time: filter.timeSpan
+        },
+        headers
+      });
+
+      if (response.data.statusCode === 200) {
         return response.data.data;
-      } catch (error) {
-        return {
-          tableTypeId: filter.tableTypeId,
-          typeName: '',
-          description: '',
-          bookingTables: [{
-            reservationDate: filter.date,
-            reservationTime: filter.timeSpan,
-            tables: []
-          }]
-        };
       }
-    }, 'Không thể tìm bàn trống. Vui lòng thử lại sau.');
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tìm bàn trống. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async bookTable(request: BookingTableRequest, onCancel?: () => void) {
-    return handleConnectionError(async () => {
-      try {
-        const headers = await this.getAuthHeader();
-        const response = await api.post('/api/Booking/booking-table', request, { headers });
-        return response.data;
-      } catch (error) {
-        console.error('Error booking table:', error);
-        throw error;
+    try {
+      const headers = await this.getAuthHeader();
+      const response = await api.post('/api/Booking/booking-table', request, { headers });
+
+      if (response.data.statusCode === 200) {
+        return response.data.data;
       }
-    }, 'Không thể đặt bàn. Vui lòng thử lại sau.', onCancel);
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể đặt bàn. Vui lòng thử lại sau.',
+        onCancel
+      );
+    }
   }
 
   async bookTableWithDrinks(request: BookingDrinkRequest, onCancel?: () => void) {
-    return handleConnectionError(async () => {
-      try {
-        const headers = await this.getAuthHeader();
-        const response = await api.post('/api/Booking/booking-drink/mobile', request, { headers });
+    try {
+      const headers = await this.getAuthHeader();
+      console.log("request", request);
+      const response = await api.post('/api/Booking/booking-drink/mobile', request, { headers });
+
+      if (response.data.statusCode === 200) {
         return response.data;
-      } catch (error) {
-        console.error('Error booking table with drinks:', error);
-        throw error;
       }
-    }, 'Không thể đặt bàn và đồ uống. Vui lòng thử lại sau.', onCancel);
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể đặt bàn và đồ uống. Vui lòng thử lại sau.',
+        onCancel
+      );
+    }
   }
 
   async getHoldTable(params: GetHoldTableParams): Promise<HoldTableInfo[]> {
-    return handleConnectionError(async () => {
-      try {
-        const headers = await this.getAuthHeader();
-        const response = await api.get(
-          `/api/bookingTable/getHoldTable/${params.barId}`, 
-          {
-            params: {
-              Date: params.date,
-              Time: params.timeSpan
-            },
-            headers
-          }
-        );
-        console.log(response.data.data);
+    try {
+      const headers = await this.getAuthHeader();
+      const response = await api.get(
+        `/api/bookingTable/getHoldTable/${params.barId}`, 
+        {
+          params: {
+            Date: params.date,
+            Time: params.timeSpan
+          },
+          headers
+        }
+      );
+
+      if (response.data.statusCode === 200) {
         return response.data.data;
-      } catch (error) {
-        console.error('Error getting hold tables:', error);
-        return [];
       }
-    }, 'Không thể lấy thông tin bàn đã giữ. Vui lòng thử lại sau.');
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể lấy thông tin bàn đã giữ. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async holdTable(request: HoldTableRequest) {
-    return handleConnectionError(async () => {
-      try {
-        const headers = await this.getAuthHeader();
-        const response = await api.post('/api/bookingTable/holdTable', request, { headers });
-        return response.data;
-      } catch (error) {
-        console.error('Error holding table:', error);
-        throw error;
+    try {
+      const headers = await this.getAuthHeader();
+      const response = await api.post('/api/bookingTable/holdTable', request, { headers });
+
+      if (response.data.statusCode === 200) {
+        return response.data.data;
       }
-    }, 'Không thể giữ bàn. Vui lòng thử lại sau.');
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể giữ bàn. Vui lòng thử lại sau.'
+      );
+    }
   }
 
   async releaseTable(request: HoldTableRequest) {
     try {
       const headers = await this.getAuthHeader();
       const response = await api.post('/api/bookingTable/releaseTable', request, { headers });
-      return response.data;
+
+      if (response.data.statusCode === 200) {
+        return response.data.data;
+      }
+
+      throw new Error(response.data.message);
     } catch (error: any) {
       if (error.response?.status === 500) {
         console.log('Ignored 500 error when releasing table:', error);
         return null;
       }
       
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
       return handleConnectionError(
         async () => { throw error; },
         'Không thể hủy giữ bàn. Vui lòng thử lại sau.'

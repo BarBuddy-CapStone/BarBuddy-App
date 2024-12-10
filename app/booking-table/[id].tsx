@@ -1400,7 +1400,7 @@ export default function BookingTableScreen() {
         {/* Header mới với thông tin quán */}
         <View className="border-b border-white/10">
           {/* Phần navigation */}
-          <View className="px-4 pt-1.5 pb-2 flex-row items-center">
+          <View className="px-4 pt-1.5 pb-2 flex-row items-center border-b border-white/10">
             <TouchableOpacity
               onPress={handleBack}
               className="h-9 w-9 bg-neutral-800 rounded-full items-center justify-center mr-3"
@@ -1414,7 +1414,7 @@ export default function BookingTableScreen() {
 
           {/* Thông tin quán */}
           {barDetail ? (
-            <View className="px-4 pb-3">
+            <View className="px-4 pb-2 pt-1 bg-neutral-800">
               <View className="flex-row items-center">
                 <Image 
                   source={{ 
@@ -1425,7 +1425,7 @@ export default function BookingTableScreen() {
                 <View className="ml-4 flex-1">
                   <View className="flex-row items-center mb-1">
                     <Text 
-                      className="text-white font-bold text-base flex-1"
+                      className="text-yellow-500 font-bold text-base flex-1"
                       numberOfLines={1}
                     >
                       {barDetail.barName}
@@ -1478,15 +1478,28 @@ export default function BookingTableScreen() {
               </View>
             </View>
           ) : (
-            <View className="px-4 pb-3">
+            <View className="px-4 pb-2 pt-1 bg-neutral-800">
               <Animated.View entering={FadeIn} className="flex-row items-center">
-                <View className="w-20 h-20 rounded-lg bg-white/10 animate-pulse" />
-                <View className="ml-3 flex-1">
-                  <View className="h-4 w-32 bg-white/10 rounded animate-pulse mb-2" />
-                  <View className="space-y-1.5 mt-0.5">
-                    <View className="h-3 w-48 bg-white/10 rounded animate-pulse" />
-                    <View className="h-3 w-32 bg-white/10 rounded animate-pulse" />
-                    <View className="h-3 w-40 bg-white/10 rounded animate-pulse" />
+                {/* Skeleton cho ảnh */}
+                <View className="w-20 h-20 rounded-lg bg-white/10 animate-pulse mt-1" />
+                
+                <View className="ml-4 flex-1">
+                  {/* Skeleton cho tên quán */}
+                  <View className="flex-row items-center mb-1">
+                    <View className="h-5 w-32 bg-white/10 rounded animate-pulse flex-1" />
+                    <View className="ml-2 w-16 h-4 bg-white/10 rounded animate-pulse" />
+                  </View>
+                  
+                  {/* Skeleton cho thông tin địa chỉ, SĐT, giờ mở cửa */}
+                  <View className="space-y-2 mt-0.5">
+                    {[1, 2, 3].map((i) => (
+                      <View key={i} className="flex-row items-center">
+                        <View className="w-5 items-center">
+                          <View className="w-3.5 h-3.5 rounded-full bg-white/10 animate-pulse" />
+                        </View>
+                        <View className="h-3 flex-1 bg-white/10 rounded animate-pulse ml-2" />
+                      </View>
+                    ))}
                   </View>
                 </View>
               </Animated.View>
@@ -1614,6 +1627,18 @@ export default function BookingTableScreen() {
                           <View className="h-4 w-16 bg-white/5 rounded" />
                           <View className="w-5 h-5 bg-white/5 rounded" />
                         </View>
+                      </View>
+                    </View>
+
+                    {/* Thêm skeleton cho số khách hàng */}
+                    <View>
+                      <View className="h-5 w-28 bg-white/10 rounded animate-pulse mb-3" />
+                      <View className="bg-white/10 p-4 rounded-xl flex-row items-center justify-between animate-pulse">
+                        <View className="flex-row items-center">
+                          <View className="w-5 h-5 bg-white/5 rounded" />
+                          <View className="h-4 w-24 bg-white/5 rounded ml-2" />
+                        </View>
+                        <View className="w-5 h-5 bg-white/5 rounded" />
                       </View>
                     </View>
 

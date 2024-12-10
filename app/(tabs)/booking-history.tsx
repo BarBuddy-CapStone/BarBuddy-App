@@ -160,10 +160,10 @@ const BookingItem = memo(({ booking, onRefreshList }: {
     try {
       setLoading(true);
       const response = await feedbackService.getFeedbackByBooking(booking.bookingId);
-      setFeedback(response.data.data);
+      setFeedback(response);
       setShowFeedbackModal(true);
-    } catch (error) {
-      Alert.alert('Lỗi', 'Không thể tải đánh giá. Vui lòng thử lại sau.');
+    } catch (error: any) {
+      Alert.alert('Lỗi', error.message || 'Không thể tải đánh giá. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
     }

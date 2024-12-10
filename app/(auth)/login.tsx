@@ -250,6 +250,10 @@ export default function LoginScreen() {
     }
   };
 
+  const handleForgotPassword = () => {
+    router.push('/(auth)/forgot-password' as any);
+  };
+
   return (
     <Animated.View 
       entering={FadeIn.duration(200)} 
@@ -342,7 +346,7 @@ export default function LoginScreen() {
                 </View>
               )}
 
-              <TouchableOpacity onPress={() => {}}>
+              <TouchableOpacity onPress={handleForgotPassword}>
                 <Text className="text-yellow-400 text-right font-medium">Quên mật khẩu?</Text>
               </TouchableOpacity>
 

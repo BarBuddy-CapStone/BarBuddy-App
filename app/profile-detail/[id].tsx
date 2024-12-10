@@ -20,113 +20,120 @@ type ResultStatus = 'loading' | 'success' | 'error' | null;
 // Cập nhật component LoadingPopup
 const LoadingPopup = ({ 
   visible, 
-  message = 'Đang xử lý...', 
   status = 'loading',
-  onClose
+  errorMessage = '',
+  successMessage = '' 
 }: { 
-  visible: boolean, 
-  message?: string,
-  status?: ResultStatus,
-  onClose?: () => void 
-}) => {
-  const [showModal, setShowModal] = useState(visible);
-  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+  visible: boolean;
+  status?: ResultStatus;
+  errorMessage?: string;
+  successMessage?: string;
+}) => (
+  <Modal transparent visible={visible}>
+    <View className="flex-1 bg-black/50 items-center justify-center">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
+        {status === 'loading' && (
+          <>
+            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đang cập nhật thông tin...
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng không tắt ứng dụng
+            </Text>
+          </>
+        )}
 
-  useEffect(() => {
-    if (visible) {
-      setShowModal(true);
-      RNAnimated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      RNAnimated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowModal(false);
-      });
-    }
-  }, [visible]);
+        {status === 'success' && (
+          <>
+            <View className="mb-4 bg-green-500/20 p-3 rounded-full">
+              <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Cập nhật thành công!
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {successMessage || 'Thông tin của bạn đã được cập nhật'}
+            </Text>
+          </>
+        )}
 
-  if (!showModal) return null;
+        {status === 'error' && (
+          <>
+            <View className="mb-4 bg-red-500/20 p-3 rounded-full">
+              <Ionicons name="close-circle" size={32} color="#EF4444" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Cập nhật thất bại
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {errorMessage || 'Vui lòng thử lại sau'}
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  </Modal>
+);
 
-  return (
-    <Modal 
-      transparent 
-      visible={showModal}
-      onRequestClose={() => {
-        // Chỉ cho phép đóng khi không phải đang loading
-        if (status !== 'loading') {
-          onClose?.();
-        }
-      }}
-    >
-      <RNAnimated.View 
-        style={{
-          flex: 1,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          opacity: fadeAnim,
-        }}
-      >
-        <TouchableOpacity
-          activeOpacity={1}
-          onPress={() => {
-            // Chỉ cho phép đóng khi không phải đang loading
-            if (status !== 'loading') {
-              onClose?.();
-            }
-          }}
-          className="flex-1 w-full items-center justify-center"
-        >
-          <TouchableOpacity 
-            activeOpacity={1}
-            onPress={e => e.stopPropagation()}
-            className="bg-neutral-900 rounded-2xl p-6 items-center mx-4"
-          >
-            {status === 'loading' && (
-              <>
-                <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
-                <Text className="text-white text-center font-medium">
-                  {message}
-                </Text>
-                <Text className="text-white/60 text-center text-sm mt-2">
-                  Vui lòng không tắt ứng dụng
-                </Text>
-              </>
-            )}
+// Thêm component AvatarLoadingPopup
+const AvatarLoadingPopup = ({ 
+  visible, 
+  status = 'loading',
+  errorMessage = '',
+  successMessage = '' 
+}: { 
+  visible: boolean;
+  status?: ResultStatus;
+  errorMessage?: string;
+  successMessage?: string;
+}) => (
+  <Modal transparent visible={visible}>
+    <View className="flex-1 bg-black/50 items-center justify-center">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
+        {status === 'loading' && (
+          <>
+            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đang cập nhật ảnh đại diện...
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng không tắt ứng dụng
+            </Text>
+          </>
+        )}
 
-            {status === 'success' && (
-              <>
-                <View className="w-16 h-16 bg-green-500/20 rounded-full items-center justify-center mb-4">
-                  <Ionicons name="checkmark" size={32} color="#22C55E" />
-                </View>
-                <Text className="text-white text-center font-medium">
-                  {message}
-                </Text>
-              </>
-            )}
+        {status === 'success' && (
+          <>
+            <View className="mb-4 bg-green-500/20 p-3 rounded-full">
+              <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Cập nhật ảnh thành công!
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {successMessage || 'Ảnh đại diện của bạn đã được cập nhật'}
+            </Text>
+          </>
+        )}
 
-            {status === 'error' && (
-              <>
-                <View className="w-16 h-16 bg-red-500/20 rounded-full items-center justify-center mb-4">
-                  <Ionicons name="close" size={32} color="#EF4444" />
-                </View>
-                <Text className="text-white text-center font-medium">
-                  {message}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </RNAnimated.View>
-    </Modal>
-  );
-};
+        {status === 'error' && (
+          <>
+            <View className="mb-4 bg-red-500/20 p-3 rounded-full">
+              <Ionicons name="close-circle" size={32} color="#EF4444" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Cập nhật ảnh thất bại
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {errorMessage || 'Vui lòng thử lại sau'}
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  </Modal>
+);
 
 // Thêm component Skeleton
 const Skeleton = ({ className }: { className: string }) => {
@@ -205,6 +212,11 @@ export default function ProfileDetailScreen() {
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
   const [tempDate, setTempDate] = useState<Date | null>(null);
   const isKeyboardVisible = useKeyboardStatus();
+  const [showAvatarLoadingPopup, setShowAvatarLoadingPopup] = useState(false);
+  const [avatarLoadingStatus, setAvatarLoadingStatus] = useState<ResultStatus>('loading');
+  const [avatarErrorMessage, setAvatarErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [avatarSuccessMessage, setAvatarSuccessMessage] = useState('');
 
   useEffect(() => {
     fetchAccountDetail();
@@ -278,17 +290,17 @@ export default function ProfileDetailScreen() {
         dob: selectedDate ? format(selectedDate, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx") : undefined
       };
 
-      const updatedAccount = await accountService.updateAccountInfo(id as string, updateData);
-      setAccount(updatedAccount);
+      const response = await accountService.updateAccountInfo(id as string, updateData);
+      setAccount(response.data);
       
       await updateUserData({
-        fullname: updatedAccount.fullname,
-        phone: updatedAccount.phone
+        fullname: response.data.fullname,
+        phone: response.data.phone
       });
 
       setIsEditing(false);
-      setLoadingMessage('Đã cập nhật thông tin thành công');
       setPopupStatus('success');
+      setSuccessMessage(response.message || 'Cập nhật thành công!');
       
       // Tự động đóng sau 1 giây nếu thành công
       setTimeout(() => {
@@ -365,9 +377,8 @@ export default function ProfileDetailScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
-        setLoadingMessage('Đang cập nhật ảnh đại diện...');
-        setPopupStatus('loading');
-        setShowLoadingPopup(true);
+        setAvatarLoadingStatus('loading');
+        setShowAvatarLoadingPopup(true);
         
         try {
           const response = await accountService.uploadAvatar(
@@ -382,32 +393,29 @@ export default function ProfileDetailScreen() {
 
           await updateUserData({ image: response.url });
 
-          setLoadingMessage('Đã cập nhật ảnh đại diện thành công');
-          setPopupStatus('success');
+          setAvatarLoadingStatus('success');
+          setAvatarSuccessMessage(response.message || 'Cập nhật ảnh thành công!');
           
-          // Tự động đóng sau 1 giây nếu thành công
+          // Tự động đóng sau 1.5s nếu thành công
           setTimeout(() => {
-            setShowLoadingPopup(false);
-            setPopupStatus(null);
-          }, 1000);
-        } catch (error) {
-          let errorMessage = 'Không thể cập nhật ảnh đại diện';
-          if (error instanceof Error) {
-            errorMessage = error.message;
-          }
-          setLoadingMessage(errorMessage);
-          setPopupStatus('error');
+            setShowAvatarLoadingPopup(false);
+            setAvatarLoadingStatus('loading');
+          }, 1500);
+        } catch (error: any) {
+          setAvatarLoadingStatus('error');
+          setAvatarErrorMessage(error.message || 'Không thể cập nhật ảnh đại diện');
           
-          // Tự động đóng sau 1.5 giây nếu lỗi
+          // Tự động đóng sau 1.5s nếu lỗi
           setTimeout(() => {
-            setShowLoadingPopup(false);
-            setPopupStatus(null);
+            setShowAvatarLoadingPopup(false);
+            setAvatarLoadingStatus('loading');
+            setAvatarErrorMessage('');
           }, 1500);
         }
       }
     } catch (error) {
-      setLoadingMessage('Không thể mở thư viện ảnh');
-      setPopupStatus('error');
+      setAvatarLoadingStatus('error');
+      setAvatarErrorMessage('Không thể mở thư viện ảnh');
     }
   };
 
@@ -773,10 +781,17 @@ export default function ProfileDetailScreen() {
       </SafeAreaView>
 
       <LoadingPopup 
-        visible={showLoadingPopup} 
-        message={loadingMessage}
+        visible={showLoadingPopup}
         status={popupStatus}
-        onClose={handleClosePopup}
+        errorMessage={loadingMessage}
+        successMessage={successMessage}
+      />
+
+      <AvatarLoadingPopup 
+        visible={showAvatarLoadingPopup}
+        status={avatarLoadingStatus}
+        errorMessage={avatarErrorMessage}
+        successMessage={avatarSuccessMessage}
       />
     </View>
   );

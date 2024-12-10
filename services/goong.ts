@@ -64,7 +64,6 @@ class GoongService {
       
       return location;
     } catch (error) {
-      console.error('Error geocoding address:', error);
       return null;
     }
   }

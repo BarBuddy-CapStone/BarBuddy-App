@@ -64,7 +64,7 @@ export const feedbackService = {
       }>(`/api/feedback/createFeedBack`, data);
 
       if (response.data.statusCode === 200) {
-        return response.data.data;
+        return response.data;
       }
 
       throw new Error(response.data.message);

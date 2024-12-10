@@ -20,6 +20,16 @@ export type UpdateAccountData = {
   dob?: string;
 };
 
+interface UpdateResponse {
+  data: Account;
+  message: string;
+}
+
+interface UploadAvatarResponse {
+  url: string;
+  message: string;
+}
+
 class AccountService {
   async getAccountInfo(accountId: string): Promise<Account> {
     try {
@@ -44,7 +54,7 @@ class AccountService {
     }
   }
 
-  async updateAccountInfo(accountId: string, data: UpdateAccountData): Promise<Account> {
+  async updateAccountInfo(accountId: string, data: UpdateAccountData): Promise<UpdateResponse> {
     try {
       // Validate input data
       if (data.fullname) {
@@ -79,7 +89,10 @@ class AccountService {
       );
 
       if (response.data.statusCode === 200) {
-        return response.data.data;
+        return {
+          data: response.data.data,
+          message: response.data.message
+        };
       }
 
       throw new Error(response.data.message);
@@ -102,7 +115,7 @@ class AccountService {
     }
   }
 
-  async uploadAvatar(accountId: string, imageUri: string): Promise<{ url: string }> {
+  async uploadAvatar(accountId: string, imageUri: string): Promise<UploadAvatarResponse> {
     try {
       const formData = new FormData();
       
@@ -144,7 +157,10 @@ class AccountService {
       );
 
       if (response.data.statusCode === 200) {
-        return response.data.data;
+        return {
+          url: response.data.data.url,
+          message: response.data.message
+        };
       }
 
       throw new Error(response.data.message);

@@ -138,7 +138,7 @@ class BookingService {
     }
   }
 
-  async cancelBooking(bookingId: string): Promise<boolean> {
+  async cancelBooking(bookingId: string): Promise<{success: boolean; message: string}> {
     try {
       const accessToken = await AsyncStorage.getItem('accessToken');
       
@@ -149,25 +149,23 @@ class BookingService {
           headers: {
             'Authorization': `Bearer ${accessToken}`,
             'Content-Type': 'application/json'
-          },
-          validateStatus: (status) => true 
+          }
         }
       );
-      
-      // Xử lý các trường hợp lỗi đặc biệt
-      if (response.status === 405) {
-        throw new Error('Phương thức không được phép. Vui lòng liên hệ admin.');
-      }
-      
+
       if (response.status === 202) {
-        throw new Error(`Bạn chỉ có thể hủy bàn trước ${response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
+        throw new Error(response.data.message || 'Bạn chỉ có thể hủy bàn trước 2 giờ đồng hồ đến giờ phục vụ.');
       }
-      
-      if (response.data.statusCode !== 200) {
-        throw new Error(response.data.message || 'Không thể hủy đặt bàn');
+
+      if (response.data.statusCode === 200) {
+        return {
+          success: true,
+          message: response.data.message || 'Hủy đặt bàn thành công!'
+        };
       }
-      
-      return true;
+
+      throw new Error(response.data.message || 'Không thể hủy đặt bàn');
+
     } catch (error: any) {
       // Xử lý lỗi 401 - để interceptor xử lý
       if (error.response?.status === 401) {
@@ -178,17 +176,14 @@ class BookingService {
         );
       }
       
-      // Xử lý lỗi 202
-      if (error.response?.status === 202) {
-        throw new Error(`Bạn chỉ có thể hủy bàn trước ${error.response.data.message || '2'} giờ đồng hồ đến giờ phục vụ.`);
+      // Nếu là lỗi từ response của API (có status code)
+      if (error.response) {
+        throw new Error(error.response.data.message || 'Không thể hủy đặt bàn');
       }
       
-      // Nếu là lỗi từ response của API
-      if (error.response) {
-        throw new Error(
-          error.response.data.message || 
-          `Lỗi ${error.response.status}: Không thể hủy đặt bàn`
-        );
+      // Nếu là error.message (từ throw new Error ở trên)
+      if (error.message) {
+        throw error;
       }
       
       // Nếu là lỗi do không kết nối được đến server

@@ -15,6 +15,8 @@ import * as MediaLibrary from 'expo-media-library';
 import { toastConfig, showToast } from '@/components/CustomToast';
 import Toast from 'react-native-toast-message';
 
+type LoadingStatus = 'loading' | 'success' | 'error';
+
 const getStatusColor = (status: number): string => {
   switch (status) {
     case 0: return 'bg-yellow-500';  // Đang chờ
@@ -512,6 +514,122 @@ const canCancelBooking = (booking: BookingDetail) => {
   return diffInMinutes > 120;
 };
 
+const LoadingPopup = ({ 
+  visible, 
+  status = 'loading',
+  errorMessage = '',
+  successMessage = ''
+}: { 
+  visible: boolean;
+  status?: LoadingStatus;
+  errorMessage?: string;
+  successMessage?: string;
+}) => (
+  <Modal transparent visible={visible}>
+    <View className="flex-1 bg-black/50 items-center justify-center">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
+        {status === 'loading' && (
+          <>
+            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đang hủy đặt bàn...
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng không tắt ứng dụng
+            </Text>
+          </>
+        )}
+
+        {status === 'success' && (
+          <>
+            <View className="mb-4 bg-green-500/20 p-3 rounded-full">
+              <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              {successMessage || 'Hủy đặt bàn thành công!'}
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Yêu cầu của bạn đã được xử lý
+            </Text>
+          </>
+        )}
+
+        {status === 'error' && (
+          <>
+            <View className="mb-4 bg-red-500/20 p-3 rounded-full">
+              <Ionicons name="close-circle" size={32} color="#EF4444" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Hủy đặt bàn thất bại
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {errorMessage || 'Vui lòng thử lại sau'}
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  </Modal>
+);
+
+const FeedbackLoadingPopup = ({ 
+  visible, 
+  status = 'loading',
+  errorMessage = '',
+  successMessage = ''
+}: { 
+  visible: boolean;
+  status?: LoadingStatus;
+  errorMessage?: string;
+  successMessage?: string;
+}) => (
+  <Modal transparent visible={visible}>
+    <View className="flex-1 bg-black/50 items-center justify-center">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
+        {status === 'loading' && (
+          <>
+            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đang gửi đánh giá...
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng không tắt ứng dụng
+            </Text>
+          </>
+        )}
+
+        {status === 'success' && (
+          <>
+            <View className="mb-4 bg-green-500/20 p-3 rounded-full">
+              <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              {successMessage || 'Gửi đánh giá thành công!'}
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Cảm ơn bạn đã đánh giá
+            </Text>
+          </>
+        )}
+
+        {status === 'error' && (
+          <>
+            <View className="mb-4 bg-red-500/20 p-3 rounded-full">
+              <Ionicons name="close-circle" size={32} color="#EF4444" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Gửi đánh giá thất bại
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {errorMessage || 'Vui lòng thử lại sau'}
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  </Modal>
+);
+
 export default function BookingDetailScreen() {
   const { id, reload, preventBack } = useLocalSearchParams<{ 
     id: string, 
@@ -603,51 +721,59 @@ export default function BookingDetailScreen() {
   }, [id, reload]); // Thêm reload vào dependencies
 
   // Thêm states để quản lý modal
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [isCanceling, setIsCanceling] = useState(false);
-  const [cancelStatus, setCancelStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [showLoadingPopup, setShowLoadingPopup] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<LoadingStatus>('loading');
   const [errorMessage, setErrorMessage] = useState('');
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Sửa lại handleCancelBooking để kiểm tra lại trước khi hủy
   const handleCancelBooking = async () => {
     if (!booking) return;
     
-    // Kiểm tra lại một lần nữa trư���c khi hủy
+    // Kiểm tra lại một lần nữa trước khi hủy
     if (!canCancelBooking(booking)) {
-      setCancelStatus('error');
+      setLoadingStatus('error');
       setErrorMessage('Bạn chỉ có thể hủy đặt bàn trước 2 tiếng.');
+      setShowLoadingPopup(true);
       return;
     }
 
     try {
-      setCancelStatus('loading');
-      setIsCanceling(true);
-      await bookingService.cancelBooking(booking.bookingId);
+      setShowCancelModal(false); // Đóng modal xác nhận
+      setLoadingStatus('loading');
+      setShowLoadingPopup(true);
       
-      setCancelStatus('success');
+      const result = await bookingService.cancelBooking(booking.bookingId);
       
-      // Đợi 1.5s để hiển thị thông báo thành công
-      setTimeout(() => {
-        // Tắt modal trước
-        setShowCancelModal(false);
-        // Sau đó mới chuyển trang
-        router.push({
-          pathname: '/(tabs)/booking-history',
-          params: { reload: 'true' }
-        });
-      }, 1500);
+      if (result.success) {
+        setLoadingStatus('success');
+        setSuccessMessage(result.message);
+        // Đợi 1.5s để hiển thị thông báo thành công
+        setTimeout(() => {
+          setShowLoadingPopup(false);
+          router.push({
+            pathname: '/(tabs)/booking-history',
+            params: { reload: 'true' }
+          });
+        }, 1500);
+      }
       
     } catch (error: any) {
-      setCancelStatus('error');
+      setLoadingStatus('error');
       setErrorMessage(error.message || 'Không thể hủy đặt bàn. Vui lòng thử lại sau.');
-    } finally {
-      setIsCanceling(false);
+      // Hiển thị error message trong 1.5s
+      setTimeout(() => {
+        setShowLoadingPopup(false);
+        setLoadingStatus('loading'); // Reset status
+        setErrorMessage('');
+      }, 1500);
     }
   };
 
   const resetModal = () => {
     setShowCancelModal(false);
-    setCancelStatus('idle');
+    setLoadingStatus('loading');
     setErrorMessage('');
   };
 
@@ -728,27 +854,28 @@ export default function BookingDetailScreen() {
     }
 
     try {
-      setIsSubmitting(true);
-      setRatingStatus('loading');
+      setShowRatingModal(false); // Đóng modal rating
+      setFeedbackLoadingStatus('loading');
+      setShowFeedbackLoadingPopup(true);
       
-      await feedbackService.createFeedback({
+      const response = await feedbackService.createFeedback({
         bookingId: booking!.bookingId,
         rating,
         comment: comment.trim()
       });
 
-      setRatingStatus('success');
-      setHasRated(true); // Đánh dấu là đã đánh giá
+      setFeedbackLoadingStatus('success');
+      // Lưu message từ backend
+      setSuccessMessage(response.message || 'Gửi đánh giá thành công!');
       
       // Reset form
       setRating(5);
       setComment('');
       
+      // Đợi 1.5s để hiển thị thông báo thành công
       setTimeout(() => {
-        setShowRatingModal(false);
-        setRatingStatus('idle');
-        
-        // Cập nhật lại booking để hiển thị nội dung xem đánh giá
+        setShowFeedbackLoadingPopup(false);
+        // Gọi onRefresh để cập nhật toàn bộ danh sách
         if (booking) {
           setBooking({
             ...booking,
@@ -758,10 +885,15 @@ export default function BookingDetailScreen() {
       }, 1500);
 
     } catch (error: any) {
-      setRatingStatus('error');
-      setRatingError(error.message || 'Không thể gửi đánh giá. Vui lòng thử lại sau.');
-    } finally {
-      setIsSubmitting(false);
+      setFeedbackLoadingStatus('error');
+      setFeedbackErrorMessage(error.message || 'Không thể gửi đánh giá. Vui lòng thử lại sau.');
+      // Hiển thị error message trong 1.5s
+      setTimeout(() => {
+        setShowFeedbackLoadingPopup(false);
+        setFeedbackLoadingStatus('loading');
+        setFeedbackErrorMessage('');
+        setShowRatingModal(true); // Mở lại modal rating để user có thể thử lại
+      }, 1500);
     }
   };
 
@@ -832,6 +964,11 @@ export default function BookingDetailScreen() {
       router.back();
     }
   };
+
+  // Trong component chính, thêm states cho feedback loading popup
+  const [showFeedbackLoadingPopup, setShowFeedbackLoadingPopup] = useState(false);
+  const [feedbackLoadingStatus, setFeedbackLoadingStatus] = useState<LoadingStatus>('loading');
+  const [feedbackErrorMessage, setFeedbackErrorMessage] = useState('');
 
   return (
     <View className="flex-1 bg-black">
@@ -1011,83 +1148,41 @@ export default function BookingDetailScreen() {
               statusBarTranslucent
             >
               <View className="flex-1 bg-black/50 justify-center items-center p-6">
-                <View className="bg-neutral-800 rounded-2xl w-full p-6">
-                  {cancelStatus === 'loading' ? (
-                    <View className="items-center py-4">
-                      <ActivityIndicator size="large" color="#EAB308" />
-                      <Text className="text-white text-lg font-bold mt-4">
-                        Đang hủy đặt bàn...
+                <View className="bg-neutral-900 rounded-2xl w-full max-w-sm p-6">
+                  <Text className="text-white text-lg font-bold text-center mb-2">
+                    Xác nhận hủy đặt bàn
+                  </Text>
+                  <Text className="text-white/60 text-center mb-6">
+                    Bạn có chắc chắn muốn hủy đặt bàn này không?
+                  </Text>
+                  
+                  <View className="flex-row space-x-3">
+                    <TouchableOpacity
+                      className="flex-1 bg-white/10 py-3 rounded-xl"
+                      onPress={() => setShowCancelModal(false)}
+                    >
+                      <Text className="text-white font-semibold text-center">Không</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
+                      className="flex-1 bg-red-500 py-3 rounded-xl"
+                      onPress={handleCancelBooking}
+                    >
+                      <Text className="text-white font-semibold text-center">
+                        Hủy đặt bàn
                       </Text>
-                    </View>
-                  ) : cancelStatus === 'success' ? (
-                    <View className="items-center py-4">
-                      <Ionicons name="checkmark-circle" size={48} color="#22C55E" />
-                      <Text className="text-white text-lg font-bold mt-4">
-                        Đã hủy đặt bàn thành công
-                      </Text>
-                    </View>
-                  ) : cancelStatus === 'error' ? (
-                    <>
-                      <View className="items-center py-4">
-                        <Ionicons name="alert-circle" size={48} color="#EF4444" />
-                        <Text className="text-white text-lg font-bold mt-4">
-                          Không thể hủy đặt bàn
-                        </Text>
-                        <Text className="text-white/60 text-center mt-2">
-                          {errorMessage}
-                        </Text>
-                      </View>
-                      <View className="flex-row space-x-3 mt-4">
-                        <TouchableOpacity
-                          className="flex-1 bg-white/10 py-3 rounded-xl"
-                          onPress={resetModal}
-                        >
-                          <Text className="text-white font-semibold text-center">Đóng</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          className="flex-1 bg-yellow-500 py-3 rounded-xl"
-                          onPress={() => {
-                            setCancelStatus('idle');
-                            setErrorMessage('');
-                          }}
-                        >
-                          <Text className="text-black font-semibold text-center">Thử lại</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  ) : (
-                    <>
-                      <Text className="text-white text-lg font-bold text-center mb-2">
-                        Xác nhận hủy đặt bàn
-                      </Text>
-                      <Text className="text-white/60 text-center mb-6">
-                        Bạn có chắc chắn muốn hủy đặt bàn này không?
-                      </Text>
-                      
-                      <View className="flex-row space-x-3">
-                        <TouchableOpacity
-                          className="flex-1 bg-white/10 py-3 rounded-xl"
-                          onPress={resetModal}
-                          disabled={isCanceling}
-                        >
-                          <Text className="text-white font-semibold text-center">Không</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                          className="flex-1 bg-red-500 py-3 rounded-xl"
-                          onPress={handleCancelBooking}
-                          disabled={isCanceling}
-                        >
-                          <Text className="text-white font-semibold text-center">
-                            Hủy đặt bàn
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  )}
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             </Modal>
+
+            <LoadingPopup 
+              visible={showLoadingPopup} 
+              status={loadingStatus}
+              errorMessage={errorMessage}
+              successMessage={successMessage}
+            />
 
             <Modal
               visible={showFeedbackModal}
@@ -1341,6 +1436,13 @@ export default function BookingDetailScreen() {
                 </TouchableOpacity>
               </TouchableOpacity>
             </Modal>
+
+            <FeedbackLoadingPopup 
+              visible={showFeedbackLoadingPopup}
+              status={feedbackLoadingStatus}
+              errorMessage={feedbackErrorMessage}
+              successMessage={successMessage}
+            />
           </>
         ) : null}
       </SafeAreaView>

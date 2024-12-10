@@ -89,25 +89,29 @@ const getBookingDate = (date: Date, time: string) => {
   return format(date, 'yyyy-MM-dd');
 };
 
-// Thêm LoadingPopup component với đầy đủ trạng thái
+// Thêm type LoadingStatus
+type LoadingStatus = 'loading' | 'success' | 'error';
+
+// Cập nhật lại LoadingPopup component
 const LoadingPopup = ({ 
   visible, 
-  status, 
-  errorMessage,
+  status = 'loading',
+  errorMessage = '',
+  successMessage = '', // Thêm successMessage prop
   onClose
 }: { 
   visible: boolean;
-  status: 'processing' | 'success' | 'error';
+  status?: LoadingStatus;
   errorMessage?: string;
-  onClose: () => void;
+  successMessage?: string; // Thêm vào interface
+  onClose?: () => void;
 }) => {
-  // Thêm useEffect để handle auto close
+  // Thêm useEffect để tự động đóng sau khi hiển thị thành công hoặc lỗi
   useEffect(() => {
     if (status === 'success' || status === 'error') {
       const timer = setTimeout(() => {
-        onClose();
-      }, 2000); // Tự động đóng sau 2 giây
-
+        onClose?.();
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [status, onClose]);
@@ -120,15 +124,12 @@ const LoadingPopup = ({
     >
       <TouchableOpacity
         activeOpacity={1}
-        onPress={status !== 'processing' ? onClose : undefined}
+        onPress={status !== 'loading' ? onClose : undefined}
         className="flex-1 bg-black/50 items-center justify-center"
       >
-        <Animated.View 
-          entering={FadeIn.duration(200)}
-          className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[85%] max-w-[240px]"
-        >
-          {status === 'processing' && (
-            <Animated.View entering={FadeIn.duration(200)} className="items-center">
+        <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
+          {status === 'loading' && (
+            <>
               <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
               <Text className="text-white text-center font-medium">
                 Đang xử lý đặt bàn...
@@ -136,33 +137,37 @@ const LoadingPopup = ({
               <Text className="text-white/60 text-center text-sm mt-2">
                 Vui lòng không tắt ứng dụng
               </Text>
-            </Animated.View>
+            </>
           )}
 
           {status === 'success' && (
-            <Animated.View entering={FadeIn.duration(200)} className="items-center">
-              <Ionicons name="checkmark-circle" size={48} color="#22C55E" className="mb-4" />
-              <Text className="text-white text-center font-medium mb-2">
-                Đặt bàn thành công
+            <>
+              <View className="mb-4 bg-green-500/20 p-3 rounded-full">
+                <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+              </View>
+              <Text className="text-white text-center font-medium">
+                {successMessage || 'Đặt bàn thành công!'}
               </Text>
-              <Text className="text-white/60 text-center text-sm">
-                Nhân viên của quán có thể sẽ liên hệ với bạn trong tương lai
+              <Text className="text-white/60 text-center text-sm mt-2">
+                Đơn đặt bàn của bạn đã được xác nhận
               </Text>
-            </Animated.View>
+            </>
           )}
 
           {status === 'error' && (
-            <Animated.View entering={FadeIn.duration(200)} className="items-center">
-              <Ionicons name="alert-circle" size={48} color="#EF4444" className="mb-4" />
-              <Text className="text-white text-center font-medium mb-2">
+            <>
+              <View className="mb-4 bg-red-500/20 p-3 rounded-full">
+                <Ionicons name="close-circle" size={32} color="#EF4444" />
+              </View>
+              <Text className="text-white text-center font-medium">
                 Đặt bàn thất bại
               </Text>
-              <Text className="text-white/60 text-center text-sm">
-                {errorMessage}
+              <Text className="text-white/60 text-center text-sm mt-2">
+                {errorMessage || 'Vui lòng thử lại sau'}
               </Text>
-            </Animated.View>
+            </>
           )}
-        </Animated.View>
+        </View>
       </TouchableOpacity>
     </Modal>
   );
@@ -208,9 +213,6 @@ export default function BookingTableScreen() {
   const [isLoadingAccount, setIsLoadingAccount] = useState(true);
   const [minDate] = useState(new Date()); // Ngày hiện tại
   const [maxDate] = useState(getMaxBookingDate()); // Ngày tối đa
-  const [showProcessingModal, setShowProcessingModal] = useState(false);
-  const [bookingStatus, setBookingStatus] = useState<'processing' | 'success' | 'error'>('processing');
-  const [bookingError, setBookingError] = useState<string>('');
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(selectedDate);
   const [showUpdateProfileModal, setShowUpdateProfileModal] = useState(false);
@@ -825,13 +827,21 @@ export default function BookingTableScreen() {
     });
   };
 
+  // Trong component chính, cập nhật states
+  const [showLoadingPopup, setShowLoadingPopup] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<LoadingStatus>('loading');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+
+  // Cập nhật lại hàm handleConfirmBooking
   const handleConfirmBooking = async () => {
+    if (!validateForm()) return;
     if (isBooking) return;
+
     setIsBooking(true);
     setShowConfirmModal(false);
-    setShowProcessingModal(true);
-    setBookingStatus('processing');
-    setBookingError('');
+    setShowLoadingPopup(true);
+    setLoadingStatus('loading');
     
     try {
       const bookingDate = selectedTime.includes('(+1 ngày)') 
@@ -842,25 +852,26 @@ export default function BookingTableScreen() {
         barId: id as string,
         bookingDate,
         bookingTime: selectedTime.replace(' (+1 ngày)', '') + ':00',
-        note: note,
+        note: note.trim(),
         tableIds: selectedTables.map(table => table.id),
-        numOfPeople: numOfPeople // Thêm số khách hàng
+        numOfPeople: numOfPeople
       };
 
-      await bookingTableService.bookTable(
+      const response = await bookingTableService.bookTable(
         bookingRequest,
-        // Thêm callback để tắt animation khi nhấn Đóng
         () => {
           setIsBooking(false);
-          setShowProcessingModal(false);
-          setBookingStatus('processing');
+          setShowLoadingPopup(false);
         }
       );
       
-      setBookingStatus('success');
+      setLoadingStatus('success');
+      // Lấy message từ response của backend
+      setSuccessMessage(response.message || 'Đặt bàn thành công!');
       
+      // Đợi 1.5s để hiển thị thông báo thành công
       setTimeout(() => {
-        setShowProcessingModal(false);
+        setShowLoadingPopup(false);
         router.replace({
           pathname: '/(tabs)/booking-history',
           params: { 
@@ -870,16 +881,16 @@ export default function BookingTableScreen() {
         });
       }, 1500);
 
-    } catch (error) {
-      setBookingStatus('error');
-      if (error instanceof Error) {
-        setBookingError(error.message);
-      } else {
-        setBookingError('Có lỗi xảy ra khi đặt bàn. Vui lòng thử lại.');
-      }
+    } catch (error: any) {
+      setLoadingStatus('error');
+      setErrorMessage(error.message || 'Không thể đặt bàn. Vui lòng thử lại sau.');
+      
+      // Hiển thị error message trong 1.5s
       setTimeout(() => {
-        setShowProcessingModal(false);
-      }, 2000);
+        setShowLoadingPopup(false);
+        setLoadingStatus('loading');
+        setErrorMessage('');
+      }, 1500);
     } finally {
       setIsBooking(false);
     }
@@ -1014,10 +1025,11 @@ export default function BookingTableScreen() {
       case ModalState.PROCESSING:
         return (
           <LoadingPopup 
-            visible={showProcessingModal}
-            status={bookingStatus}
-            errorMessage={bookingError}
-            onClose={() => setShowProcessingModal(false)}
+            visible={showLoadingPopup}
+            status={loadingStatus}
+            errorMessage={errorMessage}
+            successMessage={successMessage}
+            onClose={() => setShowLoadingPopup(false)}
           />
         );
 
@@ -1393,6 +1405,31 @@ export default function BookingTableScreen() {
 
     loadTableDetails();
   }, [showSelectedTablesModal, selectedTables, tableDetailsCache]);
+
+  // Thêm hàm validateForm
+  const validateForm = () => {
+    if (!selectedTables.length) {
+      Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một bàn');
+      return false;
+    }
+
+    if (!selectedTime) {
+      Alert.alert('Thông báo', 'Vui lòng chọn thời gian đặt bàn');
+      return false;
+    }
+
+    if (!selectedTableType) {
+      Alert.alert('Thông báo', 'Vui lòng chọn loại bàn');
+      return false;
+    }
+
+    if (numOfPeople < 1) {
+      Alert.alert('Thông báo', 'Vui lòng chọn số lượng khách hàng');
+      return false;
+    }
+
+    return true;
+  };
 
   return (
     <View className="flex-1 bg-black">
@@ -2629,10 +2666,10 @@ export default function BookingTableScreen() {
 
       {/* Thêm LoadingPopup vào đây */}
       <LoadingPopup 
-        visible={showProcessingModal}
-        status={bookingStatus}
-        errorMessage={bookingError}
-        onClose={() => setShowProcessingModal(false)}
+        visible={showLoadingPopup}
+        status={loadingStatus}
+        errorMessage={errorMessage}
+        successMessage={successMessage}
       />
     </View>
   );

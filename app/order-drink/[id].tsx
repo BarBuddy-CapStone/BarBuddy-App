@@ -224,11 +224,13 @@ const OrderSummaryModal = ({
 const LoadingPopup = ({ 
   visible, 
   status = 'loading',
-  errorMessage = '' 
+  errorMessage = '',
+  successMessage = ''
 }: { 
   visible: boolean;
   status?: LoadingStatus;
   errorMessage?: string;
+  successMessage?: string;
 }) => (
   <Modal transparent visible={visible}>
     <View className="flex-1 bg-black/50 items-center justify-center">
@@ -251,7 +253,7 @@ const LoadingPopup = ({
               <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
             </View>
             <Text className="text-white text-center font-medium">
-              Đặt món thành công!
+              {successMessage || 'Đặt thêm đồ uống thành công!'}
             </Text>
             <Text className="text-white/60 text-center text-sm mt-2">
               Đơn của bạn đã được gửi đến quán
@@ -1161,6 +1163,9 @@ export default function OrderDrinkScreen() {
   // Thêm state để lưu error message
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Thêm state để lưu message thành công
+  const [successMessage, setSuccessMessage] = useState('');
+
   // Cập nhật hàm handleConfirmOrder
   const handleConfirmOrder = useCallback(async () => {
     if (selectedDrinks.size === 0) return;
@@ -1185,6 +1190,8 @@ export default function OrderDrinkScreen() {
       
       if (result.success) {
         setLoadingStatus('success');
+        // Lưu message từ backend
+        setSuccessMessage(result.message || 'Đặt thêm đồ uống thành công');
         setTimeout(() => {
           setSelectedDrinks(new Map());
           setIsOrderSummaryVisible(false);
@@ -1210,7 +1217,6 @@ export default function OrderDrinkScreen() {
     } catch (error: any) {
       setLoadingStatus('error');
       setErrorMessage('Không thể đặt thêm đồ uống');
-      // Không tắt loading popup ngay, để hiển thị trạng thái lỗi
       setTimeout(() => {
         setShowLoadingPopup(false);
         setLoadingStatus('loading');
@@ -1814,9 +1820,10 @@ export default function OrderDrinkScreen() {
         onConfirm={handleConfirmOrder}
       />
       <LoadingPopup 
-        visible={showLoadingPopup} 
+        visible={showLoadingPopup}
         status={loadingStatus}
         errorMessage={errorMessage}
+        successMessage={successMessage}
       />
       <ConfirmationPopup
         visible={showConfirmPopup}

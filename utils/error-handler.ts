@@ -21,13 +21,7 @@ export const handleConnectionError = async (
                 onCancel?.();
                 resolve(null);
               }
-            },
-            {
-              text: 'Thử lại',
-              onPress: async () => {
-                resolve(await handleConnectionError(callback, errorMessage, onCancel));
-              },
-            },
+            }
           ]
         );
       });
@@ -47,13 +41,7 @@ export const handleConnectionError = async (
               onCancel?.();
               resolve(null);
             }
-          },
-          {
-            text: 'Thử lại',
-            onPress: async () => {
-              resolve(await handleConnectionError(callback, errorMessage, onCancel));
-            },
-          },
+          }
         ]
       );
     });

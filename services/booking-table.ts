@@ -132,7 +132,10 @@ class BookingTableService {
       const response = await api.post('/api/Booking/booking-table', request, { headers });
 
       if (response.data.statusCode === 200) {
-        return response.data.data;
+        return {
+          data: response.data.data,
+          message: response.data.message
+        };
       }
 
       throw new Error(response.data.message);

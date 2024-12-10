@@ -291,32 +291,35 @@ export default function BarsScreen() {
     }
   }, []);
 
-  // Đơn giản hóa initialization
+  // Thay đổi trong useEffect initialization
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
       
       try {
-        const [barsData, userLoc] = await Promise.all([
-          fetchBars(),
-          getUserLocation()
-        ]);
-
+        // Fetch bars trước và hiển thị ngay
+        const barsData = await fetchBars();
         if (barsData) {
+          setBarsWithLocation(barsData);
+          setIsLoading(false); // Tắt loading ngay sau khi có dữ liệu bars
+
+          // Sau đó mới tính toán khoảng cách
+          const userLoc = await getUserLocation();
           if (userLoc) {
             const barsWithDist = await calculateDistances(barsData, userLoc);
             if (barsWithDist) {
-              setBarsWithLocation(barsWithDist);
-            } else {
-              setBarsWithLocation(barsData);
+              // Tự động sắp xếp theo khoảng cách khi có dữ liệu
+              const sortedBars = [...barsWithDist].sort((a, b) => {
+                const distanceA = a.location?.distance ?? Infinity;
+                const distanceB = b.location?.distance ?? Infinity;
+                return distanceA - distanceB;
+              });
+              setBarsWithLocation(sortedBars);
             }
-          } else {
-            setBarsWithLocation(barsData);
           }
         }
       } catch (error) {
         console.error('Error in initialization:', error);
-      } finally {
         setIsLoading(false);
       }
     };
@@ -343,25 +346,36 @@ export default function BarsScreen() {
     });
   }, [barsWithLocation, searchQuery, showOpenOnly]);
 
-  // Đơn giản hóa onRefresh
+  // Cập nhật onRefresh để cũng áp dụng logic tương tự
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     setIsRefreshLoading(true);
+    
     try {
-      const barsSuccess = await fetchBars();
-      if (barsSuccess) {
-        const locationGranted = await getUserLocation();
-        if (locationGranted) {
-          await calculateDistances(barsSuccess, locationGranted);
-        } else {
-          setBarsWithLocation(barsSuccess);
+      // Fetch và hiển thị bars mới ngay lập tức
+      const barsData = await fetchBars();
+      if (barsData) {
+        setBarsWithLocation(barsData);
+        setIsRefreshLoading(false);
+
+        // Sau đó tính toán và sắp xếp lại theo khoảng cách
+        const userLoc = await getUserLocation();
+        if (userLoc) {
+          const barsWithDist = await calculateDistances(barsData, userLoc);
+          if (barsWithDist) {
+            const sortedBars = [...barsWithDist].sort((a, b) => {
+              const distanceA = a.location?.distance ?? Infinity;
+              const distanceB = b.location?.distance ?? Infinity;
+              return distanceA - distanceB;
+            });
+            setBarsWithLocation(sortedBars);
+          }
         }
       }
     } catch (error) {
       console.error('Error refreshing:', error);
     } finally {
       setRefreshing(false);
-      setIsRefreshLoading(false);
     }
   }, []);
 

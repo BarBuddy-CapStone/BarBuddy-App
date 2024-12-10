@@ -40,6 +40,16 @@ interface VerifyOTPResponse {
   data: null;
 }
 
+interface ResetPasswordRequest {
+  email: string;
+}
+
+interface ResetPasswordResponse {
+  statusCode: number;
+  message: string;
+  data: string;
+}
+
 class AuthService {
   async login(credentials: LoginRequest): Promise<UserInfo> {
     try {
@@ -119,6 +129,21 @@ class AuthService {
       return handleConnectionError(
         async () => { throw error; },
         'Không thể xác thực OTP. Vui lòng thử lại sau.'
+      );
+    }
+  }
+
+  async resetPassword(email: string): Promise<ResetPasswordResponse> {
+    try {
+      const response = await api.post<ResetPasswordResponse>('/api/authen/reset-password', email);
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể gửi yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau.'
       );
     }
   }

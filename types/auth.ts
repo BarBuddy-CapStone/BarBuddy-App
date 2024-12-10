@@ -76,3 +76,13 @@ export interface RefreshTokenResponse {
     barName: string | null;
   };
 }
+
+export interface ResetPasswordRequest {
+  email: string;
+}
+
+export interface ResetPasswordResponse {
+  statusCode: number;
+  message: string;
+  data: string;
+}

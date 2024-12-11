@@ -42,6 +42,7 @@ class NotificationService {
   private static isNavigatedToTabs = false; // Th��m flag mới để track việc đã navigate đến tabs
   private static pendingDeepLink: string | null = null;
   private static isDeepLinkHandled = false;
+  private static pendingNotificationId: string | null = null;
 
   constructor() {
     this.createDefaultChannels();
@@ -72,14 +73,19 @@ class NotificationService {
       onNotification: (notification: LocalNotification) => {
         console.log('Local notification clicked:', notification);
         
-        // Chỉ xử lý deeplink khi notification được click
         if (notification.userInteraction === true) {
           const notificationData = notification.data || notification.userInfo;
           if (notificationData?.deepLink) {
             console.log('Deep link from notification click:', notificationData.deepLink);
-            // Thay vì xử lý trực tiếp, lưu vào pending
+            // Lưu cả deepLink và notificationId
             NotificationService.pendingDeepLink = notificationData.deepLink;
-            // Kiểm tra và xử lý nếu điều kiện đã sẵn sàng
+            // Kiểm tra type của notificationId
+            const notificationId = notificationData.notificationId;
+            if (typeof notificationId === 'string') {
+              NotificationService.pendingNotificationId = notificationId;
+            } else {
+              NotificationService.pendingNotificationId = null;
+            }
             this.checkAndHandlePendingDeepLink();
           }
         }
@@ -130,10 +136,16 @@ class NotificationService {
     messaging().onNotificationOpenedApp(remoteMessage => {
       console.log('Notification opened from background state:', JSON.stringify(remoteMessage, null, 2));
       const deepLink = remoteMessage.data?.deepLink;
+      const notificationId = remoteMessage.data?.notificationId;
       if (typeof deepLink === 'string') {
-        // Luôn lưu vào pending
+        // Lưu cả deepLink và notificationId
         NotificationService.pendingDeepLink = deepLink;
-        // Kiểm tra và xử lý nếu điều kiện đã sẵn sàng
+        // Kiểm tra type của notificationId
+        if (typeof notificationId === 'string') {
+          NotificationService.pendingNotificationId = notificationId;
+        } else {
+          NotificationService.pendingNotificationId = null;
+        }
         this.checkAndHandlePendingDeepLink();
       }
     });
@@ -141,10 +153,16 @@ class NotificationService {
     // Xử lý khi nhấn vào thông báo khi app đã đóng
     messaging().getInitialNotification().then(remoteMessage => {
       const deepLink = remoteMessage?.data?.deepLink;
+      const notificationId = remoteMessage?.data?.notificationId;
       if (typeof deepLink === 'string') {
-        // Luôn lưu vào pending
+        // Lưu cả deepLink và notificationId
         NotificationService.pendingDeepLink = deepLink;
-        // Kiểm tra và xử lý nếu điều kiện đã sẵn sàng
+        // Kiểm tra type của notificationId
+        if (typeof notificationId === 'string') {
+          NotificationService.pendingNotificationId = notificationId;
+        } else {
+          NotificationService.pendingNotificationId = null;
+        }
         this.checkAndHandlePendingDeepLink();
       }
     });
@@ -193,6 +211,17 @@ class NotificationService {
         const path = url.replace('com.fptu.barbuddy://', '');
         console.log('Handling deep link path:', path);
         
+        // Tìm notificationId từ pendingDeepLink
+        const notificationId = NotificationService.pendingNotificationId;
+        if (notificationId) {
+          // Mark as read notification
+          this.markAsRead(notificationId).catch(error => {
+            console.error('Error marking notification as read:', error);
+          });
+          // Reset notificationId
+          NotificationService.pendingNotificationId = null;
+        }
+
         router.push('/' + path as any);
       }
     } catch (error) {
@@ -236,7 +265,7 @@ class NotificationService {
     });
   }
 
-  // Các phư��ng thức khác giữ nguyên
+  // Các phương thức khác giữ nguyên
   async getNotifications(pageNumber: number = 1) {
     try {
       const authData = await AsyncStorage.getItem('@auth');

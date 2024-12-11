@@ -39,7 +39,9 @@ export interface Notification {
 class NotificationService {
   // Thêm biến static để theo dõi trạng thái
   private static isAppReady = false;
+  private static isNavigatedToTabs = false; // Th��m flag mới để track việc đã navigate đến tabs
   private static pendingDeepLink: string | null = null;
+  private static isDeepLinkHandled = false;
 
   constructor() {
     this.createDefaultChannels();
@@ -70,12 +72,15 @@ class NotificationService {
       onNotification: (notification: LocalNotification) => {
         console.log('Local notification clicked:', notification);
         
-        // Chỉ xử lý deeplink khi notification được click (không phải khi vừa nhận)
+        // Chỉ xử lý deeplink khi notification được click
         if (notification.userInteraction === true) {
           const notificationData = notification.data || notification.userInfo;
           if (notificationData?.deepLink) {
             console.log('Deep link from notification click:', notificationData.deepLink);
-            this.handleDeepLink(notificationData.deepLink);
+            // Thay vì xử lý trực tiếp, lưu vào pending
+            NotificationService.pendingDeepLink = notificationData.deepLink;
+            // Kiểm tra và xử lý nếu điều kiện đã sẵn sàng
+            this.checkAndHandlePendingDeepLink();
           }
         }
       },
@@ -126,12 +131,10 @@ class NotificationService {
       console.log('Notification opened from background state:', JSON.stringify(remoteMessage, null, 2));
       const deepLink = remoteMessage.data?.deepLink;
       if (typeof deepLink === 'string') {
-        if (NotificationService.isAppReady) {
-          this.handleDeepLink(deepLink);
-        } else {
-          // Lưu deeplink để xử lý sau
-          NotificationService.pendingDeepLink = deepLink;
-        }
+        // Luôn lưu vào pending
+        NotificationService.pendingDeepLink = deepLink;
+        // Kiểm tra và xử lý nếu điều kiện đã sẵn sàng
+        this.checkAndHandlePendingDeepLink();
       }
     });
 
@@ -139,23 +142,46 @@ class NotificationService {
     messaging().getInitialNotification().then(remoteMessage => {
       const deepLink = remoteMessage?.data?.deepLink;
       if (typeof deepLink === 'string') {
-        if (NotificationService.isAppReady) {
-          this.handleDeepLink(deepLink);
-        } else {
-          // Lưu deeplink để xử lý sau
-          NotificationService.pendingDeepLink = deepLink;
-        }
+        // Luôn lưu vào pending
+        NotificationService.pendingDeepLink = deepLink;
+        // Kiểm tra và xử lý nếu điều kiện đã sẵn sàng
+        this.checkAndHandlePendingDeepLink();
       }
     });
   }
 
-  // Thêm method để set trạng thái
+  // Thêm method để set trạng thái đã navigate đến tabs
+  public setNavigatedToTabs(navigated: boolean) {
+    NotificationService.isNavigatedToTabs = navigated;
+    // Kiểm tra và xử lý deeplink nếu cả app ready và đã navigate đến tabs
+    this.checkAndHandlePendingDeepLink();
+  }
+
+  // Thêm method để set trạng thái app ready
   public setAppReady(ready: boolean) {
     NotificationService.isAppReady = ready;
-    // Xử lý deeplink đang chờ nếu có
-    if (ready && NotificationService.pendingDeepLink) {
-      this.handleDeepLink(NotificationService.pendingDeepLink);
-      NotificationService.pendingDeepLink = null;
+    // Kiểm tra và xử lý deeplink nếu cả app ready và đã navigate đến tabs
+    this.checkAndHandlePendingDeepLink();
+  }
+
+  // Thêm method mới để kiểm tra và xử lý pending deeplink
+  private checkAndHandlePendingDeepLink() {
+    if (NotificationService.isAppReady && 
+        NotificationService.isNavigatedToTabs && 
+        NotificationService.pendingDeepLink && 
+        !NotificationService.isDeepLinkHandled) {
+      NotificationService.isDeepLinkHandled = true;
+      
+      // Tăng timeout để đảm bảo navigation stack đã sẵn sàng
+      setTimeout(() => {
+        this.handleDeepLink(NotificationService.pendingDeepLink!);
+        NotificationService.pendingDeepLink = null;
+        
+        // Reset flag sau 2 giây
+        setTimeout(() => {
+          NotificationService.isDeepLinkHandled = false;
+        }, 2000);
+      }, 1000); // Tăng timeout lên 1000ms
     }
   }
 
@@ -167,13 +193,11 @@ class NotificationService {
         const path = url.replace('com.fptu.barbuddy://', '');
         console.log('Handling deep link path:', path);
         
-        // Thêm timeout ngắn để đảm bảo app đã mở hoàn toàn
-        setTimeout(() => {
-          router.push('/' + path as any);
-        }, 1000);
+        router.push('/' + path as any);
       }
     } catch (error) {
       console.error('Error handling deep link:', error);
+      NotificationService.isDeepLinkHandled = false;
     }
   }
 
@@ -212,7 +236,7 @@ class NotificationService {
     });
   }
 
-  // Các phương thức khác giữ nguyên
+  // Các phư��ng thức khác giữ nguyên
   async getNotifications(pageNumber: number = 1) {
     try {
       const authData = await AsyncStorage.getItem('@auth');

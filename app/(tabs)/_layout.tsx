@@ -3,10 +3,21 @@ import { NotificationContext } from '@/contexts/NotificationContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform, View, Text } from 'react-native';
+import { notificationService } from '@/services/notification';
 
 export default function TabLayout() {
   const { notifications } = useContext(NotificationContext);
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  useEffect(() => {
+    // Set flag đã navigate đến tabs
+    notificationService.setNavigatedToTabs(true);
+    
+    return () => {
+      // Reset flag khi unmount
+      notificationService.setNavigatedToTabs(false);
+    };
+  }, []);
 
   return (
     <Tabs

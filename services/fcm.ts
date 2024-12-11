@@ -67,6 +67,8 @@ class FCMService {
         authHeader
       );
 
+      console.log(response);
+
       if (response.data.statusCode === 200) {
         if (isLoginOrLogout) {
           await signalRService.connect();
@@ -80,12 +82,6 @@ class FCMService {
       if (error.response) {
         throw new Error(error.response.data.message);
       }
-      
-      // Nếu là lỗi do không kết nối được đến server
-      return handleConnectionError(
-        async () => { throw error; },
-        'Không thể cập nhật thông tin thiết bị. Vui lòng thử lại sau.'
-      );
     }
   }
 }

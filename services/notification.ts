@@ -37,6 +37,10 @@ export interface Notification {
 }
 
 class NotificationService {
+  // Thêm biến static để theo dõi trạng thái
+  private static isAppReady = false;
+  private static pendingDeepLink: string | null = null;
+
   constructor() {
     this.createDefaultChannels();
     this.configurePushNotification();
@@ -114,34 +118,47 @@ class NotificationService {
     // Xử lý thông báo khi app đang mở (foreground)
     messaging().onMessage(async remoteMessage => {
       console.log('Received foreground message:', JSON.stringify(remoteMessage, null, 2));
-      // Chỉ hiển thị notification, không tự động mở deeplink
       this.showLocalNotification(remoteMessage);
     });
 
     // Xử lý khi nhấn vào thông báo khi app ở background
     messaging().onNotificationOpenedApp(remoteMessage => {
       console.log('Notification opened from background state:', JSON.stringify(remoteMessage, null, 2));
-      console.log('Deep link from background:', remoteMessage.data?.deepLink);
-      // Chỉ xử lý deeplink khi người dùng click vào notification
-      if (remoteMessage.data?.deepLink) {
-        this.handleDeepLink(remoteMessage.data.deepLink as any);
+      const deepLink = remoteMessage.data?.deepLink;
+      if (typeof deepLink === 'string') {
+        if (NotificationService.isAppReady) {
+          this.handleDeepLink(deepLink);
+        } else {
+          // Lưu deeplink để xử lý sau
+          NotificationService.pendingDeepLink = deepLink;
+        }
       }
     });
 
     // Xử lý khi nhấn vào thông báo khi app đã đóng
     messaging().getInitialNotification().then(remoteMessage => {
-      if (remoteMessage) {
-        console.log('Notification opened from quit state:', JSON.stringify(remoteMessage, null, 2));
-        console.log('Deep link from quit state:', remoteMessage.data?.deepLink);
-        // Chỉ xử lý deeplink khi người dùng click vào notification
-        if (remoteMessage.data?.deepLink) {
-          this.handleDeepLink(remoteMessage.data.deepLink as any);
+      const deepLink = remoteMessage?.data?.deepLink;
+      if (typeof deepLink === 'string') {
+        if (NotificationService.isAppReady) {
+          this.handleDeepLink(deepLink);
+        } else {
+          // Lưu deeplink để xử lý sau
+          NotificationService.pendingDeepLink = deepLink;
         }
       }
     });
   }
 
-  // Thêm hàm mới để xử lý deeplink
+  // Thêm method để set trạng thái
+  public setAppReady(ready: boolean) {
+    NotificationService.isAppReady = ready;
+    // Xử lý deeplink đang chờ nếu có
+    if (ready && NotificationService.pendingDeepLink) {
+      this.handleDeepLink(NotificationService.pendingDeepLink);
+      NotificationService.pendingDeepLink = null;
+    }
+  }
+
   private handleDeepLink(url: string) {
     try {
       // Kiểm tra nếu url bắt đầu bằng scheme của app

@@ -132,6 +132,9 @@ export default function OnboardingScreen() {
     if (isLoading || hasNavigated.current) return;
     hasNavigated.current = true;
     
+    // Set app ready trước khi navigate
+    notificationService.setAppReady(true);
+    
     if (!isAuthenticated && !isGuest) {
       router.replace('/(auth)/welcome');
       return;

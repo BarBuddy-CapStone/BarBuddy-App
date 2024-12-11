@@ -24,24 +24,31 @@ interface NotificationProviderProps {
 
 export const NotificationProvider = ({ children, isGuest, userId }: NotificationProviderProps) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const clearNotifications = () => {
     setNotifications([]);
   };
 
   useEffect(() => {
-    if (!isGuest && userId) {
-      fetchNotifications();
-    } else {
-      clearNotifications();
-    }
+    const initializeNotifications = async () => {
+      if (!isGuest && userId) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        await fetchNotifications();
+        setIsInitialized(true);
+      } else {
+        clearNotifications();
+      }
+    };
+
+    initializeNotifications();
   }, [isGuest, userId]);
 
   useEffect(() => {
     let isMounted = true;
 
     const setupSignalR = async () => {
-      if (!isGuest && userId) {
+      if (!isGuest && userId && isInitialized) {
         console.log('Global SignalR: Bắt đầu kết nối SignalR...');
         await signalRService.connect();
 
@@ -74,7 +81,7 @@ export const NotificationProvider = ({ children, isGuest, userId }: Notification
         signalRService.disconnect();
       }
     };
-  }, [isGuest, userId]);
+  }, [isGuest, userId, isInitialized]);
 
   const fetchNotifications = async (pageNumber: number = 1) => {
     if (isGuest || !userId) {

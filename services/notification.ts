@@ -133,14 +133,20 @@ class NotificationService {
   async getNotifications(pageNumber: number = 1) {
     try {
       const authData = await AsyncStorage.getItem('@auth');
-      const headers: any = {};
-      
-      if (authData) {
-        const userData = JSON.parse(authData);
-        if (userData?.user?.accessToken) {
-          headers['Authorization'] = `Bearer ${userData.user.accessToken}`;
-        }
+      if (!authData) {
+        console.log('Không có dữ liệu xác thực');
+        return [];
       }
+
+      const userData = JSON.parse(authData);
+      if (!userData?.user?.accessToken) {
+        console.log('Không có access token');
+        return [];
+      }
+
+      const headers = {
+        'Authorization': `Bearer ${userData.user.accessToken}`
+      };
 
       const response = await api.get(
         `/api/Fcm/notifications?page=${pageNumber}`,
@@ -156,6 +162,7 @@ class NotificationService {
 
       throw new Error(response.data.message);
     } catch (error: any) {
+      console.log('Lỗi chi tiết:', error);
       // Nếu là lỗi từ response của API
       if (error.response) {
         throw new Error(error.response.data.message);

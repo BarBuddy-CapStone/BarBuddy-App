@@ -374,8 +374,10 @@ export default function ForgotPasswordScreen() {
 
       {/* OTP Modal */}
       {showOTPModal && (
-        <View 
-          className="absolute inset-0 items-center justify-center" 
+        <Animated.View 
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(200)}
+          className="absolute inset-0 items-center justify-center bg-black/40" 
           style={{ 
             position: 'absolute',
             top: 0,
@@ -383,44 +385,17 @@ export default function ForgotPasswordScreen() {
             right: 0,
             bottom: 0,
             zIndex: 50,
-            backgroundColor: 'rgba(0,0,0,0.4)',
           }}
         >
-          {/* Backdrop */}
+          {/* Modal Container với animation fade */}
           <Animated.View 
-            entering={FadeIn.duration(300)}
+            entering={FadeIn.duration(400).delay(100)}
             exiting={FadeOut.duration(200)}
-            className="absolute inset-0"
-            style={{
-              backgroundColor: 'rgba(0,0,0,0.4)',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
-          >
-            <TouchableOpacity 
-              activeOpacity={1} 
-              onPress={handleCloseOTPModal}
-              className="w-full h-full" 
-            />
-          </Animated.View>
-          
-          {/* Modal Container */}
-          <Animated.View 
-            entering={SlideInUp.duration(400).springify().damping(15)}
-            exiting={SlideOutDown.duration(300)}
             className="w-[90%] max-w-[400px] z-50"
           >
             <View
               className="bg-[#1A1A1A] rounded-3xl overflow-hidden"
               style={{
-                shadowColor: '#FFB800',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.3,
-                shadowRadius: 20,
-                elevation: 10,
                 borderWidth: 1,
                 borderColor: 'rgba(255, 184, 0, 0.1)',
               }}
@@ -568,7 +543,7 @@ export default function ForgotPasswordScreen() {
               </View>
             </View>
           </Animated.View>
-        </View>
+        </Animated.View>
       )}
     </>
   );

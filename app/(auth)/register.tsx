@@ -96,7 +96,7 @@ export default function RegisterScreen() {
   const [googleError, setGoogleError] = useState<string | null>(null);
   const [showOTPModal, setShowOTPModal] = useState(false);
   const [otp, setOtp] = useState('');
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(180);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const otpInputRefs = useRef(Array(6).fill(0).map(() => React.createRef<TextInput>()));
   const [isResendingOTP, setIsResendingOTP] = useState(false);
@@ -235,7 +235,7 @@ export default function RegisterScreen() {
           setResendSuccess(null);
         }, 3000);
       } else {
-        // Xử lý trường hợp API trả về lỗi
+        // Xử lý trường hợp API tr về lỗi
         setResendError(response.message || 'Có lỗi xảy ra khi gửi lại mã');
       }
     } catch (err: any) {
@@ -716,8 +716,10 @@ export default function RegisterScreen() {
 
       {/* OTP Modal */}
       {showOTPModal && (
-        <View 
-          className="absolute inset-0 items-center justify-center" 
+        <Animated.View 
+          entering={FadeIn.duration(300)}
+          exiting={FadeOut.duration(200)}
+          className="absolute inset-0 items-center justify-center bg-black/40" 
           style={{ 
             position: 'absolute',
             top: 0,
@@ -725,44 +727,17 @@ export default function RegisterScreen() {
             right: 0,
             bottom: 0,
             zIndex: 50,
-            backgroundColor: 'rgba(0,0,0,0.4)',
           }}
         >
-          {/* Backdrop với animation */}
+          {/* Modal Container với animation fade */}
           <Animated.View 
-            entering={FadeIn.duration(300)}
+            entering={FadeIn.duration(400).delay(100)}
             exiting={FadeOut.duration(200)}
-            className="absolute inset-0"
-            style={{
-              backgroundColor: 'rgba(0,0,0,0.4)',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
-          >
-            <TouchableOpacity 
-              activeOpacity={1} 
-              onPress={handleCloseOTPModal}
-              className="w-full h-full" 
-            />
-          </Animated.View>
-          
-          {/* Modal Container */}
-          <Animated.View 
-            entering={SlideInUp.duration(400).springify().damping(15)}
-            exiting={SlideOutDown.duration(300)}
             className="w-[90%] max-w-[400px] z-50"
           >
             <View
               className="bg-[#1A1A1A] rounded-3xl overflow-hidden"
               style={{
-                shadowColor: '#FFB800',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: 0.3,
-                shadowRadius: 20,
-                elevation: 10,
                 borderWidth: 1,
                 borderColor: 'rgba(255, 184, 0, 0.1)',
               }}
@@ -923,7 +898,7 @@ export default function RegisterScreen() {
               </View>
             </View>
           </Animated.View>
-        </View>
+        </Animated.View>
       )}
 
       {showSuccessModal && (
@@ -941,15 +916,6 @@ export default function RegisterScreen() {
           <Animated.View 
             entering={FadeIn.duration(300)}
             className="w-[90%] max-w-[400px] bg-[#1A1A1A] rounded-3xl overflow-hidden"
-            style={{
-              shadowColor: '#FFB800',
-              shadowOffset: { width: 0, height: 0 },
-              shadowOpacity: 0.3,
-              shadowRadius: 20,
-              elevation: 10,
-              borderWidth: 1,
-              borderColor: 'rgba(255, 184, 0, 0.1)',
-            }}
           >
             {/* Header */}
             <View className="px-6 py-5 border-b border-white/10">

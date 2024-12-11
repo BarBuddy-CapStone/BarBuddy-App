@@ -7,6 +7,20 @@ import { handleConnectionError } from '@/utils/error-handler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 
+interface NotificationData {
+  deepLink?: string;
+  notificationId?: string;
+  barId?: string;
+  type?: string;
+  [key: string]: any;
+}
+
+interface LocalNotification {
+  userInfo?: NotificationData;
+  data?: NotificationData;
+  [key: string]: any;
+}
+
 export interface Notification {
   id: string;
   title: string;
@@ -49,10 +63,19 @@ class NotificationService {
   configurePushNotification() {
     // Cấu hình cơ bản cho PushNotification
     PushNotification.configure({
-      onNotification: function (notification) {
-        // Không làm gì khi nhấn vào thông báo
+      onNotification: (notification: LocalNotification) => {
+        console.log('Local notification clicked:', notification);
+        
+        // Chỉ xử lý deeplink khi notification được click (không phải khi vừa nhận)
+        if (notification.userInteraction === true) {
+          const notificationData = notification.data || notification.userInfo;
+          if (notificationData?.deepLink) {
+            console.log('Deep link from notification click:', notificationData.deepLink);
+            this.handleDeepLink(notificationData.deepLink);
+          }
+        }
       },
-      popInitialNotification: false,
+      popInitialNotification: true,
       requestPermissions: true,
     });
   }
@@ -90,31 +113,63 @@ class NotificationService {
   setupMessageListeners() {
     // Xử lý thông báo khi app đang mở (foreground)
     messaging().onMessage(async remoteMessage => {
-      console.log('Received foreground message:', remoteMessage);
-      this.showNotification(remoteMessage);
+      console.log('Received foreground message:', JSON.stringify(remoteMessage, null, 2));
+      // Chỉ hiển thị notification, không tự động mở deeplink
+      this.showLocalNotification(remoteMessage);
     });
 
     // Xử lý khi nhấn vào thông báo khi app ở background
     messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log('Notification opened from background state:', remoteMessage);
+      console.log('Notification opened from background state:', JSON.stringify(remoteMessage, null, 2));
+      console.log('Deep link from background:', remoteMessage.data?.deepLink);
+      // Chỉ xử lý deeplink khi người dùng click vào notification
       if (remoteMessage.data?.deepLink) {
-        router.push(remoteMessage.data.deepLink as any);
+        this.handleDeepLink(remoteMessage.data.deepLink as any);
       }
     });
 
     // Xử lý khi nhấn vào thông báo khi app đã đóng
     messaging().getInitialNotification().then(remoteMessage => {
       if (remoteMessage) {
-        console.log('Notification opened from quit state:', remoteMessage);
+        console.log('Notification opened from quit state:', JSON.stringify(remoteMessage, null, 2));
+        console.log('Deep link from quit state:', remoteMessage.data?.deepLink);
+        // Chỉ xử lý deeplink khi người dùng click vào notification
         if (remoteMessage.data?.deepLink) {
-          router.push(remoteMessage.data.deepLink as any);
+          this.handleDeepLink(remoteMessage.data.deepLink as any);
         }
       }
     });
   }
 
-  // Hàm chung để hiển thị thông báo
-  showNotification(remoteMessage: any) {
+  // Thêm hàm mới để xử lý deeplink
+  private handleDeepLink(url: string) {
+    try {
+      // Kiểm tra nếu url bắt đầu bằng scheme của app
+      if (url.startsWith('com.fptu.barbuddy://')) {
+        // Lấy phần path sau scheme
+        const path = url.replace('com.fptu.barbuddy://', '');
+        console.log('Handling deep link path:', path);
+        
+        // Thêm timeout ngắn để đảm bảo app đã mở hoàn toàn
+        setTimeout(() => {
+          router.push('/' + path as any);
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('Error handling deep link:', error);
+    }
+  }
+
+  // Đổi tên để rõ ràng hơn
+  private showLocalNotification(remoteMessage: any) {
+    console.log('Showing local notification:', JSON.stringify(remoteMessage, null, 2));
+    
+    const notificationData = {
+      ...remoteMessage.data,
+      title: remoteMessage.notification?.title,
+      body: remoteMessage.notification?.body,
+    };
+
     PushNotification.localNotification({
       channelId: 'default',
       title: remoteMessage.notification?.title,
@@ -126,6 +181,17 @@ class NotificationService {
       vibrate: true,
       visibility: 'public',
       autoCancel: true,
+      userInfo: notificationData,
+      largeIcon: "ic_launcher",
+      smallIcon: "ic_notification",
+      bigText: remoteMessage.notification?.body || '',
+      subText: remoteMessage.notification?.title,
+      color: "#EAB308",
+      ongoing: false,
+      ignoreInForeground: false,
+      invokeApp: true,
+      tag: remoteMessage.messageId,
+      id: Math.floor(Math.random() * 1000000),
     });
   }
 

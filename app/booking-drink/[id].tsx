@@ -507,31 +507,39 @@ export default function BookingDrinkScreen() {
       return;
     }
 
-    const selectedTablesInfo: SelectedTableInfo[] = JSON.parse(params.selectedTables as string);
+    try {
+      const selectedTablesInfo = JSON.parse(params.selectedTables as string);
+      const tableIds = JSON.parse(params.tableIds as string);
 
-    const bookingRequest: BookingDrinkRequest = {
-      barId: params.id as string,
-      bookingDate: params.bookingDate as string,
-      bookingTime: params.bookingTime as string,
-      note: params.note as string,
-      tableIds: JSON.parse(params.tableIds as string),
-      selectedTables: selectedTablesInfo,
-      paymentDestination: "VNPAY",
-      drinks,
-      voucherCode: params.voucherCode as string || '',
-      numOfPeople: Number(params.numOfPeople)
-    };
+      const bookingRequest: BookingDrinkRequest = {
+        barId: params.id as string,
+        bookingDate: params.date as string,
+        bookingTime: params.time as string,
+        note: params.note as string,
+        tableIds: tableIds,
+        selectedTables: selectedTablesInfo,
+        paymentDestination: "VNPAY",
+        drinks,
+        voucherCode: params.voucherCode as string || '',
+        numOfPeople: Number(params.numOfPeople)
+      };
 
-    router.push({
-      pathname: "/payment/payment-detail" as any,
-      params: {
-        bookingRequest: JSON.stringify(bookingRequest),
-        discount: params.discount,
-        originalPrice: originalPrice.toString(),
-        totalPrice: totalPrice.toString(),
-        numOfPeople: params.numOfPeople
-      }
-    });
+      console.log(bookingRequest);
+
+      router.push({
+        pathname: "/payment/payment-detail" as any,
+        params: {
+          bookingRequest: JSON.stringify(bookingRequest),
+          discount: params.discount,
+          originalPrice: originalPrice.toString(),
+          totalPrice: totalPrice.toString(),
+          numOfPeople: params.numOfPeople
+        }
+      });
+    } catch (error) {
+      console.error('Error parsing JSON:', error);
+      Alert.alert('Lỗi', 'Có lỗi xảy ra khi xử lý thông tin bàn');
+    }
   };
 
   useEffect(() => {
@@ -876,7 +884,7 @@ export default function BookingDrinkScreen() {
     }
   }, [drinks]);
 
-  // Cập nhật hàm xử lý chọn emotion
+  // Cập nhật hàm x�� lý chọn emotion
   const handleEmotionSelect = (emotionId: string) => {
     if (selectedEmotion === emotionId) {
       // Chỉ reset emotion selection và recommended drinks
@@ -1367,7 +1375,7 @@ export default function BookingDrinkScreen() {
                           </Text>
                           
                           <Text className="text-gray-400 text-sm text-center px-4">
-                            Chúng tôi sử dụng trí tuệ nhân tạo để phân tích trạng thái cảm xúc của bạn dựa trên dữ liệu mà bạn nhập vào, chúng tôi cam kết sẽ không lưu trữ dữ liệu của bạn.
+                            Chúng tôi sử dụng trí tuệ nhân tạo để phân tích trạng thái cảm xúc của bạn dựa trên dữ liệu mà b��n nhập vào, chúng tôi cam kết sẽ không lưu trữ dữ liệu của bạn.
                           </Text>
                           <Text className="text-gray-500 text-sm text-center px-4 mt-2">
                             Đây là tính năng thử nghiệm, kết quả có thể không trùng khớp với trạng thái cảm xúc hiện tại của bạn.

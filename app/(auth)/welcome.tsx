@@ -43,6 +43,14 @@ export default function WelcomeScreen() {
     });
   };
 
+  const handleTermsPress = () => {
+    router.push('/terms-and-policies');
+  };
+
+  const handlePrivacyPress = () => {
+    router.push('/privacy-policy');
+  };
+
   const animatedStyle = useAnimatedStyle(() => ({
     opacity: opacity.value
   }));
@@ -96,8 +104,18 @@ export default function WelcomeScreen() {
           {/* Terms */}
           <Text className="text-white/60 text-xs text-center mt-8 mb-6 px-6">
             Bằng cách đăng ký hoặc đăng nhập, bạn đã đồng ý với{' '}
-            <Text className="text-yellow-500">Điều khoản dịch vụ</Text> và{' '}
-            <Text className="text-yellow-500">Chính sách bảo mật</Text> của chúng tôi.
+            <Text 
+              className="text-yellow-500 underline"
+              onPress={handleTermsPress}
+            >
+              Điều khoản dịch vụ
+            </Text> và{' '}
+            <Text 
+              className="text-yellow-500 underline"
+              onPress={handlePrivacyPress}
+            >
+              Chính sách bảo mật
+            </Text> của chúng tôi.
           </Text>
 
           {/* Divider */}

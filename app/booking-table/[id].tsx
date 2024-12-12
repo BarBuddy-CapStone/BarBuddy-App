@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { format, addDays, parseISO } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { BarDetail, barService } from '@/services/bar';
 import { TableType, tableTypeService } from '@/services/table-type';
@@ -14,14 +14,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { BookingTableFilter, BookingTableRequest, bookingTableService, HoldTableRequest, GetHoldTableParams, HoldTableInfo } from '@/services/booking-table';
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingSignalRService, TableHoldEvent } from '@/services/booking-signalr';
-import { AppState, AppStateStatus } from 'react-native';
-import { TableDetail, tableService } from '@/services/table';
+import { useBookingSignalR } from '@/contexts/BookingSignalRContext';
 
 // Thêm interface cho state availableTables
 interface TableUI {
   id: string;
   name: string;
-  status: 'available' | 'booked' | 'held';  // Thêm status 'held'
+  status: 'available' | 'booked';
   typeId: string;
 }
 
@@ -89,89 +88,64 @@ const getBookingDate = (date: Date, time: string) => {
   return format(date, 'yyyy-MM-dd');
 };
 
-// Thêm type LoadingStatus
-type LoadingStatus = 'loading' | 'success' | 'error';
-
-// Cập nhật lại LoadingPopup component
+// Cập nhật LoadingPopup component với thiết kế mới
 const LoadingPopup = ({ 
   visible, 
   status = 'loading',
   errorMessage = '',
-  successMessage = '', // Thêm successMessage prop
-  onClose
+  successMessage = ''
 }: { 
   visible: boolean;
-  status?: LoadingStatus;
+  status?: 'loading' | 'success' | 'error';
   errorMessage?: string;
-  successMessage?: string; // Thêm vào interface
-  onClose?: () => void;
-}) => {
-  // Thêm useEffect để tự động đóng sau khi hiển thị thành công hoặc lỗi
-  useEffect(() => {
-    if (status === 'success' || status === 'error') {
-      const timer = setTimeout(() => {
-        onClose?.();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [status, onClose]);
+  successMessage?: string;
+}) => (
+  <Modal transparent visible={visible}>
+    <View className="flex-1 bg-black/50 items-center justify-center">
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
+        {status === 'loading' && (
+          <>
+            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đang xử lý đặt bàn...
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng không tắt ứng dụng
+            </Text>
+          </>
+        )}
 
-  return (
-    <Modal 
-      transparent 
-      visible={visible}
-      onRequestClose={onClose}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={status !== 'loading' ? onClose : undefined}
-        className="flex-1 bg-black/50 items-center justify-center"
-      >
-        <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
-          {status === 'loading' && (
-            <>
-              <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
-              <Text className="text-white text-center font-medium">
-                Đang xử lý đặt bàn...
-              </Text>
-              <Text className="text-white/60 text-center text-sm mt-2">
-                Vui lòng không tắt ứng dụng
-              </Text>
-            </>
-          )}
+        {status === 'success' && (
+          <>
+            <View className="mb-4 bg-green-500/20 p-3 rounded-full">
+              <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              {successMessage || 'Đặt bàn thành công!'}
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Yêu cầu của bạn đã được xử lý
+            </Text>
+          </>
+        )}
 
-          {status === 'success' && (
-            <>
-              <View className="mb-4 bg-green-500/20 p-3 rounded-full">
-                <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
-              </View>
-              <Text className="text-white text-center font-medium">
-                {successMessage || 'Đặt bàn thành công!'}
-              </Text>
-              <Text className="text-white/60 text-center text-sm mt-2">
-                Đơn đặt bàn của bạn đã được xác nhận
-              </Text>
-            </>
-          )}
-
-          {status === 'error' && (
-            <>
-              <View className="mb-4 bg-red-500/20 p-3 rounded-full">
-                <Ionicons name="close-circle" size={32} color="#EF4444" />
-              </View>
-              <Text className="text-white text-center font-medium">
-                Đặt bàn thất bại
-              </Text>
-              <Text className="text-white/60 text-center text-sm mt-2">
-                {errorMessage || 'Vui lòng thử lại sau'}
-              </Text>
-            </>
-          )}
-        </View>
-      </TouchableOpacity>
-    </Modal>
-  );
-};
+        {status === 'error' && (
+          <>
+            <View className="mb-4 bg-red-500/20 p-3 rounded-full">
+              <Ionicons name="close-circle" size={32} color="#EF4444" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Đặt bàn thất bại
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {errorMessage || 'Vui lòng thử lại sau'}
+            </Text>
+          </>
+        )}
+      </View>
+    </View>
+  </Modal>
+);
 
 // Thêm enum để quản lý trạng thái modal
 enum ModalState {
@@ -213,10 +187,14 @@ export default function BookingTableScreen() {
   const [isLoadingAccount, setIsLoadingAccount] = useState(true);
   const [minDate] = useState(new Date()); // Ngày hiện tại
   const [maxDate] = useState(getMaxBookingDate()); // Ngày tối đa
+  const [showProcessingModal, setShowProcessingModal] = useState(false);
+  const [bookingStatus, setBookingStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [bookingError, setBookingError] = useState('');
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(selectedDate);
   const [showUpdateProfileModal, setShowUpdateProfileModal] = useState(false);
   const [isUserValidated, setIsUserValidated] = useState(false);
+  const [bookingSuccess, setBookingSuccess] = useState('');
 
   // Thay thế các state quản lý modal riêng lẻ bằng một state duy nhất
   const [currentModal, setCurrentModal] = useState<ModalState>(ModalState.NONE);
@@ -224,7 +202,7 @@ export default function BookingTableScreen() {
   // Thêm state để theo dõi việc redirect từ profile-detail
   const [isRedirectFromProfile, setIsRedirectFromProfile] = useState(false);
 
-  // Thêm state để theo dõi việc c����n refresh account info
+  // Thêm state để theo dõi việc cần refresh account info
   const [needRefreshAccount, setNeedRefreshAccount] = useState(false);
 
   // Thêm state để theo dõi trạng thái loading của từng bàn
@@ -233,23 +211,13 @@ export default function BookingTableScreen() {
   // Thêm state để lưu danh sách bàn đã giữ
   const [heldTables, setHeldTables] = useState<HoldTableInfo[]>([]);
 
-  // Thêm ref để lưu giá trị trước đó của selectedTime
-  const prevSelectedTime = useRef(selectedTime);
-
-  // Thêm state để theo dõi trạng thái loading của từng nút xóa
-  const [removingTables, setRemovingTables] = useState<{ [key: string]: boolean }>({});
-
-  // Thêm state mới
-  const [selectedTableDetails, setSelectedTableDetails] = useState<TableDetail[]>([]);
-  const [isLoadingTableDetails, setIsLoadingTableDetails] = useState(false);
-
   // Thêm state mới
   const [numOfPeople, setNumOfPeople] = useState<number>(1);
 
-  // Thêm state để quản lý modal chọn số khách hàng
+  // Thêm state để quản lý modal chọn số lượng khách hàng
   const [showPeoplePickerModal, setShowPeoplePickerModal] = useState(false);
 
-  // Thêm hàm tạo danh sách số khách hàng từ 1-100
+  // Thêm hàm tạo danh sách số khách hàng từ 1-30
   const generatePeopleOptions = () => {
     return Array.from({ length: 30 }, (_, i) => i + 1);
   };
@@ -274,7 +242,7 @@ export default function BookingTableScreen() {
                     selectedDate.getFullYear() === currentDate.getFullYear();
 
     try {
-      // Tạo date objects cho thời gian bắt đầu và kết thúc
+      // Tạo date objects cho thời gian bắt đ���u và kết thúc
       const startTimeDate = new Date(selectedDate);
       const [startHour, startMinute] = barTimeForSelectedDay.startTime.split(':');
       startTimeDate.setHours(parseInt(startHour), parseInt(startMinute), 0, 0);
@@ -328,13 +296,113 @@ export default function BookingTableScreen() {
     }
   };
 
-  const handleTimeChange = async (time: string) => {
+  // Thêm hàm releaseAllTables
+  const releaseAllTables = async () => {
+    try {
+      // Release từng bàn đã chọn
+      const releasePromises = selectedTables.map(table => {
+        const request: HoldTableRequest = {
+          tableId: table.id,
+          time: selectedTime.replace(' (+1 ngày)', '') + ':00',
+          barId: id as string,
+          date: selectedTime.includes('(+1 ngày)') 
+            ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+            : format(selectedDate, 'yyyy-MM-dd')
+        };
+        return bookingTableService.releaseTable(request);
+      });
+
+      await Promise.all(releasePromises);
+    } catch (error) {
+      console.error('Error releasing tables:', error);
+    }
+  };
+
+  // Cập nhật xử lý khi thay đổi ngày
+  const handleDateChange = useCallback((event: any, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      setIsDatePickerVisible(false);
+      
+      if (!date || event.type === 'dismissed') {
+        return;
+      }
+
+      // Release tất cả bàn trước khi thay đổi ngày
+      releaseAllTables();
+      setSelectedDate(date);
+      setSelectedTables([]);
+      setAvailableTables([]);
+      setCurrentTableType(null);
+      setHasSearched(false);
+      setShowTypeDescription(false);
+    } else {
+      if (date) {
+        setTempDate(date);
+      }
+    }
+  }, [selectedTables, selectedTime, id]);
+
+  const handleConfirmDate = () => {
+    setSelectedDate(tempDate);
+    setSelectedTables([]);
+    setAvailableTables([]);
+    setCurrentTableType(null);
+    setHasSearched(false);
+    setShowTypeDescription(false);
+    setShowDatePicker(false);
+    setIsDatePickerVisible(false);
+  };
+
+  // Cập nhật xử lý khi thay đổi giờ
+  const handleTimeChange = (time: string) => {
     if (time !== selectedTime) {
-      await releaseAllTables();
+      // Release tất cả bàn trước khi thay đổi giờ
+      releaseAllTables();
       setSelectedTime(time);
+      setSelectedTables([]);
+      setAvailableTables([]);
+      setCurrentTableType(null);
+      setHasSearched(false);
+      setShowTypeDescription(false);
     }
     setShowTimePicker(false);
   };
+
+  // Cập nhật xử lý khi nhấn nút back
+  const handleBack = async () => {
+    await releaseAllTables();
+    router.back();
+  };
+
+  // Thêm state để kiểm soát việc back
+  const [isReleasing, setIsReleasing] = useState(false);
+
+  // Thêm useEffect để xử lý back hệ thống
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isReleasing) return true; // Prevent back while releasing
+      
+      setIsReleasing(true);
+      releaseAllTables().finally(() => {
+        setIsReleasing(false);
+        router.back();
+      });
+      
+      return true; // Prevent default back behavior
+    });
+
+    return () => {
+      backHandler.remove();
+    };
+  }, [selectedTables, selectedTime, id, isReleasing]);
+
+  // Thêm cleanup khi component unmount
+  useEffect(() => {
+    return () => {
+      releaseAllTables();
+    };
+  }, []);
 
   // Load bar detail và table types khi component mount
   useEffect(() => {
@@ -441,102 +509,13 @@ export default function BookingTableScreen() {
     }
   };
 
-  // Sửa lại hàm releaseAllTables để thêm log và xử lý lỗi tốt hơn
-  const releaseAllTables = async () => {
-    if (selectedTables.length === 0) return;
-
-    console.log('Releasing tables:', selectedTables.map(t => t.id));
-    try {
-      // Gọi API release cho tất cả các bàn đã chọn
-      await Promise.all(selectedTables.map(table => {
-        const request: HoldTableRequest = {
-          tableId: table.id,
-          time: selectedTime.replace(' (+1 ngày)', '') + ':00',
-          barId: id as string,
-          date: selectedTime.includes('(+1 ngày)') 
-            ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
-            : format(selectedDate, 'yyyy-MM-dd')
-        };
-        console.log('Releasing table with request:', request);
-        return bookingTableService.releaseTable(request);
-      }));
-
-      console.log('Successfully released all tables');
-      // Reset các state
-      setSelectedTables([]);
-      setAvailableTables(prev => prev.map(table => ({
-        ...table,
-        status: selectedTables.some(st => st.id === table.id) ? 'available' : table.status
-      })));
-    } catch (error) {
-      console.error('Error releasing all tables:', error);
-    }
-  };
-
-  // Sửa lại hàm handleDateChange cho Android
-  const handleDateChange = useCallback(async (event: any, date?: Date) => {
-    if (Platform.OS === 'android') {
-      setShowDatePicker(false);
-      setIsDatePickerVisible(false);
-      
-      if (!date || event.type === 'dismissed') {
-        return;
-      }
-
-      console.log('Date changed, releasing all tables...');
-      await releaseAllTables();
-      setSelectedDate(date);
-      setSelectedTables([]);
-      setAvailableTables([]);
-      setHasSearched(false);
-    } else {
-      if (date) {
-        setTempDate(date);
-      }
-    }
-  }, [selectedTables, selectedTime, id]); // Thêm dependencies
-
-  // Sửa lại hàm handleConfirmDate cho iOS
-  const handleConfirmDate = async () => {
-    console.log('Confirming date change, releasing all tables...');
-    await releaseAllTables();
-    setSelectedDate(tempDate);
-    setSelectedTables([]);
-    setAvailableTables([]);
-    setHasSearched(false);
-    setShowDatePicker(false);
-    setIsDatePickerVisible(false);
-  };
-
-  // Sửa lại hàm fetchHoldTables
-  const fetchHoldTables = async () => {
-    try {
-      const params: GetHoldTableParams = {
-        barId: id as string,
-        date: selectedTime.includes('(+1 ngày)') 
-          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
-          : format(selectedDate, 'yyyy-MM-dd'),
-        timeSpan: selectedTime.replace(' (+1 ngày)', '') + ':00'
-      };
-
-      const holdTables = await bookingTableService.getHoldTable(params);
-      setHeldTables(holdTables);
-
-    } catch (error) {
-      console.error('Error fetching hold tables:', error);
-      setHeldTables([]);
-    }
-  };
-
-  // Sửa lại hàm handleSearchTables
   const handleSearchTables = async () => {
     setIsSearching(true);
     setHasSearched(true);
+    setAvailableTables([]);
+    setSelectedTables([]); // Reset selectedTables trước khi tìm kiếm
     
     try {
-      // Lưu lại danh sách bàn đã chọn hiện tại
-      const currentSelectedTableIds = selectedTables.map(t => t.id);
-
       // Gọi cả 2 API song song để tối ưu performance
       const [holdTablesResponse, availableTablesResponse] = await Promise.all([
         bookingTableService.getHoldTable({
@@ -557,6 +536,20 @@ export default function BookingTableScreen() {
       // Lưu danh sách bàn đã giữ
       setHeldTables(holdTablesResponse);
 
+      // Lọc ra các bàn do user hiện tại giữ
+      const userHeldTables = holdTablesResponse.filter(ht => ht.accountId === user?.accountId);
+      
+      // Map thông tin bàn đã giữ vào selectedTables
+      if (userHeldTables.length > 0) {
+        const selectedTablesFromHold = userHeldTables.map(ht => ({
+          id: ht.tableId,
+          name: ht.tableName,
+          typeId: selectedTableType,
+          typeName: tableTypes.find(t => t.tableTypeId === selectedTableType)?.typeName || ''
+        }));
+        setSelectedTables(selectedTablesFromHold);
+      }
+
       // Xử lý danh sách bàn có sẵn
       const tables = availableTablesResponse.bookingTables[0]?.tables || [];
       
@@ -565,17 +558,13 @@ export default function BookingTableScreen() {
         // Tìm thông tin bàn đã giữ tương ứng
         const heldTable = holdTablesResponse.find(ht => ht.tableId === table.tableId);
         
-        // Kiểm tra xem bàn có trong danh sách đã chọn không
-        const isCurrentlySelected = currentSelectedTableIds.includes(table.tableId);
-        
         return {
           id: table.tableId,
           name: table.tableName,
-          status: isCurrentlySelected 
-            ? 'held'  // Nếu bàn đang được chọn, giữ trạng thái 'held'
-            : (heldTable && heldTable.accountId !== user?.accountId) || table.status !== 1
-              ? 'booked' 
-              : 'available',
+          // Nếu bàn được giữ bởi người khác hoặc đã được đặt -> booked
+          status: (heldTable && heldTable.accountId !== user?.accountId) || table.status !== 1 
+            ? 'booked' 
+            : 'available',
           typeId: selectedTableType
         };
       });
@@ -585,6 +574,7 @@ export default function BookingTableScreen() {
     } catch (error) {
       console.error('Error searching tables:', error);
       setAvailableTables([]);
+      setSelectedTables([]);
       setHeldTables([]);
     } finally {
       setIsSearching(false);
@@ -594,21 +584,13 @@ export default function BookingTableScreen() {
   // Sửa lại useEffect để không tự động gọi fetchHoldTables
   useEffect(() => {
     if (selectedTime && selectedTableType) {
-      // Chỉ reset state khi thay đổi thời gian
-      if (selectedTime !== prevSelectedTime.current) {
-        setSelectedTables([]);
-        setAvailableTables([]);
-        setHeldTables([]);
-        setHasSearched(false);
-      }
-      prevSelectedTime.current = selectedTime;
+      // Chỉ reset các state khi thay đổi thời gian hoặc loại bàn
+      setSelectedTables([]);
+      setAvailableTables([]);
+      setHeldTables([]);
     }
   }, [selectedTime, selectedTableType]);
 
-  // Thêm state để lưu cache thông tin bàn
-  const [tableDetailsCache, setTableDetailsCache] = useState<{ [key: string]: TableDetail }>({});
-
-  // Sửa lại hàm handleTableSelection
   const handleTableSelection = async (table: TableUI) => {
     if (loadingTables[table.id]) return;
 
@@ -632,23 +614,23 @@ export default function BookingTableScreen() {
         // Release table
         await bookingTableService.releaseTable(request);
         setSelectedTables(prev => prev.filter(t => t.id !== table.id));
-        setAvailableTables(prev => prev.map(t => 
-          t.id === table.id ? { ...t, status: 'available' } : t
-        ));
       } else {
         // Check max tables
-        if (selectedTables.length >= MAX_TABLES) {
+        const uniqueTablesCount = new Set(selectedTables.map(t => t.id)).size;
+        if (uniqueTablesCount >= MAX_TABLES) {
           setShowMaxTablesModal(true);
           return;
         }
 
         // Hold table
         await bookingTableService.holdTable(request);
-        
-        // Không cần thêm vào selectedTables ở đây vì sẽ được thêm thông qua SignalR event
-        setAvailableTables(prev => prev.map(t => 
-          t.id === table.id ? { ...t, status: 'held' } : t
-        ));
+        const tableTypeInfo = tableTypes.find(t => t.tableTypeId === table.typeId);
+        setSelectedTables(prev => [...prev, {
+          id: table.id,
+          name: table.name,
+          typeId: table.typeId,
+          typeName: tableTypeInfo?.typeName || ''
+        }]);
       }
     } catch (error) {
       console.error('Error handling table selection:', error);
@@ -664,64 +646,8 @@ export default function BookingTableScreen() {
     }
   };
 
-  // Sửa lại hàm handleRemoveTable
-  const handleRemoveTable = async (tableId: string) => {
-    if (removingTables[tableId]) return;
-
-    setRemovingTables(prev => ({
-      ...prev,
-      [tableId]: true
-    }));
-
-    try {
-      const request: HoldTableRequest = {
-        tableId: tableId,
-        time: selectedTime.replace(' (+1 ngày)', '') + ':00',
-        barId: id as string,
-        date: selectedTime.includes('(+1 ngày)') 
-          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
-          : format(selectedDate, 'yyyy-MM-dd')
-      };
-
-      await bookingTableService.releaseTable(request);
-      
-      // Cập nhật UI và xóa cache
-      setSelectedTables(prev => {
-        const newSelectedTables = prev.filter(t => t.id !== tableId);
-        if (newSelectedTables.length === 0) {
-          setShowSelectedTablesModal(false);
-        }
-        return newSelectedTables;
-      });
-
-      setTableDetailsCache(prev => {
-        const newCache = { ...prev };
-        delete newCache[tableId];
-        return newCache;
-      });
-
-      setAvailableTables(prev => prev.map(table => {
-        if (table.id === tableId) {
-          return {
-            ...table,
-            status: 'available'
-          };
-        }
-        return table;
-      }));
-
-    } catch (error) {
-      console.error('Error releasing table:', error);
-      Alert.alert(
-        'Lỗi',
-        error instanceof Error ? error.message : 'Không thể hủy giữ bàn. Vui lòng thử lại.'
-      );
-    } finally {
-      setRemovingTables(prev => ({
-        ...prev,
-        [tableId]: false
-      }));
-    }
+  const handleRemoveTable = (tableId: string) => {
+    setSelectedTables(prev => prev.filter(t => t.id !== tableId));
   };
 
   const handleTableTypeSelect = (typeId: string) => {
@@ -731,8 +657,8 @@ export default function BookingTableScreen() {
       id: selectedType.tableTypeId, 
       name: selectedType.typeName 
     } : null);
-    setShowTypeDescription(true);
-    // Không reset các state khác
+    setShowTypeDescription(true); // Hiển thị description khi chọn loại bàn
+    setHasSearched(false); // Reset trạng thái hasSearched khi thay đổi loại bàn
   };
 
   const isOver18 = (birthDate: string) => {
@@ -791,57 +717,46 @@ export default function BookingTableScreen() {
     fetchAccountInfo();
   }, [user?.accountId]);
 
-  const handleBookingNow = async () => {
+  // Thêm hàm xử lý khi nhấn nút đặt bàn ngay
+  const handleBookNow = () => {
+    if (!validateForm()) return;
     setShowConfirmModal(true);
   };
 
   const handleBookingWithDrinks = () => {
-    if (!selectedTables.length) {
-      Alert.alert('Thông báo', 'Vui lòng chọn bàn trước khi đặt kèm nước uống');
-      return;
-    }
-
-    const bookingDate = selectedTime.includes('(+1 ngày)') 
-      ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
-      : format(selectedDate, 'yyyy-MM-dd');
-
-    const selectedTablesInfo: SelectedTableInfo[] = selectedTables.map(table => ({
-      id: table.id,
-      name: table.name,
-      typeId: table.typeId,
-      typeName: tableTypes.find(t => t.tableTypeId === table.typeId)?.typeName || ''
-    }));
+    // Lọc ra danh sách bàn unique
+    const uniqueTables = Array.from(
+      new Map(selectedTables.map(table => [table.id, table])).values()
+    );
 
     router.push({
-      pathname: "/booking-drink/[id]",
+      pathname: `/booking-drink/${id}` as any,
       params: {
-        id: id as string,
-        tableIds: JSON.stringify(selectedTables.map(table => table.id)),
-        selectedTables: JSON.stringify(selectedTablesInfo),
-        bookingDate: bookingDate,
-        bookingTime: selectedTime.replace(' (+1 ngày)', '') + ':00',
-        note: note,
-        discount: barDetail?.discount || 0,
-        numOfPeople: numOfPeople // Thêm số người vào params
+        date: selectedTime.includes('(+1 ngày)') 
+          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+          : format(selectedDate, 'yyyy-MM-dd'),
+        time: selectedTime.replace(' (+1 ngày)', '') + ':00',
+        tableIds: JSON.stringify(uniqueTables.map(table => table.id)),
+        selectedTables: JSON.stringify(uniqueTables.map(table => ({
+          id: table.id,
+          name: table.name,
+          typeId: table.typeId,
+          typeName: table.typeName
+        }))),
+        note: note.trim(),
+        numOfPeople: numOfPeople.toString(),
+        discount: barDetail?.discount?.toString() || '0'
       }
     });
   };
 
-  // Trong component chính, cập nhật states
-  const [showLoadingPopup, setShowLoadingPopup] = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState<LoadingStatus>('loading');
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-
-  // Cập nhật lại hàm handleConfirmBooking
   const handleConfirmBooking = async () => {
-    if (!validateForm()) return;
     if (isBooking) return;
-
     setIsBooking(true);
     setShowConfirmModal(false);
-    setShowLoadingPopup(true);
-    setLoadingStatus('loading');
+    setShowProcessingModal(true);
+    setBookingStatus('loading');
+    setBookingError('');
     
     try {
       const bookingDate = selectedTime.includes('(+1 ngày)') 
@@ -854,43 +769,36 @@ export default function BookingTableScreen() {
         bookingTime: selectedTime.replace(' (+1 ngày)', '') + ':00',
         note: note.trim(),
         tableIds: selectedTables.map(table => table.id),
-        numOfPeople: numOfPeople
+        numOfPeople: numOfPeople // Thêm số khách hàng
       };
 
-      const response = await bookingTableService.bookTable(
-        bookingRequest,
-        () => {
-          setIsBooking(false);
-          setShowLoadingPopup(false);
-        }
-      );
+      await bookingTableService.bookTable(bookingRequest);
+      setBookingStatus('success');
+      setBookingSuccess('Đặt bàn thành công!');
       
-      setLoadingStatus('success');
-      // Lấy message từ response của backend
-      setSuccessMessage(response.message || 'Đặt bàn thành công!');
-      
-      // Đợi 1.5s để hiển thị thông báo thành công
+      // Thay đổi cách navigation
       setTimeout(() => {
-        setShowLoadingPopup(false);
+        setShowProcessingModal(false);
+        // Replace thay vì push để không thể back lại
         router.replace({
           pathname: '/(tabs)/booking-history',
           params: { 
             reload: 'true',
-            fromBooking: 'true'
+            fromBooking: 'true' // Thêm param để biết là từ booking
           }
         });
       }, 1500);
 
-    } catch (error: any) {
-      setLoadingStatus('error');
-      setErrorMessage(error.message || 'Không thể đặt bàn. Vui lòng thử lại sau.');
-      
-      // Hiển thị error message trong 1.5s
+    } catch (error) {
+      setBookingStatus('error');
+      if (error instanceof Error) {
+        setBookingError(error.message);
+      } else {
+        setBookingError('Có lỗi xảy ra khi đặt bàn. Vui lòng thử lại.');
+      }
       setTimeout(() => {
-        setShowLoadingPopup(false);
-        setLoadingStatus('loading');
-        setErrorMessage('');
-      }, 1500);
+        setShowProcessingModal(false);
+      }, 2000);
     } finally {
       setIsBooking(false);
     }
@@ -1025,11 +933,10 @@ export default function BookingTableScreen() {
       case ModalState.PROCESSING:
         return (
           <LoadingPopup 
-            visible={showLoadingPopup}
-            status={loadingStatus}
-            errorMessage={errorMessage}
-            successMessage={successMessage}
-            onClose={() => setShowLoadingPopup(false)}
+            visible={showProcessingModal}
+            status={bookingStatus}
+            errorMessage={bookingError}
+            successMessage={bookingSuccess}
           />
         );
 
@@ -1105,7 +1012,7 @@ export default function BookingTableScreen() {
       'keyboardDidShow',
       () => {
         setKeyboardVisible(true);
-        // Đợi một chút để bàn phím hi���n lên hoàn toàn
+        // Đợi một chút để bàn phím hiện lên hoàn toàn
         setTimeout(scrollToNoteInput, 250);
       }
     );
@@ -1123,325 +1030,181 @@ export default function BookingTableScreen() {
     };
   }, []);
 
-  // Thêm useEffect để xử lý SignalR connection
+  // Thêm context của SignalR
+  const { isConnected } = useBookingSignalR();
+
+  // Thêm useEffect để lắng nghe các sự kiện SignalR
   useEffect(() => {
-    let appStateSubscription: any;
-    let isSubscribed = true;
+    if (!isConnected) return;
 
-    const initializeSignalR = async () => {
-      if (!isSubscribed) return;
-      console.log('Initializing SignalR connection...');
-      await bookingSignalRService.initialize();
-    };
-
-    const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      console.log('App state changed to:', nextAppState);
-      if (nextAppState === 'active') {
-        console.log('App became active, reconnecting SignalR...');
-        await initializeSignalR();
-      } else if (nextAppState === 'background') {
-        console.log('App went to background, stopping SignalR...');
-        await bookingSignalRService.stop();
-      }
-    };
-
-    // Khởi tạo SignalR khi component mount
-    initializeSignalR();
-
-    // Đăng ký lắng nghe sự kiện thay đổi trạng thái app
-    appStateSubscription = AppState.addEventListener('change', handleAppStateChange);
-
-    // Cleanup khi component unmount
-    return () => {
-      console.log('Component unmounting, cleaning up SignalR...');
-      isSubscribed = false;
-      appStateSubscription.remove();
-      bookingSignalRService.stop();
-    };
-  }, []); // Empty dependency array vì chúng ta chỉ muốn effect này chạy một lần khi mount
-
-  // Thêm useFocusEffect để xử lý khi screen được focus/unfocus
-  useFocusEffect(
-    useCallback(() => {
-      let isSubscribed = true;
-
-      const handleScreenFocus = async () => {
-        if (!isSubscribed) return;
-        console.log('Screen focused, initializing SignalR...');
-        await bookingSignalRService.initialize();
-      };
-
-      // Khởi tạo SignalR khi screen được focus
-      handleScreenFocus();
-
-      return () => {
-        isSubscribed = false;
-        console.log('Screen unfocused, stopping SignalR...');
-        bookingSignalRService.stop();
-      };
-    }, [])
-  );
-
-  // Thêm useEffect để xử lý các events từ SignalR
-  useEffect(() => {
-    if (!id || !selectedTime || !selectedTableType || !user?.accountId) return;
-
-    const getCurrentBookingDate = () => {
-      const date = selectedTime.includes('(+1 ngày)') 
-        ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
-        : format(selectedDate, 'yyyy-MM-dd');
-      return date + 'T00:00:00+07:00';
-    };
-
-    const getCurrentBookingTime = () => {
-      return selectedTime.replace(' (+1 ngày)', '') + ':00';
-    };
-
-    // Trong useEffect xử lý SignalR events
-    const unsubscribeTableHold = bookingSignalRService.onTableHold((event: TableHoldEvent) => {
+    // Đăng ký lắng nghe sự kiện TableHold
+    const unsubscribeTableHold = bookingSignalRService.onTableHold((event) => {
       console.log('TableHold event received:', event);
-      console.log('Current user:', user.accountId);
-      console.log('Event user:', event.accountId);
-
-      // Kiểm tra nếu event match với thời gian hiện tại
-      if (event.date === getCurrentBookingDate() &&
-          event.time === getCurrentBookingTime()) {
-        
-        if (event.accountId === user.accountId) {
-          // Nếu là cùng account, thêm bàn vào selectedTables nếu chưa có
-          if (!selectedTables.some(t => t.id === event.tableId)) {
-            // Tìm thông tin bàn từ availableTables
-            const tableInfo = availableTables.find(t => t.id === event.tableId);
-            const tableTypeInfo = tableTypes.find(t => t.tableTypeId === selectedTableType);
-
-            // Nếu không tìm thấy trong availableTables, vẫn thêm vào với thông tin cơ bản
-            setSelectedTables(prev => [...prev, {
-              id: event.tableId,
-              name: tableInfo?.name || `Bàn ${event.tableId.slice(-4)}`,
-              typeId: selectedTableType,
-              typeName: tableTypeInfo?.typeName || ''
-            }]);
-
-            // Cập nhật availableTables với status 'held' thay vì 'booked'
-            setAvailableTables(prev => prev.map(table => {
-              if (table.id === event.tableId) {
-                return {
-                  ...table,
-                  status: 'held'  // Đổi thành 'held' cho bàn do mình giữ
-                };
-              }
-              return table;
-            }));
-
-            // Phần fetch thông tin chi tiết giữ nguyên
-          }
-        } else {
-          // Nếu là account khác, đánh dấu bàn là đã được đặt
-          setAvailableTables(prev => prev.map(table => {
-            if (table.id === event.tableId) {
-              return {
-                ...table,
-                status: 'booked'  // Giữ nguyên 'booked' cho bàn của người khác
-              };
-            }
-            return table;
-          }));
-
-          // Xóa khỏi selectedTables nếu đang được chọn
-          setSelectedTables(prev => prev.filter(table => table.id !== event.tableId));
-        }
-      }
-    });
-
-    // Giữ nguyên phần xử lý TableRelease
-    const unsubscribeTableRelease = bookingSignalRService.onTableRelease((event: TableHoldEvent) => {
-      console.log('TableRelease event received:', event);
       
-      // Kiểm tra xem event có match với thời gian hiện tại không
-      if (event.date === getCurrentBookingDate() &&
-          event.time === getCurrentBookingTime()) {
-        console.log('Updating table status for release:', event.tableId);
-        
-        // Cập nhật trạng thái bàn trong availableTables
-        setAvailableTables(prev => prev.map(table => {
-          if (table.id === event.tableId) {
-            console.log('Found table to update:', table.name);
+      // Cập nhật UI khi có bàn được hold bởi người khác
+      setAvailableTables(prev => prev.map(table => {
+        if (table.id === event.tableId) {
+          // Nếu bàn được hold bởi người khác
+          if (event.accountId !== user?.accountId) {
             return {
               ...table,
-              status: 'available'
+              status: 'booked'
             };
           }
-          return table;
-        }));
-
-        // Nếu bàn này đang được user hiện tại giữ, xóa khỏi selectedTables
-        if (event.accountId === user.accountId) {
-          console.log('Removing released table from selection:', event.tableId);
-          setSelectedTables(prev => {
-            const newSelected = prev.filter(table => table.id !== event.tableId);
-            // Nếu không còn bàn nào được chọn, ẩn modal chi tiết
-            if (newSelected.length === 0) {
-              setShowSelectedTablesModal(false);
-            }
-            return newSelected;
-          });
-
-          // Xóa cache của bàn này
-          setTableDetailsCache(prev => {
-            const newCache = { ...prev };
-            delete newCache[event.tableId];
-            return newCache;
-          });
         }
+        return table;
+      }));
+
+      // Nếu bàn được hold bởi user hiện tại (trường hợp đa thiết bị)
+      if (event.accountId === user?.accountId) {
+        const tableType = tableTypes.find(t => t.tableTypeId === selectedTableType);
+        setSelectedTables(prev => {
+          // Kiểm tra xem bàn đã được chọn chưa
+          if (!prev.some(t => t.id === event.tableId)) {
+            return [...prev, {
+              id: event.tableId,
+              name: event.tableName, // Sử dụng tableName từ event
+              typeId: selectedTableType,
+              typeName: tableType?.typeName || ''
+            }];
+          }
+          return prev;
+        });
       }
     });
 
+    // Đăng ký lắng nghe sự kiện TableRelease
+    const unsubscribeTableRelease = bookingSignalRService.onTableRelease((event) => {
+      console.log('TableRelease event received:', event);
+      
+      // Cập nhật UI khi có bàn được release
+      setAvailableTables(prev => prev.map(table => {
+        if (table.id === event.tableId) {
+          return {
+            ...table,
+            status: 'available'
+          };
+        }
+        return table;
+      }));
+
+      // Nếu bàn được release bởi user hiện tại (trường hợp đa thiết bị)
+      if (event.accountId === user?.accountId) {
+        setSelectedTables(prev => prev.filter(t => t.id !== event.tableId));
+      }
+    });
+
+    // Cleanup
     return () => {
       unsubscribeTableHold();
       unsubscribeTableRelease();
     };
-  }, [id, selectedTime, selectedTableType, selectedDate, user?.accountId, tableTypes]);
+  }, [isConnected, user?.accountId, selectedTableType, tableTypes]);
 
-  // Sửa lại useFocusEffect để xử lý cleanup tốt hơn
-  useFocusEffect(
-    useCallback(() => {
-      let isSubscribed = true;
+  // Xử lý khi nhấn nút đặt bàn
+  const handleBookTableOnly = async () => {
+    if (!validateForm()) return;
 
-      return () => {
-        isSubscribed = false;
-        console.log('Screen losing focus, releasing all tables...');
-        releaseAllTables().then(() => {
-          if (isSubscribed) {
-            setSelectedTables([]);
-            setAvailableTables([]);
-            setHasSearched(false);
-          }
-        });
-      };
-    }, [])
-  );
-
-  // Sửa lại useEffect để xử lý thay đổi thời gian
-  useEffect(() => {
-    if (selectedTime) {
-      if (selectedTime !== prevSelectedTime.current) {
-        console.log('Time changed, releasing all tables...');
-        releaseAllTables().then(() => {
-          setSelectedTables([]);
-          setAvailableTables([]);
-          setHeldTables([]);
-          setHasSearched(false);
-        });
-      }
-      prevSelectedTime.current = selectedTime;
-    }
-  }, [selectedTime, selectedDate]);
-
-  // Thêm hàm xử lý khi nhấn back
-  const handleBack = async () => {
-    console.log('Back button pressed, releasing all tables...');
+    setShowConfirmModal(false);
+    setShowProcessingModal(true);
+    setBookingStatus('loading');
+    setBookingError('');
+    
     try {
-      await releaseAllTables();
-    } finally {
-      router.back();
+      // Lọc ra danh sách bàn unique
+      const uniqueTables = Array.from(
+        new Map(selectedTables.map(table => [table.id, table])).values()
+      );
+
+      const bookingRequest: BookingTableRequest = {
+        barId: id as string,
+        bookingDate: selectedTime.includes('(+1 ngày)') 
+          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+          : format(selectedDate, 'yyyy-MM-dd'),
+        bookingTime: selectedTime.replace(' (+1 ngày)', '') + ':00',
+        note: note.trim(),
+        tableIds: uniqueTables.map(table => table.id),
+        numOfPeople: numOfPeople
+      };
+
+      await bookingTableService.bookTable(bookingRequest);
+      setBookingStatus('success');
+      setBookingSuccess('Đặt bàn thành công!');
+      
+      // Delay navigation để người dùng thấy thông báo thành công
+      setTimeout(() => {
+        router.replace('/booking-history');
+      }, 2000);
+    } catch (error) {
+      console.error('Error booking table:', error);
+      setBookingStatus('error');
+      setBookingError(error instanceof Error ? error.message : 'Có lỗi xảy ra');
     }
   };
 
-  // Sửa lại phần xử lý back navigation
-  useEffect(() => {
-    const handleBeforeUnload = async () => {
-      console.log('Before unload, releasing all tables...');
-      await releaseAllTables();
-    };
+  // Xử lý khi nhấn nút đặt bàn kèm đồ uống
+  const handleBookWithDrinks = () => {
+    // Lọc ra danh sách bàn unique
+    const uniqueTables = Array.from(
+      new Map(selectedTables.map(table => [table.id, table])).values()
+    );
 
-    // Sửa lại cách xử lý hardware back button
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
-      console.log('Hardware back pressed, releasing all tables...');
-      // Gọi releaseAllTables và navigate back mà không đợi
-      releaseAllTables().finally(() => {
-        router.back();
-      });
-      // Return true để chặn default back behavior
-      return true;
-    });
-
-    return () => {
-      handleBeforeUnload();
-      backHandler.remove();
-    };
-  }, []);
-
-  // Thêm useEffect để load thông tin chi tiết khi mở modal
-  useEffect(() => {
-    const loadTableDetails = async () => {
-      if (showSelectedTablesModal && selectedTables.length > 0) {
-        setIsLoadingTableDetails(true);
-        try {
-          // Lọc ra các bàn chưa có trong cache
-          const uncachedTableIds = selectedTables
-            .filter(table => !tableDetailsCache[table.id])
-            .map(table => table.id);
-
-          if (uncachedTableIds.length > 0) {
-            const details = await tableService.getTableDetails(uncachedTableIds);
-            // Cập nhật cache với thông tin mới
-            const newCache = { ...tableDetailsCache };
-            details.forEach(detail => {
-              newCache[detail.tableId] = detail;
-            });
-            setTableDetailsCache(newCache);
-          }
-
-          // Lấy thông tin chi tiết từ cache
-          const allDetails = selectedTables.map(table => tableDetailsCache[table.id]).filter(Boolean);
-          setSelectedTableDetails(allDetails);
-        } catch (error) {
-          console.error('Error loading table details:', error);
-        } finally {
-          setIsLoadingTableDetails(false);
-        }
+    router.push({
+      pathname: `/booking-drink/${id}` as any,
+      params: {
+        date: selectedTime.includes('(+1 ngày)') 
+          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+          : format(selectedDate, 'yyyy-MM-dd'),
+        time: selectedTime.replace(' (+1 ngày)', '') + ':00',
+        tableIds: JSON.stringify(uniqueTables.map(table => table.id)),
+        selectedTables: JSON.stringify(uniqueTables.map(table => ({
+          id: table.id,
+          name: table.name,
+          typeId: table.typeId,
+          typeName: table.typeName
+        }))),
+        note: note.trim(),
+        numOfPeople: numOfPeople.toString(),
+        discount: barDetail?.discount?.toString() || '0'
       }
-    };
-
-    loadTableDetails();
-  }, [showSelectedTablesModal, selectedTables, tableDetailsCache]);
+    });
+  };
 
   // Thêm hàm validateForm
   const validateForm = () => {
-    if (!selectedTables.length) {
+    // Kiểm tra số lượng bàn đã chọn
+    const uniqueTablesCount = new Set(selectedTables.map(table => table.id)).size;
+    if (uniqueTablesCount === 0) {
       Alert.alert('Thông báo', 'Vui lòng chọn ít nhất một bàn');
       return false;
     }
 
+    // Kiểm tra thời gian đã chọn
     if (!selectedTime) {
       Alert.alert('Thông báo', 'Vui lòng chọn thời gian đặt bàn');
       return false;
     }
 
+    // Kiểm tra loại bàn đã chọn
     if (!selectedTableType) {
       Alert.alert('Thông báo', 'Vui lòng chọn loại bàn');
       return false;
     }
 
+    // Kiểm tra số lượng khách
     if (numOfPeople < 1) {
       Alert.alert('Thông báo', 'Vui lòng chọn số lượng khách hàng');
       return false;
     }
 
+    // Kiểm tra thông tin người dùng
+    if (!accountInfo?.phone || !accountInfo?.dob) {
+      setShowUpdateProfileModal(true);
+      return false;
+    }
+
     return true;
   };
-
-  // Thêm useFocusEffect để reset state khi quay lại màn hình
-  useFocusEffect(
-    useCallback(() => {
-      // Reset các state liên quan đến modal khi focus vào màn hình
-      setShowConfirmModal(false);
-      setShowMaxTablesModal(false);
-      setShowClosedModal(false);
-      setShowUpdateProfileModal(false);
-      setCurrentModal(ModalState.NONE);
-    }, [])
-  );
 
   return (
     <View className="flex-1 bg-black">
@@ -1449,7 +1212,7 @@ export default function BookingTableScreen() {
         {/* Header mới với thông tin quán */}
         <View className="border-b border-white/10">
           {/* Phần navigation */}
-          <View className="px-4 pt-1.5 pb-2 flex-row items-center border-b border-white/10">
+          <View className="px-4 pt-1.5 pb-2 flex-row items-center">
             <TouchableOpacity
               onPress={handleBack}
               className="h-9 w-9 bg-neutral-800 rounded-full items-center justify-center mr-3"
@@ -1458,12 +1221,12 @@ export default function BookingTableScreen() {
             </TouchableOpacity>
             <Text className="text-yellow-500 text-lg font-bold">
               Đặt bàn
-            </Text>
+              </Text>
           </View>
 
           {/* Thông tin quán */}
           {barDetail ? (
-            <View className="px-4 pb-2 pt-1 bg-neutral-800">
+            <View className="px-4 pb-3">
               <View className="flex-row items-center">
                 <Image 
                   source={{ 
@@ -1474,7 +1237,7 @@ export default function BookingTableScreen() {
                 <View className="ml-4 flex-1">
                   <View className="flex-row items-center mb-1">
                     <Text 
-                      className="text-yellow-500 font-bold text-base flex-1"
+                      className="text-white font-bold text-base flex-1"
                       numberOfLines={1}
                     >
                       {barDetail.barName}
@@ -1527,28 +1290,15 @@ export default function BookingTableScreen() {
               </View>
             </View>
           ) : (
-            <View className="px-4 pb-2 pt-1 bg-neutral-800">
+            <View className="px-4 pb-3">
               <Animated.View entering={FadeIn} className="flex-row items-center">
-                {/* Skeleton cho ảnh */}
-                <View className="w-20 h-20 rounded-lg bg-white/10 animate-pulse mt-1" />
-                
-                <View className="ml-4 flex-1">
-                  {/* Skeleton cho tên quán */}
-                  <View className="flex-row items-center mb-1">
-                    <View className="h-5 w-32 bg-white/10 rounded animate-pulse flex-1" />
-                    <View className="ml-2 w-16 h-4 bg-white/10 rounded animate-pulse" />
-                  </View>
-                  
-                  {/* Skeleton cho thông tin địa chỉ, SĐT, giờ mở cửa */}
-                  <View className="space-y-2 mt-0.5">
-                    {[1, 2, 3].map((i) => (
-                      <View key={i} className="flex-row items-center">
-                        <View className="w-5 items-center">
-                          <View className="w-3.5 h-3.5 rounded-full bg-white/10 animate-pulse" />
-                        </View>
-                        <View className="h-3 flex-1 bg-white/10 rounded animate-pulse ml-2" />
-                      </View>
-                    ))}
+                <View className="w-20 h-20 rounded-lg bg-white/10 animate-pulse" />
+                <View className="ml-3 flex-1">
+                  <View className="h-4 w-32 bg-white/10 rounded animate-pulse mb-2" />
+                  <View className="space-y-1.5 mt-0.5">
+                    <View className="h-3 w-48 bg-white/10 rounded animate-pulse" />
+                    <View className="h-3 w-32 bg-white/10 rounded animate-pulse" />
+                    <View className="h-3 w-40 bg-white/10 rounded animate-pulse" />
                   </View>
                 </View>
               </Animated.View>
@@ -1645,7 +1395,7 @@ export default function BookingTableScreen() {
                 </View>
               ) : (
                 <View className="items-center py-4">
-                  <Text className="text-white/60">Không thể tải thông tin khách hàng dùng</Text>
+                  <Text className="text-white/60">Không thể tải thông tin người dùng</Text>
                 </View>
               )}
             </View>
@@ -1679,16 +1429,21 @@ export default function BookingTableScreen() {
                       </View>
                     </View>
 
-                    {/* Thêm skeleton cho số khách hàng */}
-                    <View>
-                      <View className="h-5 w-28 bg-white/10 rounded animate-pulse mb-3" />
-                      <View className="bg-white/10 p-4 rounded-xl flex-row items-center justify-between animate-pulse">
+                    {/* Thêm phần chọn số lượng khách hàng */}
+                    <View className="mt-6">
+                      <Text className="text-white text-base font-bold mb-3">Số khách hàng</Text>
+                      <TouchableOpacity
+                        onPress={() => setShowPeoplePickerModal(true)}
+                        className="bg-white/10 p-4 rounded-xl flex-row items-center justify-between"
+                      >
                         <View className="flex-row items-center">
-                          <View className="w-5 h-5 bg-white/5 rounded" />
-                          <View className="h-4 w-24 bg-white/5 rounded ml-2" />
+                          <Ionicons name="people-outline" size={20} color="#9CA3AF" />
+                          <Text className="text-white ml-2">
+                            {numOfPeople} khách hàng
+                          </Text>
                         </View>
-                        <View className="w-5 h-5 bg-white/5 rounded" />
-                      </View>
+                        <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
+                      </TouchableOpacity>
                     </View>
 
                     {/* Skeleton cho loại bàn */}
@@ -1743,22 +1498,22 @@ export default function BookingTableScreen() {
                       </View>
                     </View>
 
-                    {/* Thêm phần chọn số khách hàng */}
-                    <View className="mt-6">
-                      <Text className="text-white text-base font-bold mb-3">Số khách hàng</Text>
-                      <TouchableOpacity
-                        onPress={() => setShowPeoplePickerModal(true)}
-                        className="bg-white/10 p-4 rounded-xl flex-row items-center justify-between"
-                      >
-                        <View className="flex-row items-center">
-                          <Ionicons name="people-outline" size={20} color="#9CA3AF" />
-                          <Text className="text-white ml-2">
-                            {numOfPeople} khách hàng
-                          </Text>
-                        </View>
-                        <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
-                      </TouchableOpacity>
-                    </View>
+                    {/* Thêm phần chọn số lượng khách hàng */}
+   <View className="mt-6">
+     <Text className="text-white text-base font-bold mb-3">Số khách hàng</Text>
+     <TouchableOpacity
+       onPress={() => setShowPeoplePickerModal(true)}
+       className="bg-white/10 p-4 rounded-xl flex-row items-center justify-between"
+     >
+       <View className="flex-row items-center">
+         <Ionicons name="people-outline" size={20} color="#9CA3AF" />
+         <Text className="text-white ml-2">
+           {numOfPeople} khách hàng
+         </Text>
+       </View>
+       <Ionicons name="chevron-down" size={20} color="#9CA3AF" />
+     </TouchableOpacity>
+   </View>
 
                     {/* Chọn loại bàn */}
                     <View>
@@ -1829,7 +1584,7 @@ export default function BookingTableScreen() {
                             </View>
                           </View>
 
-                          {/* Content */}
+                          {/* Nội dung */}
                           <View className="p-4 space-y-4">
                             {/* Mô tả */}
                             <View>
@@ -1881,7 +1636,7 @@ export default function BookingTableScreen() {
                       )}
                     </View>
 
-                    {/* Nt tìm bàn */}
+                    {/* Nút tìm bàn */}
                     <TouchableOpacity
                       onPress={handleSearchTables}
                       disabled={!selectedTime || !selectedTableType || isSearching}
@@ -1904,77 +1659,65 @@ export default function BookingTableScreen() {
                       )}
                     </TouchableOpacity>
 
-                    {/* Hiển thị bàn sau khi tìm kiếm */}
+                    {/* Hiển thị bàn sau khi t��m kiếm */}
                     {hasSearched && !isSearching && availableTables.length > 0 && (
                       <Animated.View entering={FadeIn}>
                         <View className="bg-neutral-900 rounded-2xl">
                           <Text className="text-white text-base font-bold mb-3">Chọn bàn</Text>
                           <View className="flex-row flex-wrap" style={{ marginHorizontal: -4 }}>
-                            {availableTables
-                              .filter((table, index, self) => 
-                                // Lọc bỏ các bàn trùng lặp
-                                index === self.findIndex(t => t.id === table.id)
-                              )
-                              .map((table) => (
-                                <View 
-                                  key={`table-${table.id}`} // Thêm prefix để đảm bảo key unique
-                                  style={{ width: '50%', padding: 4 }}
+                            {availableTables.map((table) => (
+                              <View key={table.id} style={{ width: '50%', padding: 4 }}>
+                                <TouchableOpacity
+                                  onPress={() => handleTableSelection(table)}
+                                  disabled={table.status === 'booked' || loadingTables[table.id]}
+                                  className={`flex-row items-center rounded-xl px-3 py-2 ${
+                                    table.status === 'booked' 
+                                      ? 'bg-white/5' 
+                                      : selectedTables.some(t => t.id === table.id)
+                                        ? 'bg-yellow-500'
+                                        : 'bg-white/10'
+                                  }`}
                                 >
-                                  <TouchableOpacity
-                                    onPress={() => handleTableSelection(table)}
-                                    disabled={table.status === 'booked' || loadingTables[table.id]}
-                                    className={`flex-row items-center rounded-xl px-3 py-2 ${
-                                      table.status === 'booked' 
-                                        ? 'bg-white/5' 
-                                        : table.status === 'held'
-                                          ? 'bg-yellow-500'
-                                          : 'bg-white/10'
+                                  {loadingTables[table.id] ? (
+                                    <ActivityIndicator 
+                                      size="small" 
+                                      color={selectedTables.some(t => t.id === table.id) ? '#000' : '#EAB308'} 
+                                    />
+                                  ) : (
+                                    <MaterialCommunityIcons 
+                                      name="table-furniture" 
+                                      size={20} 
+                                      color={
+                                        table.status === 'booked' 
+                                          ? '#9CA3AF'
+                                          : selectedTables.some(t => t.id === table.id)
+                                            ? '#000'
+                                            : '#fff'
+                                      } 
+                                    />
+                                  )}
+                                  <Text 
+                                    className={`ml-2 font-medium flex-1 ${
+                                      table.status === 'booked'
+                                        ? 'text-gray-400'
+                                        : selectedTables.some(t => t.id === table.id)
+                                          ? 'text-black'
+                                          : 'text-white'
                                     }`}
+                                    numberOfLines={1}
+                                    ellipsizeMode="tail"
                                   >
-                                    {loadingTables[table.id] ? (
-                                      <ActivityIndicator 
-                                        size="small" 
-                                        color={selectedTables.some(t => t.id === table.id) ? '#000' : '#EAB308'} 
-                                      />
-                                    ) : (
-                                      <MaterialCommunityIcons 
-                                        name="table-furniture" 
-                                        size={20} 
-                                        color={
-                                          table.status === 'booked' 
-                                            ? '#9CA3AF'
-                                            : table.status === 'held'
-                                              ? '#000'  // Bàn đang được giữ
-                                              : selectedTables.some(t => t.id === table.id)
-                                                ? '#000'
-                                                : '#fff'
-                                        } 
-                                      />
-                                    )}
-                                    <Text 
-                                      className={`ml-2 font-medium flex-1 ${
-                                        table.status === 'booked'
-                                          ? 'text-gray-400'
-                                          : table.status === 'held'
-                                            ? 'text-black'  // Bàn đang được giữ
-                                            : selectedTables.some(t => t.id === table.id)
-                                              ? 'text-black'
-                                              : 'text-white'
-                                      }`}
-                                      numberOfLines={1}
-                                      ellipsizeMode="tail"
-                                    >
-                                      {table.name}
-                                    </Text>
+                                    {table.name}
+                                  </Text>
 
-                                    {table.status === 'booked' ? (
-                                      <Text className="text-gray-400 text-xs ml-1">Đã đặt</Text>
-                                    ) : table.status === 'held' && !loadingTables[table.id] && (
-                                      <Ionicons name="checkmark-circle" size={16} color="#000" className="ml-1" />
-                                    )}
-                                  </TouchableOpacity>
-                                </View>
-                              ))}
+                                  {table.status === 'booked' ? (
+                                    <Text className="text-gray-400 text-xs ml-1">Đã đặt</Text>
+                                  ) : selectedTables.some(t => t.id === table.id) && !loadingTables[table.id] && (
+                                    <Ionicons name="checkmark-circle" size={16} color="#000" className="ml-1" />
+                                  )}
+                                </TouchableOpacity>
+                              </View>
+                            ))}
                           </View>
                         </View>
                       </Animated.View>
@@ -2117,58 +1860,6 @@ export default function BookingTableScreen() {
           </View>
         </Modal>
 
-        {/* Thêm Modal chọn số khách hàng */}
-        <Modal
-          visible={showPeoplePickerModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowPeoplePickerModal(false)}
-        >
-          <View className="flex-1 justify-end bg-black/50">
-            <View className="bg-neutral-800 rounded-t-3xl">
-              {/* Header */}
-              <View className="flex-row justify-between items-center p-4 border-b border-white/10">
-                <TouchableOpacity onPress={() => setShowPeoplePickerModal(false)}>
-                  <Text className="text-white">Hủy</Text>
-                </TouchableOpacity>
-                <Text className="text-white font-bold">Chọn số lượng khách hàng</Text>
-                <TouchableOpacity onPress={() => setShowPeoplePickerModal(false)}>
-                  <Text className="text-yellow-500 font-bold">Xong</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Content */}
-              <ScrollView 
-                className="max-h-96"
-                showsVerticalScrollIndicator={false}
-              >
-                <View className="p-4">
-                  {generatePeopleOptions().map((number) => (
-                    <TouchableOpacity
-                      key={number}
-                      onPress={() => {
-                        setNumOfPeople(number);
-                        setShowPeoplePickerModal(false);
-                      }}
-                      className={`p-4 rounded-xl mb-2 ${
-                        numOfPeople === number ? 'bg-yellow-500' : 'bg-white/10'
-                      }`}
-                    >
-                      <Text 
-                        className={`text-center ${
-                          numOfPeople === number ? 'text-black font-medium' : 'text-white'
-                        }`}
-                      >
-                        {number} khách hàng
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
         {/* Footer hiển thị bàn đã chọn */}
         {selectedTables.length > 0 && !keyboardVisible && (
           <Animated.View 
@@ -2182,7 +1873,7 @@ export default function BookingTableScreen() {
                   <View className="flex-row items-center">
                     <MaterialCommunityIcons name="table-furniture" size={20} color="#EAB308" />
                     <Text className="text-white font-medium ml-2">
-                      {selectedTables.length} {selectedTables.length === 1 ? 'bàn' : 'bàn'} đã chọn
+                      {new Set(selectedTables.map(table => table.id)).size} {new Set(selectedTables.map(table => table.id)).size === 1 ? 'bàn' : 'bàn'} đã chọn
                     </Text>
                   </View>
                   <TouchableOpacity 
@@ -2194,32 +1885,34 @@ export default function BookingTableScreen() {
                   </TouchableOpacity>
                 </View>
 
-                {/* Nút đặt bàn */}
-                <View className={`flex-row space-x-4 ${Platform.OS !== 'ios' ? 'mb-4' : ''}`}>
-                  <TouchableOpacity 
-                    onPress={() => handleBookingNow()}
-                    className="flex-1 bg-yellow-500 py-3.5 rounded-2xl"
+                {/* Buttons */}
+                <View className="flex-row space-x-3 pb-4">
+                <TouchableOpacity
+                    onPress={handleBookNow}
+                    className="flex-1 bg-yellow-500 py-4 rounded-xl"
                   >
                     <Text className="text-black text-center font-bold">
                       Đặt bàn ngay
                     </Text>
                   </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    onPress={() => handleBookingWithDrinks()}
-                    className="flex-1 bg-white/10 py-3.5 rounded-2xl relative"
+                  
+                  <TouchableOpacity
+                    onPress={handleBookWithDrinks}
+                    className="flex-1 bg-white/10 py-4 rounded-xl"
                   >
                     <Text className="text-white text-center font-bold">
-                      Đặt kèm thức uống
+                      Đặt kèm đồ uống
                     </Text>
                     {barDetail && typeof barDetail.discount === 'number' && barDetail.discount > 0 && (
                       <View className="absolute -top-2 -right-2 bg-yellow-500 px-2 py-0.5 rounded-full">
                         <Text className="text-black text-[10px] font-bold">
-                          -{barDetail.discount}%
+                          Ưu đãi đặt trước -{barDetail.discount}%
                         </Text>
                       </View>
                     )}
                   </TouchableOpacity>
+
+                  
                 </View>
               </View>
             </SafeAreaView>
@@ -2234,175 +1927,117 @@ export default function BookingTableScreen() {
           onRequestClose={() => setShowSelectedTablesModal(false)}
         >
           <View className="flex-1 justify-end bg-black/50">
-            <Animated.View 
-              entering={FadeIn}
-              className="bg-neutral-900 rounded-t-3xl"
-            >
+            <View className="bg-neutral-900 rounded-t-3xl">
               {/* Header */}
-              <View className="px-6 pt-6 pb-4 border-b border-white/10">
+              <View className="px-6 pt-6 pb-4">
                 <View className="flex-row justify-between items-center">
                   <View>
-                    <Text className="text-white text-xl font-bold">
+                    <Text className="text-white text-xl font-bold mb-1">
                       Bàn đã chọn
                     </Text>
-                    <Text className="text-white/60 text-sm mt-1">
-                      {selectedTables.length} {selectedTables.length === 1 ? 'bàn' : 'bàn'}
+                    <Text className="text-white/60">
+                      {new Set(selectedTables.map(table => table.id)).size} {new Set(selectedTables.map(table => table.id)).size === 1 ? 'bàn' : 'bàn'}
                     </Text>
                   </View>
                   <TouchableOpacity 
                     onPress={() => setShowSelectedTablesModal(false)}
-                    className="h-10 w-10 bg-white/10 rounded-full items-center justify-center"
+                    className="h-8 w-8 bg-white/10 rounded-full items-center justify-center"
                   >
                     <Ionicons name="close" size={20} color="white" />
                   </TouchableOpacity>
                 </View>
               </View>
 
-              {/* Content */}
+              {/* Divider */}
+              <View className="h-[1px] bg-white/10" />
+
+              {/* Danh sách bàn */}
               <ScrollView 
-                className="px-6 py-4"
-                style={{ maxHeight: Dimensions.get('window').height * 0.6 }}
+                className="max-h-[70vh]"
                 showsVerticalScrollIndicator={false}
               >
-                {isLoadingTableDetails ? (
-                  <View className="space-y-4">
-                    {[1, 2, 3].map((i) => (
-                      <View key={i} className="bg-white/10 rounded-xl overflow-hidden">
-                        {/* Header skeleton */}
-                        <View className="bg-white/10 px-4 py-3 flex-row items-center justify-between">
-                          <View className="flex-row items-center space-x-2">
-                            <View className="w-5 h-5 rounded-full bg-white/10 animate-pulse" />
-                            <View className="h-5 w-32 bg-white/10 rounded animate-pulse" />
-                          </View>
-                          <View className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
-                        </View>
-
-                        {/* Content skeleton */}
-                        <View className="p-4 space-y-3">
-                          {/* Type info skeleton */}
-                          <View className="flex-row items-center">
-                            <View className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
-                            <View className="ml-3 flex-1">
-                              <View className="h-3 w-16 bg-white/10 rounded animate-pulse mb-1" />
-                              <View className="h-4 w-24 bg-white/10 rounded animate-pulse" />
-                            </View>
-                          </View>
-
-                          {/* Guest info skeleton */}
-                          <View className="flex-row items-center">
-                            <View className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
-                            <View className="ml-3 flex-1">
-                              <View className="h-3 w-16 bg-white/10 rounded animate-pulse mb-1" />
-                              <View className="h-4 w-28 bg-white/10 rounded animate-pulse" />
-                            </View>
-                          </View>
-
-                          {/* Price info skeleton */}
-                          <View className="flex-row items-center">
-                            <View className="w-8 h-8 rounded-full bg-white/10 animate-pulse" />
-                            <View className="ml-3 flex-1">
-                              <View className="h-3 w-16 bg-white/10 rounded animate-pulse mb-1" />
-                              <View className="h-4 w-32 bg-white/10 rounded animate-pulse" />
-                            </View>
-                          </View>
-                        </View>
-
-                        {/* Note skeleton */}
-                        <View className="bg-yellow-500/10 p-3 mx-4 mb-4 rounded-lg">
-                          <View className="flex-row items-start space-x-2">
-                            <View className="w-[18px] h-[18px] rounded-full bg-white/10 animate-pulse" />
-                            <View className="h-8 flex-1 bg-white/10 rounded animate-pulse" />
-                          </View>
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                ) : (
-                  <View className="space-y-4 pb-10">
-                    {selectedTableDetails.map((table) => (
-                      <Animated.View
-                        key={table.tableId}
-                        entering={FadeIn}
-                        className="bg-white/10 rounded-xl overflow-hidden"
+                <View className="p-6 space-y-4">
+                  {Array.from(new Set(selectedTables.map(table => table.id))).map(tableId => {
+                    const table = selectedTables.find(t => t.id === tableId);
+                    if (!table) return null;
+                    
+                    return (
+                      <View 
+                        key={table.id}
+                        className="bg-white/5 rounded-2xl overflow-hidden"
                       >
-                        {/* Table header */}
-                        <View className="bg-white/10 px-4 py-3 flex-row items-center justify-between">
+                        {/* Header của card */}
+                        <View className="bg-white/5 px-4 py-3 flex-row items-center justify-between">
                           <View className="flex-row items-center">
-                            <MaterialCommunityIcons name="table-furniture" size={20} color="#EAB308" />
+                            <MaterialCommunityIcons 
+                              name="table-furniture" 
+                              size={20} 
+                              color="#EAB308"
+                            />
                             <Text className="text-white font-medium ml-2">
-                              {table.tableName}
+                              Bàn {table.name}
                             </Text>
                           </View>
                           <TouchableOpacity 
-                            onPress={() => handleRemoveTable(table.tableId)}
-                            disabled={removingTables[table.tableId]}
+                            onPress={() => handleRemoveTable(table.id)}
                             className="h-8 w-8 bg-white/10 rounded-full items-center justify-center"
                           >
-                            {removingTables[table.tableId] ? (
-                              <ActivityIndicator size="small" color="#EF4444" />
-                            ) : (
-                              <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                            )}
+                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
                           </TouchableOpacity>
                         </View>
 
-                        {/* Table details */}
+                        {/* Nội dung card */}
                         <View className="p-4 space-y-3">
-                          {/* Type info */}
+                          {/* Loại bàn */}
                           <View className="flex-row items-center">
-                            <View className="w-8 h-8 bg-white/10 rounded-full items-center justify-center">
-                              <MaterialCommunityIcons name="format-list-text" size={16} color="#9CA3AF" />
+                            <View className="w-6">
+                              <MaterialCommunityIcons 
+                                name="format-list-bulleted-type" 
+                                size={16} 
+                                color="#9CA3AF"
+                              />
                             </View>
-                            <View className="ml-3">
-                              <Text className="text-white/60 text-xs">Loại bàn</Text>
-                              <Text className="text-white">{table.tableTypeName}</Text>
-                            </View>
+                            <Text className="text-white/60 ml-2">
+                              Loại bàn: <Text className="text-white">{table.typeName}</Text>
+                            </Text>
                           </View>
 
-                          {/* Guest info */}
+                          {/* Thời gian giữ bàn */}
                           <View className="flex-row items-center">
-                            <View className="w-8 h-8 bg-white/10 rounded-full items-center justify-center">
-                              <Ionicons name="people-outline" size={16} color="#9CA3AF" />
+                            <View className="w-6">
+                              <Ionicons 
+                                name="time-outline" 
+                                size={16} 
+                                color="#9CA3AF"
+                              />
                             </View>
-                            <View className="ml-3">
-                              <Text className="text-white/60 text-xs">Số khách</Text>
-                              <Text className="text-white">
-                                {table.minimumGuest} - {table.maximumGuest} khách hàng
-                              </Text>
-                            </View>
+                            <Text className="text-white/60 ml-2">
+                              Thời gian giữ bàn: <Text className="text-white">5 phút</Text>
+                            </Text>
                           </View>
 
-                          {/* Price info */}
+                          {/* Trạng thái */}
                           <View className="flex-row items-center">
-                            <View className="w-8 h-8 bg-white/10 rounded-full items-center justify-center">
-                              <Ionicons name="wallet-outline" size={16} color="#9CA3AF" />
+                            <View className="w-6">
+                              <Ionicons 
+                                name="information-circle-outline" 
+                                size={16} 
+                                color="#9CA3AF"
+                              />
                             </View>
-                            <View className="ml-3">
-                              <Text className="text-white/60 text-xs">Giá tối thiểu</Text>
-                              <Text className="text-white">
-                                {table.minimumPrice.toLocaleString('vi-VN')}đ
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-
-                        {/* Total minimum price note */}
-                        <View className="bg-yellow-500/10 p-3 mx-4 mb-4 rounded-lg">
-                          <View className="flex-row items-start">
-                            <Ionicons name="information-circle" size={18} color="#EAB308" />
-                            <Text className="text-yellow-500/80 text-xs ml-2 flex-1">
-                              Bạn cần đặt thức uống tối thiểu {table.minimumPrice.toLocaleString('vi-VN')}đ cho bàn này
+                            <Text className="text-white/60 ml-2">
+                              Trạng thái: <Text className="text-emerald-500">Đang giữ</Text>
                             </Text>
                           </View>
                         </View>
-                      </Animated.View>
-                    ))}
-                  </View>
-                )}
+                      </View>
+                    );
+                  })}
+                </View>
               </ScrollView>
 
               {/* Footer */}
-              <View className="px-6 py-4 border-t border-white/10">
+              <View className="p-6 border-t border-white/10">
                 <TouchableOpacity 
                   onPress={() => setShowSelectedTablesModal(false)}
                   className="bg-yellow-500 rounded-xl py-4"
@@ -2412,7 +2047,7 @@ export default function BookingTableScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </Animated.View>
+            </View>
           </View>
         </Modal>
 
@@ -2468,33 +2103,31 @@ export default function BookingTableScreen() {
                         {numOfPeople} khách hàng
                       </Text>
                     </View>
-
-                    <View className="flex-row items-center">
-                      <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
-                      <Text className="text-white ml-2">
-                        {selectedTables.length} bàn đã chọn
-                      </Text>
-                    </View>
                   </View>
 
                   {/* Danh sách bàn - Tách thành khối riêng */}
                   <View className="bg-white/5 rounded-xl p-4 mb-4">
                     <Text className="text-white/80 font-medium mb-3">Bàn đã chọn</Text>
                     <View className="space-y-3">
-                      {selectedTables.map((table, index) => (
-                        <View key={table.id} className="flex-row items-center justify-between">
-                          <View className="flex-row items-center">
-                            <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
-                            <View className="ml-3">
-                              <Text className="text-white font-medium">Bàn {table.name}</Text>
-                              <Text className="text-white/60 text-sm">{table.typeName}</Text>
+                      {Array.from(new Set(selectedTables.map(table => table.id))).map((tableId, index) => {
+                        const table = selectedTables.find(t => t.id === tableId);
+                        if (!table) return null;
+                        
+                        return (
+                          <View key={table.id} className="flex-row items-center justify-between">
+                            <View className="flex-row items-center">
+                              <MaterialCommunityIcons name="table-chair" size={20} color="#ffffff" />
+                              <View className="ml-3">
+                                <Text className="text-white font-medium">Bàn {table.name}</Text>
+                                <Text className="text-white/60 text-sm">{table.typeName}</Text>
+                              </View>
                             </View>
+                            {index < Array.from(new Set(selectedTables.map(t => t.id))).length - 1 && (
+                              <View className="h-[1px] bg-white/10 my-2" />
+                            )}
                           </View>
-                          {index < selectedTables.length - 1 && (
-                            <View className="h-[1px] bg-white/10 my-2" />
-                          )}
-                        </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   </View>
 
@@ -2510,27 +2143,31 @@ export default function BookingTableScreen() {
                   )}
 
                   {/* Điều khoản */}
-                  <Text className="text-white/60 text-sm mb-6 text-center">
-                    Bằng cách nhấn "Xác nhận", bạn đã đồng ý với{' '}
-                    <Text 
-                      onPress={() => {
-                        setShowConfirmModal(false); // Đóng modal trước khi navigate
-                        router.push('/terms-and-policies');
-                      }} 
-                      className="text-yellow-500"
-                    >
-                      điều khoản dịch vụ
-                    </Text> và{' '}
-                    <Text 
-                      onPress={() => {
-                        setShowConfirmModal(false); // Đóng modal trước khi navigate
-                        router.push('/privacy-policy');
-                      }} 
-                      className="text-yellow-500"
-                    >
-                      chính sách bảo mật
-                    </Text> của chúng tôi.
-                  </Text>
+                  <View className="mb-6">
+                    <Text className="text-white/60 text-sm text-center">
+                      Bằng cách nhấn "Xác nhận", bạn đã đồng ý với{' '}
+                      <Text 
+                        className="text-yellow-500 underline"
+                        onPress={() => {
+                          setShowConfirmModal(false);
+                          router.push('/terms-and-policies');
+                        }}
+                      >
+                        Điều khoản dịch vụ
+                      </Text>
+                      {' '}và{' '}
+                      <Text 
+                        className="text-yellow-500 underline"
+                        onPress={() => {
+                          setShowConfirmModal(false);
+                          router.push('/privacy-policy');
+                        }}
+                      >
+                        Chính sách bảo mật
+                      </Text>
+                      {' '}của chúng tôi.
+                    </Text>
+                  </View>
                 </View>
               </ScrollView>
 
@@ -2696,11 +2333,63 @@ export default function BookingTableScreen() {
 
       {/* Thêm LoadingPopup vào đây */}
       <LoadingPopup 
-        visible={showLoadingPopup}
-        status={loadingStatus}
-        errorMessage={errorMessage}
-        successMessage={successMessage}
+        visible={showProcessingModal}
+        status={bookingStatus}
+        errorMessage={bookingError}
+        successMessage={bookingSuccess}
       />
+
+      {/* Modal chọn số lượng khách hàng */}
+      <Modal
+        visible={showPeoplePickerModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowPeoplePickerModal(false)}
+      >
+        <View className="flex-1 justify-end bg-black/50">
+          <View className="bg-neutral-800 rounded-t-3xl">
+            {/* Header */}
+            <View className="flex-row justify-between items-center p-4 border-b border-white/10">
+              <TouchableOpacity onPress={() => setShowPeoplePickerModal(false)}>
+                <Text className="text-white">Hủy</Text>
+              </TouchableOpacity>
+              <Text className="text-white font-bold">Chọn số lượng khách hàng</Text>
+              <TouchableOpacity onPress={() => setShowPeoplePickerModal(false)}>
+                <Text className="text-yellow-500 font-bold">Xong</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Nội dung */}
+            <ScrollView 
+              className="max-h-96"
+              showsVerticalScrollIndicator={false}
+            >
+              <View className="p-4">
+                {generatePeopleOptions().map((number) => (
+                  <TouchableOpacity
+                    key={number}
+                    onPress={() => {
+                      setNumOfPeople(number);
+                      setShowPeoplePickerModal(false);
+                    }}
+                    className={`p-4 rounded-xl mb-2 ${
+                      numOfPeople === number ? 'bg-yellow-500' : 'bg-white/10'
+                    }`}
+                  >
+                    <Text 
+                      className={`text-center ${
+                        numOfPeople === number ? 'text-black font-medium' : 'text-white'
+                      }`}
+                    >
+                      {number} khách hàng
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

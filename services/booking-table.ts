@@ -195,6 +195,7 @@ class BookingTableService {
       );
 
       if (response.data.statusCode === 200) {
+        console.log("response.data.data", response.data.data);
         return response.data.data;
       }
 

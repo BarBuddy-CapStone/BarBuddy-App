@@ -6,6 +6,7 @@ export interface TableHoldEvent {
   accountId: string;
   barId: string;
   tableId: string;
+  tableName: string;
   date: string;
   time: string;
 }
@@ -22,10 +23,34 @@ class BookingSignalRService {
         throw new Error('No authentication token found');
       }
 
+      // Lấy accountId từ AsyncStorage
+      let accountId = null;
+      try {
+        const authData = await AsyncStorage.getItem('@auth');
+        if (authData) {
+          const userData = JSON.parse(authData);
+          accountId = userData?.user?.accountId;
+          
+          if (!accountId) {
+            console.log('Không có accountId, bỏ qua kết nối SignalR');
+            return;
+          }
+        } else {
+          console.log('Chưa đăng nhập, bỏ qua kết nối SignalR');
+          return;
+        }
+      } catch (error) {
+        console.log('Lỗi khi lấy accountId:', error);
+        return;
+      }
+
       // Tạo connection mới nếu chưa có hoặc đã đóng
       if (!this.connection || this.connection.state === 'Disconnected') {
+        // Thêm accountId vào URL
+        const hubUrl = `${API_CONFIG.BASE_URL}/bookingHub?accountId=${accountId}`;
+
         this.connection = new HubConnectionBuilder()
-          .withUrl(`${API_CONFIG.BASE_URL}/bookingHub`, {
+          .withUrl(hubUrl, {
             accessTokenFactory: () => token,
             skipNegotiation: true,
             transport: HttpTransportType.WebSockets
@@ -36,7 +61,7 @@ class BookingSignalRService {
 
         // Đăng ký các event handlers
         this.connection.on('TableHoId', (data: TableHoldEvent) => {
-          console.log('TableHold event received:', data);
+          console.log('TableHoId event received:', data);
           this.onTableHoldCallbacks.forEach(callback => callback(data));
         });
 
@@ -56,7 +81,7 @@ class BookingSignalRService {
         });
 
         await this.connection.start();
-        console.log('Booking SignalR connected');
+        console.log('Booking SignalR connected with accountId:', accountId);
       }
     } catch (error) {
       console.error('Error initializing booking SignalR:', error);

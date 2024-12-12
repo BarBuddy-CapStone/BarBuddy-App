@@ -648,18 +648,18 @@ export default function PaymentDetailScreen() {
                 setShowConfirmModal(false); // Đóng modal trước khi navigate
                 router.push('/terms-and-policies');
               }} 
-              className="text-yellow-500"
+              className="text-yellow-500 underline"
             >
-              điều khoản dịch vụ
+              Điều khoản dịch vụ
             </Text> và{' '}
             <Text 
               onPress={() => {
                 setShowConfirmModal(false); // Đóng modal trước khi navigate
                 router.push('/privacy-policy');
               }} 
-              className="text-yellow-500"
+              className="text-yellow-500 underline"
             >
-              chính sách bảo mật
+              Chính sách bảo mật
             </Text> của chúng tôi.
           </Text>
         </ScrollView>
@@ -917,18 +917,18 @@ export default function PaymentDetailScreen() {
                       setShowConfirmModal(false); // Đóng modal trước khi navigate
                       router.push('/terms-and-policies');
                     }} 
-                    className="text-yellow-500"
+                    className="text-yellow-500 underline"
                   >
-                    điều khoản dịch vụ
+                    Điều khoản dịch vụ
                   </Text> và{' '}
                   <Text 
                     onPress={() => {
                       setShowConfirmModal(false); // Đóng modal trước khi navigate
                       router.push('/privacy-policy');
                     }} 
-                    className="text-yellow-500"
+                    className="text-yellow-500 underline"
                   >
-                    chính sách bảo mật
+                    Chính sách bảo mật
                   </Text> của chúng tôi.
                 </Text>
               </View>

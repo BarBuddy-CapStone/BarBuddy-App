@@ -9,6 +9,7 @@ import { NotificationProvider } from '@/contexts/NotificationContext';
 import { View, Linking } from 'react-native';
 import '@/services/background-messaging';
 import { tokenService } from '@/services/token';
+import { BookingSignalRProvider } from '@/contexts/BookingSignalRContext';
 
 // Giữ splash screen hiển thị
 SplashScreen.preventAutoHideAsync();
@@ -147,7 +148,9 @@ export default function RootLayout() {
           <AuthConsumer>
             {({ isGuest, user }) => (
               <NotificationProvider isGuest={isGuest} userId={user?.accountId}>
-                <LoadingLayout loaded={loaded} />
+                <BookingSignalRProvider>
+                  <LoadingLayout loaded={loaded} />
+                </BookingSignalRProvider>
               </NotificationProvider>
             )}
           </AuthConsumer>

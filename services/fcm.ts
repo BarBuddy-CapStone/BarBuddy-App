@@ -67,8 +67,6 @@ class FCMService {
         authHeader
       );
 
-      console.log(response);
-
       if (response.data.statusCode === 200) {
         if (isLoginOrLogout) {
           await signalRService.connect();

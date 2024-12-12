@@ -706,10 +706,10 @@ export default function RegisterScreen() {
 
               <Text className="text-white/60 text-xs text-center mt-8 mb-6 px-6">
                 Bằng cách đăng ký, bạn đã đồng ý với{' '}
-                <Text onPress={() => router.push('/terms-and-policies')} className="text-yellow-500">
+                <Text onPress={() => router.push('/terms-and-policies')} className="text-yellow-500 underline">
                   Điều khoản dịch vụ
                 </Text> và{' '}
-                <Text onPress={() => router.push('/privacy-policy')} className="text-yellow-500">
+                <Text onPress={() => router.push('/privacy-policy')} className="text-yellow-500 underline">
                   Chính sách bảo mật
                 </Text> của chúng tôi.
               </Text>

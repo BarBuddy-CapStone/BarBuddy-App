@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import {
   BookingDrinkRequest,
@@ -26,6 +26,7 @@ import { BarDetail, barService } from "@/services/bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { voucherService, VoucherResponse } from "@/services/voucher";
 import axios from "axios";
+import { useFocusEffect } from "@react-navigation/native";
 
 const LoadingPopup = ({ visible }: { visible: boolean }) => (
   <Modal transparent visible={visible}>
@@ -607,6 +608,14 @@ export default function PaymentDetailScreen() {
     );
   };
 
+  useFocusEffect(
+    useCallback(() => {
+      // Reset các state liên quan đến modal
+      setShowConfirmModal(false);
+      setShowLoadingPopup(false);
+    }, [])
+  );
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1 mt-0.5" edges={["top"]}>
@@ -632,8 +641,26 @@ export default function PaymentDetailScreen() {
           <PaymentSummary />
 
           {/* Điều khoản */}
-          <Text className="text-white/60 text-sm px-4 mb-6 text-center">
-            Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản đặt bàn của chúng tôi
+          <Text className="text-white/60 text-sm mb-6 text-center">
+            Bằng cách nhấn "Xác nhận", bạn đã đồng ý với{' '}
+            <Text 
+              onPress={() => {
+                setShowConfirmModal(false); // Đóng modal trước khi navigate
+                router.push('/terms-and-policies');
+              }} 
+              className="text-yellow-500"
+            >
+              điều khoản dịch vụ
+            </Text> và{' '}
+            <Text 
+              onPress={() => {
+                setShowConfirmModal(false); // Đóng modal trước khi navigate
+                router.push('/privacy-policy');
+              }} 
+              className="text-yellow-500"
+            >
+              chính sách bảo mật
+            </Text> của chúng tôi.
           </Text>
         </ScrollView>
 
@@ -761,7 +788,7 @@ export default function PaymentDetailScreen() {
                   </View>
                 </View>
 
-                {/* Thông tin đồ uống */}
+                {/* Thông tin đ�� uống */}
                 <View className="bg-white/5 rounded-xl p-4 mb-4">
                   <Text className="text-white/80 font-medium mb-3">
                     Đồ uống đã chọn
@@ -884,8 +911,25 @@ export default function PaymentDetailScreen() {
 
                 {/* Điều khoản */}
                 <Text className="text-white/60 text-sm mb-6 text-center">
-                  Bằng cách nhấn "Xác nhận", bạn đồng ý với các điều khoản thanh
-                  toán của chúng tôi
+                  Bằng cách nhấn "Xác nhận", bạn đã đồng ý với{' '}
+                  <Text 
+                    onPress={() => {
+                      setShowConfirmModal(false); // Đóng modal trước khi navigate
+                      router.push('/terms-and-policies');
+                    }} 
+                    className="text-yellow-500"
+                  >
+                    điều khoản dịch vụ
+                  </Text> và{' '}
+                  <Text 
+                    onPress={() => {
+                      setShowConfirmModal(false); // Đóng modal trước khi navigate
+                      router.push('/privacy-policy');
+                    }} 
+                    className="text-yellow-500"
+                  >
+                    chính sách bảo mật
+                  </Text> của chúng tôi.
                 </Text>
               </View>
             </ScrollView>

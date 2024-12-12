@@ -1431,6 +1431,18 @@ export default function BookingTableScreen() {
     return true;
   };
 
+  // Thêm useFocusEffect để reset state khi quay lại màn hình
+  useFocusEffect(
+    useCallback(() => {
+      // Reset các state liên quan đến modal khi focus vào màn hình
+      setShowConfirmModal(false);
+      setShowMaxTablesModal(false);
+      setShowClosedModal(false);
+      setShowUpdateProfileModal(false);
+      setCurrentModal(ModalState.NONE);
+    }, [])
+  );
+
   return (
     <View className="flex-1 bg-black">
       <SafeAreaView className="flex-1" edges={['top']}>
@@ -2499,7 +2511,25 @@ export default function BookingTableScreen() {
 
                   {/* Điều khoản */}
                   <Text className="text-white/60 text-sm mb-6 text-center">
-                    Bằng cách nhấn "Xác nhận", bạn đã đồng ý với các điều khoản đặt bàn của chúng tôi.
+                    Bằng cách nhấn "Xác nhận", bạn đã đồng ý với{' '}
+                    <Text 
+                      onPress={() => {
+                        setShowConfirmModal(false); // Đóng modal trước khi navigate
+                        router.push('/terms-and-policies');
+                      }} 
+                      className="text-yellow-500"
+                    >
+                      điều khoản dịch vụ
+                    </Text> và{' '}
+                    <Text 
+                      onPress={() => {
+                        setShowConfirmModal(false); // Đóng modal trước khi navigate
+                        router.push('/privacy-policy');
+                      }} 
+                      className="text-yellow-500"
+                    >
+                      chính sách bảo mật
+                    </Text> của chúng tôi.
                   </Text>
                 </View>
               </ScrollView>

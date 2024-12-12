@@ -422,8 +422,12 @@ export default function LoginScreen() {
 
           <Text className="text-white/60 text-xs text-center mt-8 mb-6 px-6">
             Bằng cách đăng nhập, bạn đã đồng ý với{' '}
-            <Text className="text-yellow-500">Điều khoản dịch vụ</Text> và{' '}
-            <Text className="text-yellow-500">Chính sách bảo mật</Text> của chúng tôi.
+            <Text onPress={() => router.push('/terms-and-policies')} className="text-yellow-500">
+              Điều khoản dịch vụ
+            </Text> và{' '}
+            <Text onPress={() => router.push('/privacy-policy')} className="text-yellow-500">
+              Chính sách bảo mật
+            </Text> của chúng tôi.
           </Text>
         </ScrollView>
       </SafeAreaView>

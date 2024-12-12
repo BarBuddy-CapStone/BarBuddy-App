@@ -95,6 +95,10 @@ interface CustomerBarResponse {
   data: CustomerBar[];
 }
 
+// Thêm biến global để lưu trữ bars đã tính khoảng cách
+let cachedBarsWithDistance: Bar[] = [];
+let hasCachedDistances = false;
+
 class BarService implements IBarService {
   private readonly maxRetries = 5;
   private readonly retryDelay = 100;
@@ -194,6 +198,11 @@ class BarService implements IBarService {
   }
 
   async calculateBarDistances(bars: Bar[], userLocation: GoongLocation): Promise<Bar[]> {
+    // Nếu đã có cache và không phải force refresh thì trả về cache
+    if (hasCachedDistances && cachedBarsWithDistance.length > 0) {
+      return cachedBarsWithDistance;
+    }
+
     const batchSize = 5;
     const updatedBars: Bar[] = [...bars];
     
@@ -238,7 +247,17 @@ class BarService implements IBarService {
       await this.delay(100);
     }
     
+    // Lưu kết quả vào cache
+    cachedBarsWithDistance = updatedBars;
+    hasCachedDistances = true;
+    
     return updatedBars;
+  }
+
+  // Thêm method mới để clear cache khi cần refresh
+  clearDistanceCache() {
+    cachedBarsWithDistance = [];
+    hasCachedDistances = false;
   }
 
   async getBarDetailWithDistance(barId: string, userLocation?: GoongLocation): Promise<BarDetail | null> {

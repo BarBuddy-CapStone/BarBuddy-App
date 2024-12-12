@@ -397,7 +397,8 @@ export default function HomeScreen() {
         try {
           const location = await checkAndGetLocation();
           if (location && bars.length > 0) {
-            calculateDistances();
+            const updatedBars = await barService.calculateBarDistances(bars, location);
+            setBarsWithLocation(updatedBars);
           }
         } catch (error) {
           console.error('Error checking location:', error);
@@ -593,6 +594,8 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
+      // Clear cache khi refresh
+      barService.clearDistanceCache();
       await Promise.all([
         fetchBars(),
         fetchEvents()

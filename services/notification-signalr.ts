@@ -28,6 +28,7 @@ class SignalRService {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private maxRetryAttempts: number = 10;
   private currentRetryCount: number = 0;
+  private reconnectedCallback: (() => void) | null = null;
 
   constructor() {
     // Theo dõi trạng thái của ứng dụng
@@ -39,7 +40,10 @@ class SignalRService {
       // Khi app trở lại foreground
       await this.reconnect();
     } else if (nextAppState === 'background') {
-      // Giữ kết nối khi app vào background
+      // Kiểm tra và kết nối lại nếu cần khi app vào background
+      if (this.connection?.state !== 'Connected') {
+        await this.reconnect();
+      }
     }
   };
 
@@ -170,7 +174,7 @@ class SignalRService {
     });
 
     this.connection.onreconnecting((error) => {
-      console.log('SignalR đang kết nối lại:', error);
+      console.log('SignalR đang kết n���i lại:', error);
     });
 
     this.connection.onreconnected(async (connectionId) => {
@@ -181,6 +185,11 @@ class SignalRService {
         await this.connection?.invoke('RequestUnreadCount');
       } catch (error) {
         console.log('Lỗi khi yêu cầu unread count mới:', error);
+      }
+
+      // Gọi callback khi kết nối lại thành công
+      if (this.reconnectedCallback) {
+        this.reconnectedCallback();
       }
     });
 
@@ -223,6 +232,10 @@ class SignalRService {
 
   setUnreadCountCallback(callback: (count: number) => void) {
     this.unreadCountCallback = callback;
+  }
+
+  setReconnectedCallback(callback: () => void) {
+    this.reconnectedCallback = callback;
   }
 
   async disconnect() {

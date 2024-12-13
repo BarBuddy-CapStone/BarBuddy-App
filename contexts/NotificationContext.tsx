@@ -33,6 +33,8 @@ export const NotificationProvider = ({ children, isGuest, userId }: Notification
   useEffect(() => {
     const initializeNotifications = async () => {
       if (!isGuest && userId) {
+        clearNotifications();
+
         await new Promise(resolve => setTimeout(resolve, 1000));
         await fetchNotifications();
         setIsInitialized(true);
@@ -65,6 +67,15 @@ export const NotificationProvider = ({ children, isGuest, userId }: Notification
                 return [newNotification, ...prevNotifications];
               }
             });
+          }
+        });
+
+        signalRService.setReconnectedCallback(async () => {
+          try {
+            await notificationService.getUnreadCount();
+            await fetchNotifications();
+          } catch (error) {
+            console.error('Lỗi khi fetch notifications sau khi kết nối lại:', error);
           }
         });
 

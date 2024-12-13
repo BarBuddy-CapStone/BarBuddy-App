@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Gọi API logout để hủy refresh token
       await tokenService.logout();
 
-      // Xóa user từ state
+      // Xóa user từ state và set isAuthenticated về false
       setUser(null);
       setIsAuthenticated(false);
       

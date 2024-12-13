@@ -10,6 +10,7 @@ import { View, Linking } from 'react-native';
 import '@/services/background-messaging';
 import { tokenService } from '@/services/token';
 import { BookingSignalRProvider } from '@/contexts/BookingSignalRContext';
+import FloatingServingBookings from '@/components/FloatingServingBookings';
 
 // Giữ splash screen hiển thị
 SplashScreen.preventAutoHideAsync();
@@ -78,6 +79,7 @@ function RootLayoutNav() {
           }} 
         />
       </Stack>
+      <FloatingServingBookings />
     </ThemeProvider>
   );
 }

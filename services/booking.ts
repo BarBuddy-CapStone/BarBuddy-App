@@ -85,6 +85,27 @@ interface ExtraDrinkRequest {
   quantity: number;
 }
 
+// Thêm interface cho serving bookings
+export interface ServingBooking {
+  bookingId: string;
+  barId: string;
+  barName: string;
+  bookingDate: string;
+  bookingTime: string;
+  bookingCode: string;
+  note: string;
+  status: number;
+  createAt: string;
+  image: string;
+  isRated: boolean;
+}
+
+export interface ServingBookingsResponse {
+  statusCode: number;
+  message: string;
+  data: ServingBooking[];
+}
+
 class BookingService {
   async getBookingHistory(
     accountId: string,
@@ -259,6 +280,29 @@ class BookingService {
       return handleConnectionError(
         async () => { throw error; },
         'Không thể đặt thêm đồ uống. Vui lòng thử lại sau.'
+      );
+    }
+  }
+
+  async getServingBookings(accountId: string): Promise<ServingBookingsResponse> {
+    try {
+      const response = await api.get(`/api/Booking/serving/${accountId}`);
+
+      if (response.data.statusCode === 200) {
+        return response.data;
+      }
+
+      throw new Error(response.data.message);
+    } catch (error: any) {
+      // Nếu là lỗi từ response của API
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      
+      // Nếu là lỗi do không kết nối được đến server
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể tải danh sách đơn đang phục vụ. Vui lòng thử lại sau.'
       );
     }
   }

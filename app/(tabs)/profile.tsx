@@ -162,6 +162,13 @@ const LogoutModal = memo(({
   </Modal>
 ));
 
+// Thêm component mới cho tiêu đề nhóm
+const MenuSection = memo(({ title }: { title: string }) => (
+  <Text className="text-white/60 text-sm font-medium uppercase mb-3 mt-6 px-1">
+    {title}
+  </Text>
+));
+
 export default function ProfileScreen() {
   const { user, logout, isGuest, setIsGuest } = useAuth();
   const [account, setAccount] = useState<Account | null>(null);
@@ -202,7 +209,12 @@ export default function ProfileScreen() {
     }
   }, [user?.accountId]);
 
-  const menuItems = useCallback((): MenuItem[] => [
+  // Cập nhật lại menuItems
+  const menuItems = useCallback((): (MenuItem | { type: 'section', title: string })[] => [
+    {
+      type: 'section',
+      title: 'Tài khoản'
+    },
     {
       id: '1',
       icon: 'person-outline',
@@ -220,20 +232,59 @@ export default function ProfileScreen() {
       onPress: () => router.push(`/payment-history/${user?.accountId}` as any)
     },
     {
+      type: 'section',
+      title: 'Điều khoản'
+    },
+    {
       id: '3',
+      icon: 'document-text-outline',
+      title: 'Điều khoản sử dụng',
+      subtitle: 'Các quy định và điều khoản',
+      variant: 'default',
+      onPress: () => router.push('/terms-and-policies')
+    },
+    {
+      id: '4',
+      icon: 'shield-checkmark-outline',
+      title: 'Chính sách bảo mật',
+      subtitle: 'Chính sách về quyền riêng tư',
+      variant: 'default', 
+      onPress: () => router.push('/privacy-policy')
+    },
+    {
+      type: 'section',
+      title: 'Khác'
+    },
+    {
+      id: '5',
       icon: 'log-out-outline',
       title: 'Đăng xuất',
       subtitle: 'Tạm biệt!',
       variant: 'danger',
       onPress: () => setShowLogoutModal(true)
     }
-  ], [router]);
+  ], [router, user?.accountId]);
 
-  const renderItem = useCallback(({ item }: { item: MenuItem }) => (
-    <MenuItem item={item} />
-  ), []);
+  // Cập nhật renderItem để xử lý cả MenuItem và section
+  const renderItem = useCallback(({ item }: { item: MenuItem | { type: 'section', title: string } }) => {
+    if ('type' in item && item.type === 'section') {
+      return <MenuSection title={item.title} />;
+    }
+    return <MenuItem item={item as MenuItem} />;
+  }, []);
 
-  const keyExtractor = useCallback((item: MenuItem) => item.id, []);
+  // Cập nhật keyExtractor
+  const keyExtractor = useCallback((item: MenuItem | { type: 'section', title: string }) => {
+    if ('type' in item) {
+      return `section-${item.title}`;
+    }
+    return item.id;
+  }, []);
+
+  // Cập nhật ItemSeparatorComponent để có khoảng cách nhỏ hơn giữa các mục trong cùng một nhóm
+  const ItemSeparator = memo(() => (
+    <View style={{ height: 8 }} />
+  ));
 
   useEffect(() => {
     if (user?.accountId) {
@@ -260,8 +311,8 @@ export default function ProfileScreen() {
                 renderItem={renderItem}
                 keyExtractor={keyExtractor}
                 ListHeaderComponent={<ProfileHeader account={account} />}
-                contentContainerStyle={{ padding: 24 }}
-                ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
+                contentContainerStyle={{ padding: 24, paddingBottom: 80 }}
+                ItemSeparatorComponent={ItemSeparator}
                 refreshControl={
                   <RefreshControl 
                     refreshing={refreshing} 

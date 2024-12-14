@@ -50,6 +50,30 @@ interface ResetPasswordResponse {
   data: string;
 }
 
+interface VerifyResetPasswordOTPRequest {
+  email: string;
+  otp: string;
+}
+
+interface VerifyResetPasswordOTPResponse {
+  statusCode: number;
+  message: string;
+  data: string;
+}
+
+interface SetNewPasswordRequest {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  uniqueCode: string;
+}
+
+interface SetNewPasswordResponse {
+  statusCode: number;
+  message: string;
+  data: boolean;
+}
+
 class AuthService {
   async login(credentials: LoginRequest): Promise<UserInfo> {
     try {
@@ -144,6 +168,42 @@ class AuthService {
       return handleConnectionError(
         async () => { throw error; },
         'Không thể gửi yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau.'
+      );
+    }
+  }
+
+  async verifyResetPasswordOTP(data: VerifyResetPasswordOTPRequest): Promise<VerifyResetPasswordOTPResponse> {
+    try {
+      const response = await api.post<VerifyResetPasswordOTPResponse>(
+        '/api/authen/reset-password/verification', 
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể xác thực OTP. Vui lòng thử lại sau.'
+      );
+    }
+  }
+
+  async setNewPassword(data: SetNewPasswordRequest): Promise<SetNewPasswordResponse> {
+    try {
+      const response = await api.post<SetNewPasswordResponse>(
+        '/api/authen/reset-password/new-password', 
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      if (error.response) {
+        throw new Error(error.response.data.message);
+      }
+      return handleConnectionError(
+        async () => { throw error; },
+        'Không thể đặt lại mật khẩu. Vui lòng thử lại sau.'
       );
     }
   }

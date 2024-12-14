@@ -156,10 +156,6 @@ export default function LoginScreen() {
     transform: [{ scale: buttonScale.value }]
   }));
 
-  const loadingIconStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${loadingRotate.value}deg` }]
-  }));
-
   const progressBarStyle = useAnimatedStyle(() => ({
     width: `${progressWidth.value}%`,
     height: 2,
@@ -176,10 +172,6 @@ export default function LoginScreen() {
 
   const googleButtonAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: googleButtonScale.value }]
-  }));
-
-  const googleLoadingIconStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${googleLoadingRotate.value}deg` }]
   }));
 
   const googleProgressBarStyle = useAnimatedStyle(() => ({
@@ -361,9 +353,7 @@ export default function LoginScreen() {
                     <View className="flex-row items-center justify-center space-x-2">
                       {isSubmitting ? (
                         <>
-                          <Animated.View style={loadingIconStyle}>
-                            <Ionicons name="sync" size={20} color="black" />
-                          </Animated.View>
+                          <ActivityIndicator size="small" color="black" />
                           <Text className="text-black font-bold text-lg">
                             Đang xử lý...
                           </Text>
@@ -395,9 +385,7 @@ export default function LoginScreen() {
                   <View className="flex-row items-center justify-center space-x-3">
                     {isGoogleLoading ? (
                       <>
-                        <Animated.View style={googleLoadingIconStyle}>
-                          <Ionicons name="sync" size={20} color="white" />
-                        </Animated.View>
+                        <ActivityIndicator size="small" color="white" />
                         <Text className="text-white font-semibold">
                           Đang xử lý...
                         </Text>

@@ -1,6 +1,6 @@
 import { Link, useRouter } from 'expo-router';
 import React, { useState, useEffect, useRef } from 'react';
-import { Image, Text, TextInput, TouchableOpacity, View, ScrollView, Platform, NativeSyntheticEvent, TextInputKeyPressEventData } from 'react-native';
+import { Image, Text, TextInput, TouchableOpacity, View, ScrollView, Platform, NativeSyntheticEvent, TextInputKeyPressEventData, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -324,14 +324,12 @@ export default function RegisterScreen() {
       setVerifyError(null);
       setIsConfirming(true);
 
-      // Bắt đầu animation
       confirmButtonScale.value = withSpring(0.95);
       confirmProgressWidth.value = withTiming(100, {
         duration: 1000,
         easing: Easing.bezier(0.4, 0.0, 0.2, 1)
       });
       
-      // Animation loading xoay
       confirmLoadingRotate.value = withRepeat(
         withTiming(360, {
           duration: 1000,
@@ -339,14 +337,13 @@ export default function RegisterScreen() {
         }),
         -1
       );
-      
+
       const response = await authService.verifyOTP({
         email,
         otp
       });
 
       if (response.statusCode === 200) {
-        // Animation hoàn thành
         confirmProgressWidth.value = withTiming(0);
         confirmButtonScale.value = withSequence(
           withSpring(1.05),
@@ -354,16 +351,16 @@ export default function RegisterScreen() {
         );
         
         setShowOTPModal(false);
-        resetRegisterButton();
         setShowSuccessModal(true);
         setRedirectCountdown(5);
       }
     } catch (err: any) {
-      // Reset animation khi có lỗi
       confirmProgressWidth.value = withTiming(0);
       confirmButtonScale.value = withSpring(1);
       confirmLoadingRotate.value = 0;
       setVerifyError(err.message);
+      setOtp('');
+      otpInputRefs.current[0]?.current?.focus();
     } finally {
       setIsConfirming(false);
       confirmLoadingRotate.value = 0;
@@ -641,9 +638,7 @@ export default function RegisterScreen() {
                     <View className="flex-row items-center justify-center space-x-2">
                       {isSubmitting ? (
                         <>
-                          <Animated.View style={loadingIconStyle}>
-                            <Ionicons name="sync" size={20} color="black" />
-                          </Animated.View>
+                          <ActivityIndicator size="small" color="black" />
                           <Text className="text-black font-bold text-lg">
                             Đang xử lý...
                           </Text>
@@ -680,9 +675,7 @@ export default function RegisterScreen() {
                     <View className="flex-row items-center justify-center space-x-3">
                       {isGoogleLoading ? (
                         <>
-                          <Animated.View style={googleLoadingIconStyle}>
-                            <Ionicons name="sync" size={20} color="white" />
-                          </Animated.View>
+                          <ActivityIndicator size="small" color="white" />
                           <Text className="text-white font-semibold">
                             Đang xử lý...
                           </Text>
@@ -854,9 +847,7 @@ export default function RegisterScreen() {
                     <View className="flex-row items-center justify-center space-x-2">
                       {isConfirming ? (
                         <>
-                          <Animated.View style={confirmLoadingIconStyle}>
-                            <Ionicons name="sync" size={20} color="black" />
-                          </Animated.View>
+                          <ActivityIndicator size="small" color="black" />
                           <Text className="text-black font-semibold text-lg">
                             Đang xử lý...
                           </Text>
@@ -882,9 +873,7 @@ export default function RegisterScreen() {
                 >
                   {isResendingOTP ? (
                     <View className="flex-row items-center justify-center space-x-2">
-                      <Animated.View style={spinnerStyle}>
-                        <Ionicons name="sync" size={18} color="#FFB800" />
-                      </Animated.View>
+                      <ActivityIndicator size="small" color="#FFB800" />
                       <Text className="text-yellow-500 font-semibold text-lg">
                         Đang gửi lại mã...
                       </Text>

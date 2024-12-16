@@ -646,8 +646,53 @@ export default function BookingTableScreen() {
     }
   };
 
-  const handleRemoveTable = (tableId: string) => {
-    setSelectedTables(prev => prev.filter(t => t.id !== tableId));
+  const handleRemoveTable = async (tableId: string) => {
+    try {
+      // Thêm loading state cho bàn đang xóa
+      setLoadingTables(prev => ({
+        ...prev,
+        [tableId]: true
+      }));
+
+      // Gọi API để release table
+      const request: HoldTableRequest = {
+        tableId: tableId,
+        time: selectedTime.replace(' (+1 ngày)', '') + ':00',
+        barId: id as string,
+        date: selectedTime.includes('(+1 ngày)') 
+          ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
+          : format(selectedDate, 'yyyy-MM-dd')
+      };
+
+      await bookingTableService.releaseTable(request);
+
+      // Cập nhật UI sau khi release thành công
+      setSelectedTables(prev => prev.filter(t => t.id !== tableId));
+      
+      // Cập nhật trạng thái bàn trong availableTables
+      setAvailableTables(prev => prev.map(table => {
+        if (table.id === tableId) {
+          return {
+            ...table,
+            status: 'available'
+          };
+        }
+        return table;
+      }));
+
+    } catch (error) {
+      console.error('Error releasing table:', error);
+      Alert.alert(
+        'Lỗi',
+        'Không thể hủy giữ bàn. Vui lòng thử lại.'
+      );
+    } finally {
+      // Xóa loading state
+      setLoadingTables(prev => ({
+        ...prev,
+        [tableId]: false
+      }));
+    }
   };
 
   const handleTableTypeSelect = (typeId: string) => {
@@ -763,28 +808,29 @@ export default function BookingTableScreen() {
         ? format(addDays(selectedDate, 1), 'yyyy-MM-dd')
         : format(selectedDate, 'yyyy-MM-dd');
 
+      // Lọc ra danh sách unique table IDs
+      const uniqueTableIds = Array.from(new Set(selectedTables.map(table => table.id)));
+
       const bookingRequest: BookingTableRequest = {
         barId: id as string,
         bookingDate,
         bookingTime: selectedTime.replace(' (+1 ngày)', '') + ':00',
         note: note.trim(),
-        tableIds: selectedTables.map(table => table.id),
-        numOfPeople: numOfPeople // Thêm số khách hàng
+        tableIds: uniqueTableIds, // Sử dụng danh sách unique table IDs
+        numOfPeople: numOfPeople
       };
 
       await bookingTableService.bookTable(bookingRequest);
       setBookingStatus('success');
       setBookingSuccess('Đặt bàn thành công!');
       
-      // Thay đổi cách navigation
       setTimeout(() => {
         setShowProcessingModal(false);
-        // Replace thay vì push để không thể back lại
         router.replace({
           pathname: '/(tabs)/booking-history',
           params: { 
             reload: 'true',
-            fromBooking: 'true' // Thêm param để biết là từ booking
+            fromBooking: 'true'
           }
         });
       }, 1500);
@@ -1657,7 +1703,7 @@ export default function BookingTableScreen() {
                       )}
                     </TouchableOpacity>
 
-                    {/* Hiển thị bàn sau khi t��m kiếm */}
+                    {/* Hiển thị bàn sau khi tm kiếm */}
                     {hasSearched && !isSearching && availableTables.length > 0 && (
                       <Animated.View entering={FadeIn}>
                         <View className="bg-neutral-900 rounded-2xl">
@@ -1978,9 +2024,14 @@ export default function BookingTableScreen() {
                           </View>
                           <TouchableOpacity 
                             onPress={() => handleRemoveTable(table.id)}
+                            disabled={loadingTables[table.id]}
                             className="h-8 w-8 bg-white/10 rounded-full items-center justify-center"
                           >
-                            <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                            {loadingTables[table.id] ? (
+                              <ActivityIndicator size="small" color="#EF4444" />
+                            ) : (
+                              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                            )}
                           </TouchableOpacity>
                         </View>
 

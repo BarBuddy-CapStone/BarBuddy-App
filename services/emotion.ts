@@ -2,6 +2,7 @@ import { Alert } from 'react-native';
 import api from './api';
 import { Drink } from './drink';
 import { handleConnectionError } from '@/utils/error-handler';
+import { sanitizeText } from '@/utils/string-utils';
 import axios from 'axios';
 
 export interface EmotionResponseItem {
@@ -41,7 +42,7 @@ class EmotionService {
           `/api/DrinkRecommendation/drink-recommendation-v2`, 
           {
             params: {
-              emotion,
+              emotion: sanitizeText(emotion),
               barId
             },
             cancelToken: source.token
@@ -52,7 +53,23 @@ class EmotionService {
         clearTimeout(timeout);
 
         if (response.data.statusCode === 200) {
-          return response.data.data;
+          // Xử lý và làm sạch dữ liệu trả về
+          return response.data.data.map(item => ({
+            drink: {
+              ...item.drink,
+              drinkName: sanitizeText(item.drink.drinkName),
+              description: sanitizeText(item.drink.description),
+              drinkCategoryResponse: {
+                ...item.drink.drinkCategoryResponse,
+                description: sanitizeText(item.drink.drinkCategoryResponse.description),
+              },
+              emotionsDrink: item.drink.emotionsDrink.map(emotion => ({
+                ...emotion,
+                description: emotion.description ? sanitizeText(emotion.description) : null,
+              })),
+            },
+            reason: sanitizeText(item.reason)
+          }));
         }
         
         throw new Error(response.data.message);

@@ -21,7 +21,10 @@ const EXCLUDED_PATHS = [
   '(auth)',
   'onboarding',
   'booking-detail',
-  'order-drink'
+  'order-drink',
+  'booking-drink',
+  'booking-table',
+  'payment-detail'
 ];
 
 const AnimatedPagerView = Animated.createAnimatedComponent(PagerView);

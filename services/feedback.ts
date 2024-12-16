@@ -31,7 +31,6 @@ export const feedbackService = {
         data: FeedbackDetail 
       }>(`/api/feedback/booking/${bookingId}`);
       
-      console.log("response", response);
 
       if (response.data.statusCode === 200) {
         return response.data.data;
@@ -44,7 +43,6 @@ export const feedbackService = {
         throw new Error(error.response.data.message);
       }
 
-      console.log("error", error);
       
       // Nếu là lỗi do không kết nối được đến server
       return handleConnectionError(

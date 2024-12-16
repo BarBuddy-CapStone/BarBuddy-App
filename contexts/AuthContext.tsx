@@ -71,11 +71,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const setupSignalR = async () => {
       if (isAuthenticated && user?.accountId && !isGuest) {
-        console.log('Global SignalR: Bắt đầu kết nối SignalR...');
         await signalRService.connect();
       } else {
         // Ngắt kết nối nếu không đăng nhập hoặc là guest
-        console.log('Global SignalR: Ngắt kết nối do chưa đăng nhập...');
         await signalRService.disconnect();
       }
     };

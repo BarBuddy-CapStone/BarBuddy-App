@@ -1039,7 +1039,6 @@ export default function BookingTableScreen() {
 
     // Đăng ký lắng nghe sự kiện TableHold
     const unsubscribeTableHold = bookingSignalRService.onTableHold((event) => {
-      console.log('TableHold event received:', event);
       
       // Cập nhật UI khi có bàn được hold bởi người khác
       setAvailableTables(prev => prev.map(table => {
@@ -1075,7 +1074,6 @@ export default function BookingTableScreen() {
 
     // Đăng ký lắng nghe sự kiện TableRelease
     const unsubscribeTableRelease = bookingSignalRService.onTableRelease((event) => {
-      console.log('TableRelease event received:', event);
       
       // Cập nhật UI khi có bàn được release
       setAvailableTables(prev => prev.map(table => {

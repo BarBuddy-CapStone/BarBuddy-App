@@ -157,7 +157,6 @@ class BookingTableService {
   async bookTableWithDrinks(request: BookingDrinkRequest, onCancel?: () => void) {
     try {
       const headers = await this.getAuthHeader();
-      console.log("request", request);
       const response = await api.post('/api/Booking/booking-drink/mobile', request, { headers });
 
       if (response.data.statusCode === 200) {
@@ -195,7 +194,6 @@ class BookingTableService {
       );
 
       if (response.data.statusCode === 200) {
-        console.log("response.data.data", response.data.data);
         return response.data.data;
       }
 
@@ -250,7 +248,6 @@ class BookingTableService {
       throw new Error(response.data.message);
     } catch (error: any) {
       if (error.response?.status === 500) {
-        console.log('Ignored 500 error when releasing table:', error);
         return null;
       }
       

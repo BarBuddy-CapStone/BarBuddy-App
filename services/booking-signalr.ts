@@ -32,15 +32,12 @@ class BookingSignalRService {
           accountId = userData?.user?.accountId;
           
           if (!accountId) {
-            console.log('Không có accountId, bỏ qua kết nối SignalR');
             return;
           }
         } else {
-          console.log('Chưa đăng nhập, bỏ qua kết nối SignalR');
           return;
         }
       } catch (error) {
-        console.log('Lỗi khi lấy accountId:', error);
         return;
       }
 
@@ -61,27 +58,22 @@ class BookingSignalRService {
 
         // Đăng ký các event handlers
         this.connection.on('TableHoId', (data: TableHoldEvent) => {
-          console.log('TableHoId event received:', data);
           this.onTableHoldCallbacks.forEach(callback => callback(data));
         });
 
         this.connection.on('TableReleased', (data: TableHoldEvent) => {
-          console.log('TableReleased event received:', data);
           this.onTableReleaseCallbacks.forEach(callback => callback(data));
         });
 
         // Xử lý khi reconnect thành công
         this.connection.onreconnected(() => {
-          console.log('Booking SignalR reconnected');
         });
 
         // Xử lý khi mất kết nối
         this.connection.onclose(() => {
-          console.log('Booking SignalR connection closed');
         });
 
         await this.connection.start();
-        console.log('Booking SignalR connected with accountId:', accountId);
       }
     } catch (error) {
       console.error('Error initializing booking SignalR:', error);
@@ -109,7 +101,6 @@ class BookingSignalRService {
         this.connection = null;
         this.onTableHoldCallbacks = [];
         this.onTableReleaseCallbacks = [];
-        console.log('Booking SignalR disconnected');
       } catch (error) {
         console.error('Error stopping booking SignalR:', error);
       }

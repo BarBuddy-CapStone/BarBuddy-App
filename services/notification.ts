@@ -62,7 +62,6 @@ class NotificationService {
         vibrate: true,
       },
       (created: boolean) => {
-        console.log(`Channel 'default' ${created ? 'was created' : 'already exists'}`);
       }
     );
   }
@@ -71,12 +70,10 @@ class NotificationService {
     // Cấu hình cơ bản cho PushNotification
     PushNotification.configure({
       onNotification: (notification: LocalNotification) => {
-        console.log('Local notification clicked:', notification);
         
         if (notification.userInteraction === true) {
           const notificationData = notification.data || notification.userInfo;
           if (notificationData?.deepLink) {
-            console.log('Deep link from notification click:', notificationData.deepLink);
             // Lưu cả deepLink và notificationId
             NotificationService.pendingDeepLink = notificationData.deepLink;
             // Kiểm tra type của notificationId
@@ -117,7 +114,6 @@ class NotificationService {
       }
 
       const fcmToken = await messaging().getToken();
-      console.log('FCM Token:', fcmToken);
       return fcmToken;
     } catch (error) {
       console.error('Error getting FCM token:', error);
@@ -128,13 +124,11 @@ class NotificationService {
   setupMessageListeners() {
     // Xử lý thông báo khi app đang mở (foreground)
     messaging().onMessage(async remoteMessage => {
-      console.log('Received foreground message:', JSON.stringify(remoteMessage, null, 2));
       this.showLocalNotification(remoteMessage);
     });
 
     // Xử lý khi nhấn vào thông báo khi app ở background
     messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log('Notification opened from background state:', JSON.stringify(remoteMessage, null, 2));
       const deepLink = remoteMessage.data?.deepLink;
       const notificationId = remoteMessage.data?.notificationId;
       if (typeof deepLink === 'string') {
@@ -209,7 +203,6 @@ class NotificationService {
       if (url.startsWith('com.fptu.barbuddy://')) {
         // Lấy phần path sau scheme
         const path = url.replace('com.fptu.barbuddy://', '');
-        console.log('Handling deep link path:', path);
         
         // Tìm notificationId từ pendingDeepLink
         const notificationId = NotificationService.pendingNotificationId;
@@ -232,7 +225,6 @@ class NotificationService {
 
   // Đổi tên để rõ ràng hơn
   private showLocalNotification(remoteMessage: any) {
-    console.log('Showing local notification:', JSON.stringify(remoteMessage, null, 2));
     
     const notificationData = {
       ...remoteMessage.data,
@@ -270,13 +262,11 @@ class NotificationService {
     try {
       const authData = await AsyncStorage.getItem('@auth');
       if (!authData) {
-        console.log('Không có dữ liệu xác thực');
         return [];
       }
 
       const userData = JSON.parse(authData);
       if (!userData?.user?.accessToken) {
-        console.log('Không có access token');
         return [];
       }
 
@@ -298,7 +288,6 @@ class NotificationService {
 
       throw new Error(response.data.message);
     } catch (error: any) {
-      console.log('Lỗi chi tiết:', error);
       // Nếu là lỗi từ response của API
       if (error.response) {
         throw new Error(error.response.data.message);

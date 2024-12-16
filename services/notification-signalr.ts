@@ -67,7 +67,6 @@ class SignalRService {
     }
 
     if (this.currentRetryCount >= this.maxRetryAttempts) {
-      console.log('Đã đạt đến số lần thử lại tối đa');
       this.currentRetryCount = 0;
       return;
     }
@@ -80,7 +79,6 @@ class SignalRService {
       try {
         await this.connect();
       } catch (error) {
-        console.log('Lỗi khi thử kết nối lại:', error);
         await this.reconnect();
       }
     }, delay);
@@ -88,12 +86,10 @@ class SignalRService {
 
   async connect() {
     if (this.isConnecting) {
-      console.log('Đang trong quá trình kết nối SignalR, bỏ qua yêu cầu mới');
       return;
     }
 
     if (this.connection?.state === 'Connected') {
-      console.log('SignalR đã được kết nối');
       return;
     }
 
@@ -109,16 +105,13 @@ class SignalRService {
           
           // Nếu không có accountId, không kết nối
           if (!accountId) {
-            console.log('Không có accountId, bỏ qua kết nối SignalR');
             return;
           }
         } else {
           // Nếu không có auth data, không kết nối
-          console.log('Chưa đăng nhập, bỏ qua kết nối SignalR');
           return;
         }
       } catch (error) {
-        console.log('Lỗi khi lấy accountId:', error);
         return;
       }
 
@@ -128,7 +121,6 @@ class SignalRService {
       }
 
       const hubUrl = `${API_CONFIG.BASE_URL}/notificationHub?accountId=${accountId}`;
-      console.log('Connecting to SignalR hub:', hubUrl);
 
       this.connection = new HubConnectionBuilder()
         .withUrl(hubUrl, {
@@ -151,11 +143,9 @@ class SignalRService {
       this.setupEventHandlers();
 
       await this.connection.start();
-      console.log('SignalR đã kết nối thành công');
       this.currentRetryCount = 0; // Reset retry count sau khi kết nối thành công
 
     } catch (error) {
-      console.log('Lỗi khi thiết lập kết nối SignalR:', error);
       await this.reconnect();
     } finally {
       this.isConnecting = false;
@@ -169,22 +159,18 @@ class SignalRService {
     this.connection.off('ReceiveUnreadCount');
 
     this.connection.onclose(async (error) => {
-      console.log('SignalR Connection closed:', error);
       await this.reconnect();
     });
 
     this.connection.onreconnecting((error) => {
-      console.log('SignalR đang kết n���i lại:', error);
     });
 
     this.connection.onreconnected(async (connectionId) => {
-      console.log('SignalR đã kết nối lại thành công:', connectionId);
       this.currentRetryCount = 0;
       
       try {
         await this.connection?.invoke('RequestUnreadCount');
       } catch (error) {
-        console.log('Lỗi khi yêu cầu unread count mới:', error);
       }
 
       // Gọi callback khi kết nối lại thành công
@@ -194,7 +180,6 @@ class SignalRService {
     });
 
     this.connection.on('ReceiveNotification', (notification: SignalRNotification) => {
-      console.log('Nhận notification mới', notification);
       
       // Chuyển đổi từ SignalRNotification sang Notification
       const normalizedNotification = {
@@ -219,7 +204,6 @@ class SignalRService {
     });
 
     this.connection.on('ReceiveUnreadCount', (count: number) => {
-      console.log('Nhận unread count mới:', count);
       if (this.unreadCountCallback) {
         this.unreadCountCallback(count);
       }
@@ -243,9 +227,7 @@ class SignalRService {
     if (this.connection) {
       try {
         await this.connection.stop();
-        console.log('Đã ngắt kết nối SignalR');
       } catch (error) {
-        console.log('Lỗi khi ngắt kết nối SignalR:', error);
       } finally {
         this.connection = null;
       }

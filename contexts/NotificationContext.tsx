@@ -51,12 +51,10 @@ export const NotificationProvider = ({ children, isGuest, userId }: Notification
 
     const setupSignalR = async () => {
       if (!isGuest && userId && isInitialized) {
-        console.log('Global SignalR: Bắt đầu kết nối SignalR...');
         await signalRService.connect();
 
         signalRService.setNotificationCallback((newNotification: Notification) => {
           if (isMounted) {
-            console.log('Global SignalR: Nhận notification mới:', newNotification);
             setNotifications(prevNotifications => {
               const exists = prevNotifications.some(n => n.id === newNotification.id);
               if (exists) {
@@ -88,7 +86,6 @@ export const NotificationProvider = ({ children, isGuest, userId }: Notification
     return () => {
       isMounted = false;
       if (!isGuest && userId) {
-        console.log('Global SignalR: Cleanup SignalR connection...');
         signalRService.disconnect();
       }
     };

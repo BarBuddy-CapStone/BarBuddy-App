@@ -1,5 +1,6 @@
 import api from './api';
 import { handleConnectionError } from '@/utils/error-handler';
+import { sanitizeText } from '@/utils/string-utils';
 
 export type Drink = {
   drinkId: string;
@@ -39,7 +40,19 @@ class DrinkService {
       const response = await api.get(`/api/v1/Drink/customer/${barId}`);
       
       if (response.data.statusCode === 200) {
-        return response.data.data;
+        return response.data.data.map((drink: Drink) => ({
+          ...drink,
+          drinkName: sanitizeText(drink.drinkName),
+          description: sanitizeText(drink.description),
+          drinkCategoryResponse: {
+            ...drink.drinkCategoryResponse,
+            description: sanitizeText(drink.drinkCategoryResponse.description),
+          },
+          emotionsDrink: drink.emotionsDrink.map(emotion => ({
+            ...emotion,
+            description: emotion.description ? sanitizeText(emotion.description) : null,
+          })),
+        }));
       }
       
       throw new Error(response.data.message);
@@ -62,7 +75,20 @@ class DrinkService {
       const response = await api.get(`/api/v1/Drink/${drinkId}`);
       
       if (response.data.statusCode === 200) {
-        return response.data.data;
+        const drink = response.data.data;
+        return {
+          ...drink,
+          drinkName: sanitizeText(drink.drinkName),
+          description: sanitizeText(drink.description),
+          drinkCategoryResponse: {
+            ...drink.drinkCategoryResponse,
+            description: sanitizeText(drink.drinkCategoryResponse.description),
+          },
+          emotionsDrink: drink.emotionsDrink.map((emotion: any) => ({
+            ...emotion,
+            description: emotion.description ? sanitizeText(emotion.description) : null,
+          })),
+        };
       }
       
       throw new Error(response.data.message);

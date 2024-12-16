@@ -524,7 +524,6 @@ export default function BookingDrinkScreen() {
         numOfPeople: Number(params.numOfPeople)
       };
 
-      console.log(bookingRequest);
 
       router.push({
         pathname: "/payment/payment-detail" as any,
@@ -1375,7 +1374,7 @@ export default function BookingDrinkScreen() {
                           </Text>
                           
                           <Text className="text-gray-400 text-sm text-center px-4">
-                            Chúng tôi sử dụng trí tuệ nhân tạo để phân tích trạng thái cảm xúc của bạn dựa trên dữ liệu mà b��n nhập vào, chúng tôi cam kết sẽ không lưu trữ dữ liệu của bạn.
+                            Chúng tôi sử dụng trí tuệ nhân tạo để phân tích trạng thái cảm xúc của bạn dựa trên dữ liệu mà bạn nhập vào, chúng tôi cam kết sẽ không lưu trữ dữ liệu của bạn.
                           </Text>
                           <Text className="text-gray-500 text-sm text-center px-4 mt-2">
                             Đây là tính năng thử nghiệm, kết quả có thể không trùng khớp với trạng thái cảm xúc hiện tại của bạn.

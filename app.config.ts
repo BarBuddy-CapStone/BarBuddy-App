@@ -98,6 +98,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       goongMapsKey: process.env.GOONG_MAPS_KEY,
       apiUrl: process.env.API_URL,
       apiTimeout: process.env.API_TIMEOUT,
+      geminiApiKey: process.env.GEMINI_API_KEY,
       eas: {
         projectId: "7f78547a-caf1-420f-b7bb-d69c26cd081d"
       }

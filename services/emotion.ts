@@ -1,114 +1,184 @@
 import { Alert } from 'react-native';
 import api from './api';
-import { Drink } from './drink';
+import { Drink, drinkService } from './drink';
 import { handleConnectionError } from '@/utils/error-handler';
 import { sanitizeText } from '@/utils/string-utils';
 import axios from 'axios';
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import Constants from 'expo-constants';
+
+const GEMINI_API_KEY = Constants.expoConfig?.extra?.geminiApiKey;
+const MAX_RETRIES = 10;
+const RETRY_DELAY = 500;
 
 export interface EmotionResponseItem {
   drink: Drink;
   reason: string;
 }
 
-interface EmotionApiResponse {
-  statusCode: number;
-  message: string;
-  data: EmotionResponseItem[];
+interface DrinkRecommendation {
+  drinkName: string;
+  reason: string;
+}
+
+interface GeminiResponse {
+  drinkRecommendation: DrinkRecommendation[];
 }
 
 class EmotionService {
+  private readonly genAI: GoogleGenerativeAI;
+
+  constructor() {
+    if (!GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY is not configured');
+    }
+    this.genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  }
+
   /**
-   * Get drink recommendations based on emotion
-   * @param emotion - User's emotion text
-   * @param barId - ID of the bar
-   * @returns Promise<EmotionResponseItem[]> - Array of recommended drinks
+   * Chuẩn bị prompt cho Gemini
+   */
+  private prepareSystemPrompt(drinksData: any[]) {
+    return `Bạn là một bartender chuyên nghiệp với kinh nghiệm gợi ý đồ uống dựa trên cảm xúc của khách hàng.
+
+Đây là danh sách đồ uống có sẵn: ${JSON.stringify(drinksData)}
+
+Hãy phân tích cảm xúc của khách. Trả về kết quả theo format JSON:
+{
+  "drinkRecommendation": [
+    {
+      "drinkName": "tên đồ uống",
+      "reason": "lý do chi tiết tại sao đồ uống này phù hợp với cảm xúc hiện tại"
+    }
+  ]
+}
+
+Lưu ý:
+- Chỉ gợi ý đồ uống có trong danh sách
+- Đảm bảo tên đồ uống khớp chính xác
+- Lý do phải cụ thể và liên quan đến cảm xúc`;
+  }
+
+  /**
+   * Get drink recommendations based on emotion using Gemini AI
    */
   async getDrinkRecommendations(
-    emotion: string, 
+    emotion: string,
     barId: string,
-    onCancel?: () => void
+    onCancel?: () => void,
+    retryCount = 0
   ): Promise<EmotionResponseItem[]> {
     try {
-      // Tạo CancelToken source để handle timeout
-      const source = axios.CancelToken.source();
-      
-      // Set timeout 30 seconds
-      const timeout = setTimeout(() => {
-        source.cancel('Timeout - Request took too long');
-      }, 30000);
+      // Validate input
+      if (!emotion.trim()) {
+        throw new Error('Emotion text is required');
+      }
 
-      try {
-        const response = await api.get<EmotionApiResponse>(
-          `/api/DrinkRecommendation/drink-recommendation-v2`, 
+      // Lấy danh sách đồ uống từ bar
+      const drinks = await drinkService.getDrinks(barId);
+      if (!drinks.length) {
+        throw new Error('No drinks available');
+      }
+
+      // Map drinks data cho Gemini
+      const drinksData = drinks.map(drink => ({
+        drinkName: drink.drinkName,
+        drinkDescription: drink.description,
+        emotionsDrink: drink.emotionsDrink.map(e => e.categoryName),
+        price: drink.price
+      }));
+
+      // Khởi tạo model với config phù hợp
+      const model = this.genAI.getGenerativeModel({ 
+        model: "gemini-pro",
+        generationConfig: {
+          temperature: 0.7, // Giảm temperature để tăng độ chính xác
+          topP: 0.8,
+          topK: 40,
+          maxOutputTokens: 2048,
+        }
+      });
+
+      // Tạo chat session với system prompt được cải thiện
+      const chat = model.startChat({
+        history: [
           {
-            params: {
-              emotion: sanitizeText(emotion),
-              barId
-            },
-            cancelToken: source.token
+            role: "user",
+            parts: [{ text: this.prepareSystemPrompt(drinksData) }]
+          },
+          {
+            role: "model",
+            parts: [{ text: "Tôi đã sẵn sàng phân tích cảm xúc và gợi ý đồ uống phù hợp." }]
           }
-        );
+        ]
+      });
 
-        // Clear timeout nếu request thành công
-        clearTimeout(timeout);
+      // Gửi cảm xúc của khách
+      const result = await chat.sendMessage(
+        `Cảm xúc hiện tại của tôi là: ${sanitizeText(emotion)}`
+      );
+      
+      // Xử lý response
+      const jsonString = result.response.text().replace(/```json\n|\n```/g, "").trim();
+      let recommendations: GeminiResponse;
+      
+      try {
+        recommendations = JSON.parse(jsonString) as GeminiResponse;
+      } catch (error) {
+        throw new Error('Invalid response format from Gemini');
+      }
 
-        if (response.data.statusCode === 200) {
-          // Xử lý và làm sạch dữ liệu trả về
-          return response.data.data.map(item => ({
+      // Validate recommendations
+      if (!recommendations?.drinkRecommendation?.length) {
+        throw new Error('No recommendations received');
+      }
+
+      // Map và validate từng recommendation
+      const recommendedDrinks = recommendations.drinkRecommendation
+        .map((rec: DrinkRecommendation) => {
+          const drink = drinks.find(d => 
+            d.drinkName.toLowerCase() === rec.drinkName.toLowerCase()
+          );
+          
+          if (!drink || !rec.reason) return null;
+
+          return {
             drink: {
-              ...item.drink,
-              drinkName: sanitizeText(item.drink.drinkName),
-              description: sanitizeText(item.drink.description),
+              ...drink,
+              drinkName: sanitizeText(drink.drinkName),
+              description: sanitizeText(drink.description),
               drinkCategoryResponse: {
-                ...item.drink.drinkCategoryResponse,
-                description: sanitizeText(item.drink.drinkCategoryResponse.description),
+                ...drink.drinkCategoryResponse,
+                description: sanitizeText(drink.drinkCategoryResponse.description),
               },
-              emotionsDrink: item.drink.emotionsDrink.map(emotion => ({
+              emotionsDrink: drink.emotionsDrink.map(emotion => ({
                 ...emotion,
                 description: emotion.description ? sanitizeText(emotion.description) : null,
               })),
             },
-            reason: sanitizeText(item.reason)
-          }));
-        }
-        
-        throw new Error(response.data.message);
-      } catch (error) {
-        // Clear timeout để tránh memory leak
-        clearTimeout(timeout);
-        throw error;
+            reason: sanitizeText(rec.reason)
+          };
+        })
+        .filter(Boolean) as EmotionResponseItem[];
+
+      // Validate final results
+      if (!recommendedDrinks.length) {
+        throw new Error('No valid recommendations found');
       }
+
+      return recommendedDrinks;
 
     } catch (error: any) {
-      // Xử lý riêng cho timeout
-      if (axios.isCancel(error)) {
-        Alert.alert(
-          "Quá thời gian", 
-          "Không thể phân tích cảm xúc. Vui lòng thử lại sau."
-        );
-        throw new Error('Quá thời gian phân tích cảm xúc');
+      if (retryCount < MAX_RETRIES - 1) {
+        await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+        return this.getDrinkRecommendations(emotion, barId, onCancel, retryCount + 1);
       }
 
-      // Nếu là lỗi từ response của API
-      if (error.response) {
-        Alert.alert(
-          "Lỗi phân tích", 
-          "Không thể lấy gợi ý đồ uống. Vui lòng thử lại sau."
-        );
-        throw new Error(error.response.data.message);
-      }
-
-      // Nếu là error.message (từ throw new Error ở trên)
-      if (error.message) {
-        throw error;
-      }
-      
-      // Nếu là lỗi do không kết nối được đến server
-      return handleConnectionError(
-        async () => { throw error; },
-        'Không thể lấy gợi ý đồ uống. Vui lòng thử lại sau.',
-        onCancel
+      Alert.alert(
+        "Lỗi gợi ý",
+        `Không thể gợi ý đồ uống sau ${MAX_RETRIES} lần thử. Vui lòng thử lại sau.`
       );
+      throw new Error(error.message || 'Không thể gợi ý đồ uống');
     }
   }
 }

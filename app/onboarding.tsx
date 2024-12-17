@@ -193,7 +193,7 @@ export default function OnboardingScreen() {
       </Animated.View>
       
       <View className="absolute bottom-10 w-full items-center">
-        <Text className="text-white/50 text-sm">Version 1.0.1</Text>
+        <Text className="text-white/50 text-sm">Version 1.0.0</Text>
       </View>
     </View>
   );

@@ -252,11 +252,19 @@ export default function ProfileScreen() {
       onPress: () => router.push('/privacy-policy')
     },
     {
+      id: '5',
+      icon: 'information-circle-outline',
+      title: 'Về chúng tôi',
+      subtitle: 'Thông tin về Bar Buddy',
+      variant: 'default',
+      onPress: () => router.push('/about-us')
+    },
+    {
       type: 'section',
       title: 'Khác'
     },
     {
-      id: '5',
+      id: '6',
       icon: 'log-out-outline',
       title: 'Đăng xuất',
       subtitle: 'Tạm biệt!',

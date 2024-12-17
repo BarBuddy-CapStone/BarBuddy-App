@@ -5,7 +5,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: "BarBuddy",
     slug: "BarBuddy-App",
-    version: "1.0.1",
+    version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     scheme: "com.fptu.barbuddy",
@@ -17,7 +17,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     ios: {
       bundleIdentifier: "com.fptu.barbuddy",
-      buildNumber: "1.0.1",
+      buildNumber: "1.0.0",
       supportsTablet: false,
       "config": {
         "usesNonExemptEncryption": false

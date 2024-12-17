@@ -1,20 +1,56 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { NotificationContext } from '@/contexts/NotificationContext';
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform, View, Text } from 'react-native';
 import { notificationService } from '@/services/notification';
+import Animated, { 
+  useAnimatedStyle, 
+  withSpring, 
+  withTiming 
+} from 'react-native-reanimated';
+
+// Component cho Icon với animation
+const AnimatedTabBarIcon = ({ 
+  name, 
+  color, 
+  focused 
+}: { 
+  name: 'home' | 'globe' | 'calendar' | 'notifications' | 'person',
+  color: string,
+  focused: boolean 
+}) => {
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          scale: withSpring(focused ? 1.2 : 1, {
+            damping: 10,
+            stiffness: 100
+          })
+        }
+      ]
+    };
+  });
+
+  return (
+    <Animated.View style={animatedStyle}>
+      <Ionicons 
+        name={focused ? name : `${name}-outline`}
+        size={24} 
+        color={color} 
+      />
+    </Animated.View>
+  );
+};
 
 export default function TabLayout() {
   const { notifications } = useContext(NotificationContext);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   useEffect(() => {
-    // Set flag đã navigate đến tabs
     notificationService.setNavigatedToTabs(true);
-    
     return () => {
-      // Reset flag khi unmount
       notificationService.setNavigatedToTabs(false);
     };
   }, []);
@@ -52,11 +88,7 @@ export default function TabLayout() {
         options={{
           title: 'Trang chủ',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'home' : 'home-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <AnimatedTabBarIcon name="home" color={color} focused={focused} />
           ),
         }}
       />
@@ -65,11 +97,7 @@ export default function TabLayout() {
         options={{
           title: 'Quán Bar',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'globe' : 'globe-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <AnimatedTabBarIcon name="globe" color={color} focused={focused} />
           ),
         }}
       />
@@ -78,11 +106,7 @@ export default function TabLayout() {
         options={{
           title: 'Lịch sử',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'calendar' : 'calendar-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <AnimatedTabBarIcon name="calendar" color={color} focused={focused} />
           ),
         }}
       />
@@ -92,11 +116,7 @@ export default function TabLayout() {
           title: 'Thông báo',
           tabBarIcon: ({ color, focused }) => (
             <View>
-              <Ionicons 
-                name={focused ? 'notifications' : 'notifications-outline'} 
-                size={24} 
-                color={color} 
-              />
+              <AnimatedTabBarIcon name="notifications" color={color} focused={focused} />
               {unreadCount > 0 && (
                 <View className="absolute -right-2 -top-1 bg-red-500 rounded-full min-w-[16px] h-4 items-center justify-center px-1">
                   <Text className="text-white text-xs font-bold">
@@ -113,11 +133,7 @@ export default function TabLayout() {
         options={{
           title: 'Hồ sơ',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons 
-              name={focused ? 'person' : 'person-outline'} 
-              size={24} 
-              color={color} 
-            />
+            <AnimatedTabBarIcon name="person" color={color} focused={focused} />
           ),
         }}
       />

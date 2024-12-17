@@ -46,19 +46,19 @@ const BANNERS: Banner[] = [
     id: 1,
     image: 'https://cdn-kvweb.kiotviet.vn/kiotviet-website/wp-content/uploads/2019/09/kinh-doanh-qu%C3%A1n-bar.jpg',
     title: 'Nhận ưu đãi khi đặt trước',
-    description: 'Chiết khấu cho khách hàng đặt trước thức uống tại quán'
+    description: 'Ưu đãi đặc biệt cho khách hàng đặt bàn kèm thức uống tại quán.'
   },
   {
     id: 2, 
     image: 'https://cdn.pastaxi-manager.onepas.vn/content/uploads/articles/nguyendoan/anh-blog/20-beer-club-soi-dong-hcm/top-20-beer-club-noi-tieng-soi-dong-nhat-o-tphcm-14.jpg',
     title: 'Đa dạng concept',
-    description: 'Mỗi quán bar sẽ có những concept khác nhau'
+    description: 'Nhiều quán bar với nhiều concept riêng biệt nhằm đa dạng hóa không gian và trải nghiệm cho khách hàng.'
   },
   {
     id: 3,
     image: 'https://i0.wp.com/utahagenda.com/wp-content/uploads/2022/08/e7e10-live-music-venue-utah-1038.jpg?resize=1038%2C576&ssl=1', 
-    title: 'Sự kiện âm nhạc mỗi cuối tuần',
-    description: 'Live cùng các band nhạc mỗi tối Thứ 7 và Chủ nhật'
+    title: 'Đa dạng sự kiện',
+    description: 'Nhiều sự kiện đa dạng nhằm đa dạng hóa trải nghiệm cho khách hàng.'
   }
 ];
 

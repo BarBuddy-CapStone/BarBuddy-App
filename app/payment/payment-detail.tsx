@@ -28,17 +28,59 @@ import { voucherService, VoucherResponse } from "@/services/voucher";
 import axios from "axios";
 import { useFocusEffect } from "@react-navigation/native";
 
-const LoadingPopup = ({ visible }: { visible: boolean }) => (
+const LoadingPopup = ({ 
+  visible, 
+  status = 'loading',
+  errorMessage = '',
+  successMessage = ''
+}: { 
+  visible: boolean;
+  status?: 'loading' | 'success' | 'error';
+  errorMessage?: string;
+  successMessage?: string;
+}) => (
   <Modal transparent visible={visible}>
     <View className="flex-1 bg-black/50 items-center justify-center">
-      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4">
-        <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
-        <Text className="text-white text-center font-medium">
-          Đang xử lý thanh toán...
-        </Text>
-        <Text className="text-white/60 text-center text-sm mt-2">
-          Vui lòng không tắt ứng dụng
-        </Text>
+      <View className="bg-neutral-900 rounded-2xl p-6 items-center mx-4 w-[60%] max-w-[300px]">
+        {status === 'loading' && (
+          <>
+            <ActivityIndicator size="large" color="#EAB308" className="mb-4" />
+            <Text className="text-white text-center font-medium">
+              Đang xử lý thanh toán...
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Vui lòng không tắt ứng dụng
+            </Text>
+          </>
+        )}
+
+        {status === 'success' && (
+          <>
+            <View className="mb-4 bg-green-500/20 p-3 rounded-full">
+              <Ionicons name="checkmark-circle" size={32} color="#22C55E" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              {successMessage || 'Đặt bàn thành công!'}
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              Yêu cầu của bạn đã được xử lý
+            </Text>
+          </>
+        )}
+
+        {status === 'error' && (
+          <>
+            <View className="mb-4 bg-red-500/20 p-3 rounded-full">
+              <Ionicons name="close-circle" size={32} color="#EF4444" />
+            </View>
+            <Text className="text-white text-center font-medium">
+              Đặt bàn thất bại
+            </Text>
+            <Text className="text-white/60 text-center text-sm mt-2">
+              {errorMessage || 'Vui lòng thử lại sau'}
+            </Text>
+          </>
+        )}
       </View>
     </View>
   </Modal>
@@ -73,6 +115,8 @@ export default function PaymentDetailScreen() {
     null
   );
   const [currentTotalPrice, setCurrentTotalPrice] = useState(totalPrice);
+  const [bookingStatus, setBookingStatus] = useState<'loading' | 'success' | 'error'>('loading');
+  const [bookingError, setBookingError] = useState('');
 
   useEffect(() => {
     loadDrinks();
@@ -111,6 +155,8 @@ export default function PaymentDetailScreen() {
       setIsProcessing(true);
       setShowLoadingPopup(true);
       setShowConfirmModal(false);
+      setBookingStatus('loading');
+      setBookingError('');
 
       // Lưu booking data vào storage
       const bookingData = {
@@ -148,13 +194,16 @@ export default function PaymentDetailScreen() {
       }
     } catch (error: any) {
       console.error("Booking Error:", error);
-      router.replace({
-        pathname: "/payment/error/0" as any,
-        params: { fromPayment: "true" },
-      });
+      // Thay vì redirect, hiển thị lỗi trên popup
+      setBookingStatus('error');
+      setBookingError(error instanceof Error ? error.message : 'Có lỗi xảy ra khi đặt bàn. Vui lòng thử lại.');
+      
+      // Tự động ẩn popup lỗi sau 2 giây
+      setTimeout(() => {
+        setShowLoadingPopup(false);
+      }, 2000);
     } finally {
       setIsProcessing(false);
-      setShowLoadingPopup(false);
     }
   };
 
@@ -788,7 +837,7 @@ export default function PaymentDetailScreen() {
                   </View>
                 </View>
 
-                {/* Thông tin đ�� uống */}
+                {/* Thông tin đồ uống */}
                 <View className="bg-white/5 rounded-xl p-4 mb-4">
                   <Text className="text-white/80 font-medium mb-3">
                     Đồ uống đã chọn
@@ -858,7 +907,7 @@ export default function PaymentDetailScreen() {
                       )}
                     </View>
 
-                    {/* Phần Voucher nếu có */}
+                    {/* Phần Voucher n��u có */}
                     {appliedVoucher && (
                       <View className="border-t border-white/10 mt-3">
                         <View className="space-y-3 pt-3">
@@ -963,7 +1012,12 @@ export default function PaymentDetailScreen() {
         </View>
       </Modal>
 
-      <LoadingPopup visible={showLoadingPopup} />
+      <LoadingPopup 
+        visible={showLoadingPopup}
+        status={bookingStatus}
+        errorMessage={bookingError}
+        successMessage="Đặt bàn thành công!"
+      />
     </View>
   );
 }

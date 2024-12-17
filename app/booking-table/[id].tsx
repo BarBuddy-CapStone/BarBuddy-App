@@ -1614,18 +1614,11 @@ export default function BookingTableScreen() {
                           className="bg-white/5 rounded-xl mt-4 overflow-hidden"
                         >
                           {/* Header */}
-                          <View className="bg-white/10 px-4 py-3 flex-row items-center justify-between">
-                            <View className="flex-row items-center">
-                              <MaterialCommunityIcons name="table-furniture" size={20} color="#EAB308" />
-                              <Text className="text-white font-medium ml-2">
-                                {currentTableType.name}
-                              </Text>
-                            </View>
-                            <View className="bg-yellow-500/20 px-2 py-1 rounded">
-                              <Text className="text-yellow-500 text-xs font-medium">
-                                Tối thiểu {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.minimumPrice?.toLocaleString('vi-VN')}đ
-                              </Text>
-                            </View>
+                          <View className="bg-white/10 px-4 py-3 flex-row items-center">
+                            <MaterialCommunityIcons name="table-furniture" size={20} color="#EAB308" />
+                            <Text className="text-white font-medium ml-2">
+                              {currentTableType.name}
+                            </Text>
                           </View>
 
                           {/* Nội dung */}
@@ -1662,17 +1655,6 @@ export default function BookingTableScreen() {
                                     {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.maximumGuest || 0} khách hàng
                                   </Text>
                                 </View>
-                              </View>
-                            </View>
-
-                            {/* Lưu ý về giá tối thiểu */}
-                            <View className="bg-yellow-500/10 rounded-lg p-3">
-                              <View className="flex-row items-start">
-                                <Ionicons name="information-circle" size={18} color="#EAB308" />
-                                <Text className="text-yellow-500/80 text-sm ml-2 flex-1">
-                                  Đây là loại bàn có giá tiêu thụ tối thiểu {tableTypes.find(t => t.tableTypeId === currentTableType.id)?.minimumPrice?.toLocaleString('vi-VN')}đ. 
-                                  Quý khách vui lòng đặt thức uống đạt mức tối thiểu này.
-                                </Text>
                               </View>
                             </View>
                           </View>
@@ -2146,7 +2128,7 @@ export default function BookingTableScreen() {
                       </Text>
                     </View>
 
-                    <View className="flex-row items-center mb-3">
+                    <View className="flex-row items-center">
                       <Ionicons name="people-outline" size={20} color="#ffffff" />
                       <Text className="text-white ml-2">
                         {numOfPeople} khách hàng
